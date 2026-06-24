@@ -2,6 +2,7 @@ const express = require('express');
 const axios = require('axios');
 const path = require('path');
 const cors = require('cors');
+const mongoose = require('mongoose');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -11,6 +12,52 @@ const SHOP_ID = "18488";
 const API_KEY = "V9JN25IFH5hdZYc1k8NNRVgnLYXyQLzc";
 const POSTONE_URL = "https://postone.thailandpost.com/api/bc.php";
 
+// ==============================
+//  MongoDB Connection
+// ==============================
+const MONGODB_URI = process.env.MONGODB_URI;
+
+let isDbConnected = false;
+
+if (MONGODB_URI) {
+    mongoose.connect(MONGODB_URI, {
+        serverSelectionTimeoutMS: 5000,
+        socketTimeoutMS: 45000,
+    })
+    .then(() => {
+        console.log('✅ MongoDB Atlas connected successfully!');
+        isDbConnected = true;
+    })
+    .catch((err) => {
+        console.error('❌ MongoDB connection error:', err.message);
+    });
+
+    mongoose.connection.on('connected', () => { isDbConnected = true; });
+    mongoose.connection.on('disconnected', () => { isDbConnected = false; });
+} else {
+    console.warn('⚠️ MONGODB_URI not set. Database logging is disabled.');
+}
+
+// ==============================
+//  MongoDB Schema & Model
+// ==============================
+const barcodeLogSchema = new mongoose.Schema({
+    requestedAt: { type: Date, default: Date.now },
+    serviceType: { type: String }, // typ parameter
+    requestedCount: { type: Number }, // cnt parameter
+    status: { type: String }, // SUCCESS / ERROR
+    prefix: { type: String },
+    begin: { type: Number },
+    end: { type: Number },
+    barcodes: [{ type: String }], // เก็บเฉพาะ string ของบาร์โค้ด
+    errorMessage: { type: String }
+});
+
+const BarcodeLog = mongoose.model('BarcodeLog', barcodeLogSchema);
+
+// ==============================
+//  Middleware
+// ==============================
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
@@ -49,6 +96,19 @@ function calculateCheckDigit(numStr) {
     return checkDigit;
 }
 
+// ==============================
+//  API: Check DB Status
+// ==============================
+app.get('/api/db-status', (req, res) => {
+    res.json({
+        connected: isDbConnected,
+        hasUri: !!MONGODB_URI
+    });
+});
+
+// ==============================
+//  API: Get Barcodes
+// ==============================
 /**
  * API สำหรับดึงบาร์โค้ด
  * Query parameters:
@@ -99,6 +159,17 @@ app.get('/api/get-barcodes', async (req, res) => {
             data = JSON.parse(cleanedText);
         } catch (parseError) {
             console.error("JSON Parse Error:", parseError, "Original text:", cleanedText);
+
+            // บันทึก error log ลง MongoDB
+            if (isDbConnected) {
+                await BarcodeLog.create({
+                    serviceType: typ,
+                    requestedCount: parseInt(cnt, 10),
+                    status: 'ERROR',
+                    errorMessage: 'JSON Parse Failed: ' + cleanedText.substring(0, 200)
+                }).catch(e => console.error('DB log error:', e));
+            }
+
             return res.status(500).json({
                 status: 'ERROR',
                 message: 'ไม่สามารถแปลงผลลัพธ์จาก API ของไปรษณีย์ไทยได้ (JSON Parsing Failed)'
@@ -130,6 +201,19 @@ app.get('/api/get-barcodes', async (req, res) => {
                 });
             }
 
+            // บันทึก success log ลง MongoDB
+            if (isDbConnected) {
+                await BarcodeLog.create({
+                    serviceType: typ,
+                    requestedCount: parseInt(cnt, 10),
+                    status: 'SUCCESS',
+                    prefix: prefix,
+                    begin: begin,
+                    end: end,
+                    barcodes: barcodes.map(b => b.barcode)
+                }).catch(e => console.error('DB log error:', e));
+            }
+
             return res.json({
                 status: 'SUCCESS',
                 prefix: prefix,
@@ -139,6 +223,16 @@ app.get('/api/get-barcodes', async (req, res) => {
                 barcodes: barcodes
             });
         } else {
+            // บันทึก error log ลง MongoDB
+            if (isDbConnected) {
+                await BarcodeLog.create({
+                    serviceType: typ,
+                    requestedCount: parseInt(cnt, 10),
+                    status: 'ERROR',
+                    errorMessage: `API Response: ${data.STATUS}`
+                }).catch(e => console.error('DB log error:', e));
+            }
+
             return res.status(400).json({
                 status: 'ERROR',
                 message: `API Response: ${data.STATUS}`
@@ -147,10 +241,42 @@ app.get('/api/get-barcodes', async (req, res) => {
 
     } catch (error) {
         console.error("API Error Details:", error.message);
+
+        // บันทึก error log ลง MongoDB
+        if (isDbConnected) {
+            await BarcodeLog.create({
+                serviceType: req.query.typ,
+                requestedCount: parseInt(req.query.cnt, 10),
+                status: 'ERROR',
+                errorMessage: error.message
+            }).catch(e => console.error('DB log error:', e));
+        }
+
         return res.status(500).json({
             status: 'ERROR',
             message: 'เกิดข้อผิดพลาดในการดึงข้อมูลจาก API ของไปรษณีย์ไทย: ' + error.message
         });
+    }
+});
+
+// ==============================
+//  API: Get Logs from DB
+// ==============================
+app.get('/api/logs', async (req, res) => {
+    if (!isDbConnected) {
+        return res.status(503).json({
+            status: 'ERROR',
+            message: 'ไม่ได้เชื่อมต่อฐานข้อมูล'
+        });
+    }
+
+    try {
+        const logs = await BarcodeLog.find()
+            .sort({ requestedAt: -1 })
+            .limit(50);
+        res.json({ status: 'SUCCESS', logs });
+    } catch (err) {
+        res.status(500).json({ status: 'ERROR', message: err.message });
     }
 });
 
