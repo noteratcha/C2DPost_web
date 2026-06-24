@@ -66,10 +66,10 @@ app.get('/api/get-barcodes', async (req, res) => {
             });
         }
 
-        if (parseInt(cnt, 10) > 10000) {
+        if (parseInt(cnt, 10) > 2) {
             return res.status(400).json({
                 status: 'ERROR',
-                message: 'จำนวนบาร์โค้ดที่ดึงได้สูงสุดต้องไม่เกิน 10,000 รายการ'
+                message: 'จำนวนบาร์โค้ดที่ดึงได้สูงสุดต้องไม่เกิน 2 รายการ'
             });
         }
 
