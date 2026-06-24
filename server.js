@@ -13,27 +13,51 @@ const API_KEY = "V9JN25IFH5hdZYc1k8NNRVgnLYXyQLzc";
 const POSTONE_URL = "https://postone.thailandpost.com/api/bc.php";
 
 // ==============================
-//  MongoDB Connection
+//  MongoDB Connection (Serverless-safe)
 // ==============================
 const MONGODB_URI = process.env.MONGODB_URI;
 
-let isDbConnected = false;
+// Global cache for serverless reuse
+let cachedConnection = global._mongooseConnection;
 
-if (MONGODB_URI) {
-    mongoose.connect(MONGODB_URI, {
+async function connectToDatabase() {
+    if (!MONGODB_URI) return false;
+
+    // ถ้าเชื่อมต่ออยู่แล้ว ใช้ connection เดิม
+    if (mongoose.connection.readyState === 1) {
+        return true;
+    }
+
+    // ถ้ามี cached connection รอให้เสร็จ
+    if (cachedConnection) {
+        await cachedConnection;
+        return mongoose.connection.readyState === 1;
+    }
+
+    // สร้าง connection ใหม่
+    cachedConnection = mongoose.connect(MONGODB_URI, {
         serverSelectionTimeoutMS: 5000,
         socketTimeoutMS: 45000,
-    })
-    .then(() => {
-        console.log('✅ MongoDB Atlas connected successfully!');
-        isDbConnected = true;
-    })
-    .catch((err) => {
-        console.error('❌ MongoDB connection error:', err.message);
+        bufferCommands: false,
     });
 
-    mongoose.connection.on('connected', () => { isDbConnected = true; });
-    mongoose.connection.on('disconnected', () => { isDbConnected = false; });
+    global._mongooseConnection = cachedConnection;
+
+    try {
+        await cachedConnection;
+        console.log('✅ MongoDB Atlas connected successfully!');
+        return true;
+    } catch (err) {
+        console.error('❌ MongoDB connection error:', err.message);
+        global._mongooseConnection = null;
+        cachedConnection = null;
+        return false;
+    }
+}
+
+// เริ่มเชื่อมต่อทันทีที่ server start
+if (MONGODB_URI) {
+    connectToDatabase();
 } else {
     console.warn('⚠️ MONGODB_URI not set. Database logging is disabled.');
 }
@@ -99,9 +123,12 @@ function calculateCheckDigit(numStr) {
 // ==============================
 //  API: Check DB Status
 // ==============================
-app.get('/api/db-status', (req, res) => {
+app.get('/api/db-status', async (req, res) => {
+    // ลอง connect ก่อนเช็ค
+    if (MONGODB_URI) await connectToDatabase();
     res.json({
-        connected: isDbConnected,
+        connected: mongoose.connection.readyState === 1,
+        readyState: mongoose.connection.readyState,
         hasUri: !!MONGODB_URI
     });
 });
@@ -161,7 +188,7 @@ app.get('/api/get-barcodes', async (req, res) => {
             console.error("JSON Parse Error:", parseError, "Original text:", cleanedText);
 
             // บันทึก error log ลง MongoDB
-            if (isDbConnected) {
+            if (mongoose.connection.readyState === 1) {
                 await BarcodeLog.create({
                     serviceType: typ,
                     requestedCount: parseInt(cnt, 10),
@@ -202,7 +229,7 @@ app.get('/api/get-barcodes', async (req, res) => {
             }
 
             // บันทึก success log ลง MongoDB
-            if (isDbConnected) {
+            if (mongoose.connection.readyState === 1) {
                 await BarcodeLog.create({
                     serviceType: typ,
                     requestedCount: parseInt(cnt, 10),
@@ -224,7 +251,7 @@ app.get('/api/get-barcodes', async (req, res) => {
             });
         } else {
             // บันทึก error log ลง MongoDB
-            if (isDbConnected) {
+            if (mongoose.connection.readyState === 1) {
                 await BarcodeLog.create({
                     serviceType: typ,
                     requestedCount: parseInt(cnt, 10),
@@ -243,7 +270,7 @@ app.get('/api/get-barcodes', async (req, res) => {
         console.error("API Error Details:", error.message);
 
         // บันทึก error log ลง MongoDB
-        if (isDbConnected) {
+        if (mongoose.connection.readyState === 1) {
             await BarcodeLog.create({
                 serviceType: req.query.typ,
                 requestedCount: parseInt(req.query.cnt, 10),
@@ -263,7 +290,8 @@ app.get('/api/get-barcodes', async (req, res) => {
 //  API: Get Logs from DB
 // ==============================
 app.get('/api/logs', async (req, res) => {
-    if (!isDbConnected) {
+    const connected = await connectToDatabase();
+    if (!connected) {
         return res.status(503).json({
             status: 'ERROR',
             message: 'ไม่ได้เชื่อมต่อฐานข้อมูล'
