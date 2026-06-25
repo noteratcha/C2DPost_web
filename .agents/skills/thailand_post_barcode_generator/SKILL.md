@@ -25,5 +25,9 @@ description: Handles Thailand Post (Post One) barcode generation, Modulus 11 che
 *   **การต่อรหัส 13 หลัก:** `[PRE 2 ตัวแรก][Serial 8 หลัก][Check Digit][PRE 2 ตัวท้าย]` (เช่น EATH -> EAxxxxxxXTH)
 
 ## 3. Deployment Constraints (ข้อจำกัดสำคัญ)
-*   **IP Blocking (403 Forbidden):** API ของไปรษณีย์ไทยจะบล็อกทราฟฟิกจากผู้ให้บริการ Cloud ต่างประเทศ (เช่น Vercel, AWS, Google Cloud)
-*   **การแก้ไข:** ต้องรันแอปพลิเคชันบน **โฮสติ้งที่ตั้งอยู่ในประเทศไทย** (เช่น Shared Hosting ไทย หรือ VPS ไทย) หรือรันผ่านเครื่องภายในหน่วยงานเท่านั้น
+*   **IP Blocking (403 Forbidden):** API ของไปรษณีย์ไทยจะบล็อกทราฟฟิกจากผู้ให้บริการ Cloud ต่างประเทศ (เช่น Vercel, Fly.io, AWS, Google Cloud) การนำไปรันบนระบบเหล่านี้โดยตรงจะถูกปฏิเสธการเชื่อมต่อเสมอ
+*   **การแก้ไข (ทางเลือกที่ 1):** นำแอปพลิเคชันไปรันบน **โฮสติ้งที่ตั้งอยู่ในประเทศไทย** (เช่น Shared Hosting ไทย, VPS ไทย) หรือรันบนเซิร์ฟเวอร์ภายในองค์กร หรือใช้ Ngrok/Cloudflare Tunnels
+*   **การแก้ไข (ทางเลือกที่ 2):** หากจำเป็นต้องใช้ Cloud ต่างประเทศ ต้องเพิ่มระบบ **Forward Proxy** เข้าไปใน Axios config และรันผ่าน Proxy Server ที่ตั้งอยู่ในประเทศไทย (รองรับค่าผ่าน Environment Variables: `PROXY_HOST`, `PROXY_PORT`)
+
+## 4. Best Practices
+*   **Dynamic Versioning:** ควรมีการสร้างเวอร์ชันโดยอัตโนมัติตอน Start Server (เช่นรูปแบบ `YYYY.MMDD.HHmm`) เพื่อให้ตรวจสอบผ่าน API `/api/version` ได้ง่ายขึ้นว่าเซิร์ฟเวอร์รันด้วยโค้ดชุดล่าสุดหรือไม่
