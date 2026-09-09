@@ -1,10 +1,14 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import './FileListModal.css';
 
 export default function FileListModal({ isOpen, onClose, files = [] }) {
   const [searchQuery, setSearchQuery] = useState('');
 
-  if (!isOpen) return null;
+  useEffect(() => {
+    if (!isOpen) {
+      setSearchQuery('');
+    }
+  }, [isOpen]);
 
   // Format file size helper
   const formatFileSize = (bytes) => {
@@ -28,6 +32,8 @@ export default function FileListModal({ isOpen, onClose, files = [] }) {
       return name.toLowerCase().includes(q);
     });
   }, [files, searchQuery]);
+
+  if (!isOpen) return null;
 
   return (
     <div className="custom-modal-overlay file-list-overlay" onClick={onClose}>
