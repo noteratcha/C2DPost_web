@@ -55,6 +55,20 @@
   border-color: #059669;
 }
 
+.file-stat-failed-pill {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+  padding: 1px 6px;
+  background: #ef4444;
+  color: #ffffff;
+  border-radius: 10px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  box-shadow: 0 1px 4px rgba(239, 68, 68, 0.4);
+  line-height: 1.2;
+}
+
 .btn-clear-pill {
   height: 30px;
   padding: 0 16px;

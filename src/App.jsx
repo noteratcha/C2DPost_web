@@ -42,8 +42,28 @@ export default function App() {
 
   // App Main State
   const [selectedFiles, setSelectedFiles] = useState(() => {
-    if (isDemo) return ['SVARADMServlert(ที่ดินเรณูนคร).pdf'];
+    if (isDemo) return [
+      'SVARADMServlert(ที่ดินเรณูนคร).pdf',
+      'ตัวอย่างเอกสาร_ที่สแกนไม่ชัด(ล้มเหลว).pdf'
+    ];
     return [];
+  });
+  const [fileStatuses, setFileStatuses] = useState(() => {
+    if (isDemo) {
+      return {
+        'SVARADMServlert(ที่ดินเรณูนคร).pdf': {
+          status: 'success',
+          recordCount: 3,
+          message: 'แปลงข้อมูลสำเร็จ (3 รายการ)'
+        },
+        'ตัวอย่างเอกสาร_ที่สแกนไม่ชัด(ล้มเหลว).pdf': {
+          status: 'error',
+          error: 'ไม่พบตารางข้อมูลในไฟล์ PDF หรือข้อความในเอกสารถูกเข้ารหัส',
+          recordCount: 0
+        }
+      };
+    }
+    return {};
   });
   const [records, setRecords] = useState(() => {
     if (isDemo) {
@@ -227,7 +247,36 @@ export default function App() {
           NO: i + 1
         }));
 
+        // Map status for each newly uploaded file
+        const newStatusMap = { ...fileStatuses };
+        newFiles.forEach((f) => {
+          const name = f.name;
+          const errObj = (result.error_files || []).find((ef) => ef.filename === name);
+          const count = formattedNewRecords.filter((r) => r.SOURCE_FILE === name).length;
+
+          if (errObj) {
+            newStatusMap[name] = {
+              status: 'error',
+              error: errObj.error || 'เกิดข้อผิดพลาดในการประมวลผล',
+              recordCount: 0
+            };
+          } else if (count > 0) {
+            newStatusMap[name] = {
+              status: 'success',
+              recordCount: count,
+              message: `แปลงข้อมูลสำเร็จ (${count} รายการ)`
+            };
+          } else {
+            newStatusMap[name] = {
+              status: 'error',
+              error: 'ไม่พบรายการข้อมูลในไฟล์ หรือรูปแบบไม่ตรงกับมาตรฐาน',
+              recordCount: 0
+            };
+          }
+        });
+
         setSelectedFiles(updatedFiles);
+        setFileStatuses(newStatusMap);
         setRecords(sequencedRecords);
         setProgress(null);
         setStatusText(`ประมวลผลเสร็จสิ้น รวมทั้งหมด ${sequencedRecords.length} รายการ`);
@@ -538,6 +587,7 @@ export default function App() {
       }
     }
     setSelectedFiles([]);
+    setFileStatuses({});
     setRecords([]);
     setStatusText('ยังไม่ได้เลือกไฟล์');
     setProgress(null);
@@ -624,6 +674,7 @@ export default function App() {
             <PreviewGrid 
               records={records} 
               selectedFiles={selectedFiles}
+              fileStatuses={fileStatuses}
               onUpdateRecord={handleUpdateRecord} 
               onDeleteRecord={handleDeleteRecord} 
               onClearAll={handleClearAll}

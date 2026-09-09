@@ -5,6 +5,7 @@ import './PreviewGrid.css';
 export default function PreviewGrid({
   records = [],
   selectedFiles = [],
+  fileStatuses = {},
   onUpdateRecord,
   onDeleteRecord,
   onClearAll,
@@ -12,6 +13,19 @@ export default function PreviewGrid({
 }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [showFileListModal, setShowFileListModal] = useState(false);
+
+  // Count failed files if any
+  const failedFileCount = useMemo(() => {
+    return selectedFiles.filter(f => {
+      const name = typeof f === 'string' ? f : (f.name || '');
+      const explicit = fileStatuses[name];
+      if (explicit) return explicit.status === 'error';
+      if (records.length > 0) {
+        return !records.some(r => (r.SOURCE_FILE || r.source_file || '') === name);
+      }
+      return false;
+    }).length;
+  }, [selectedFiles, fileStatuses, records]);
 
   // Filter records based on search query
   const filteredRecords = useMemo(() => {
@@ -97,9 +111,14 @@ export default function PreviewGrid({
           <div 
             className="stat-label-item clickable-files-stat"
             onClick={() => setShowFileListModal(true)}
-            title="คลิกเพื่อดูไฟล์ PDF ที่เลือก"
+            title="คลิกเพื่อดูไฟล์ PDF ที่เลือก และสถานะการแปลงข้อมูล"
           >
-            ไฟล์ PDF: {selectedFiles.length} ไฟล์
+            <span>ไฟล์ PDF: {selectedFiles.length} ไฟล์</span>
+            {failedFileCount > 0 && (
+              <span className="file-stat-failed-pill" title={`พบไฟล์ที่ไม่สำเร็จ ${failedFileCount} ไฟล์`}>
+                ✕ {failedFileCount}
+              </span>
+            )}
           </div>
 
           {/* Receiver Count */}
@@ -311,6 +330,8 @@ export default function PreviewGrid({
         isOpen={showFileListModal}
         onClose={() => setShowFileListModal(false)}
         files={selectedFiles}
+        fileStatuses={fileStatuses}
+        records={records}
       />
     </section>
   );
