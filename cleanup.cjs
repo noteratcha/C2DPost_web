@@ -41,6 +41,24 @@ function clean() {
             console.error('Failed to delete temp_assets:', err.message);
         }
     }
+
+    // Clean Google Drive desktop.ini in public and dist directories
+    const publicDesktopIni = path.join(dir, 'public', 'desktop.ini');
+    if (fs.existsSync(publicDesktopIni)) {
+        try {
+            fs.unlinkSync(publicDesktopIni);
+            console.log('Deleted: public/desktop.ini');
+            deletedCount++;
+        } catch (err) {}
+    }
+    const distDesktopIni = path.join(dir, 'dist', 'desktop.ini');
+    if (fs.existsSync(distDesktopIni)) {
+        try {
+            fs.unlinkSync(distDesktopIni);
+            console.log('Deleted: dist/desktop.ini');
+            deletedCount++;
+        } catch (err) {}
+    }
     
     if (deletedCount === 0) {
         console.log('No temporary files found to clean.');

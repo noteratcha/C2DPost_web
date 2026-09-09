@@ -635,7 +635,7 @@ export default function App() {
 
       <footer className="main-footer">
         <div className="footer-container">
-          <span>C2DPost Web Edition v2026.0909.1616 — ส่วน ทข.ปข.10</span>
+          <span>C2DPost Web Edition v2026.0909.2008 — ส่วน ทข.ปข.10</span>
           <span>เชื่อมต่อ API ไปรษณีย์ไทย (PostOne & e-Parcel) ผ่าน C2DPost Helper Extension</span>
         </div>
       </footer>
