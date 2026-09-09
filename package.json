@@ -1,7 +1,7 @@
 {
   "name": "c2dpost-web",
   "private": true,
-  "version": "2026.0909.2206",
+  "version": "2026.0909.2209",
   "type": "module",
   "scripts": {
     "clean": "node cleanup.cjs",
