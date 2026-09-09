@@ -49,12 +49,6 @@ export default function LoginModal({ onLogin, people = [], loading = false, erro
     <div className="login-modal-overlay">
       <div className="login-wrapper">
         <div className="login-modal-card">
-          {/* Status dots like Python app in top-right */}
-          <div className="login-status-dots" title="สถานะการเชื่อมต่อ API">
-            <span className="dot dot-active" title="API : Gen barcode (พร้อมใช้งาน)">●</span>
-            <span className="dot dot-active" title="API : Preload e-Parcel (พร้อมใช้งาน)">●</span>
-          </div>
-
           <div className="login-brand">
             <img src="/logo.png" alt="C2DPost Logo" className="login-logo-img" />
             <h2 className="login-title-green">C2DPost Login</h2>
