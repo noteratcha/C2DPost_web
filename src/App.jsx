@@ -47,6 +47,7 @@ export default function App() {
     const saved = typeof window !== 'undefined' ? localStorage.getItem(STORAGE_USER_KEY) || '' : '';
     return saved.toLowerCase() === 'admin' ? 'admin' : 'workspace';
   });
+  const [adminServices, setAdminServices] = useState(null);
   const [people, setPeople] = useState([]);
   const [loadingSheet, setLoadingSheet] = useState(true);
   const [sheetError, setSheetError] = useState(false);
@@ -675,6 +676,7 @@ export default function App() {
         isAdmin={isAdmin}
         adminActiveView={adminActiveView}
         onToggleAdminView={() => setAdminActiveView(prev => prev === 'admin' ? 'workspace' : 'admin')}
+        adminServices={adminServices}
       />
 
       {/* 3. Dedicated Login Screen (Shown when NOT logged in) */}
@@ -699,6 +701,7 @@ export default function App() {
             onRefreshPeople={loadPeople}
             onLogout={handleLogout}
             onSwitchToWorkspace={() => setAdminActiveView('workspace')}
+            onServicesChange={setAdminServices}
           />
         ) : (
           <main className="main-content python-layout-main">

@@ -8,7 +8,8 @@ export default function AdminManagementView({
   loadingPeople = false,
   onRefreshPeople,
   onLogout,
-  onSwitchToWorkspace
+  onSwitchToWorkspace,
+  onServicesChange
 }) {
   // Service API health state
   const [services, setServices] = useState({
@@ -74,6 +75,11 @@ export default function AdminManagementView({
     const interval = setInterval(checkApiServices, 60000); // Poll health every 60s
     return () => clearInterval(interval);
   }, [checkApiServices]);
+
+  // Lift services state up to parent (Navbar)
+  useEffect(() => {
+    if (onServicesChange) onServicesChange(services);
+  }, [services, onServicesChange]);
 
   // Form Change Handler
   const handleInputChange = (field, value) => {
@@ -251,29 +257,6 @@ export default function AdminManagementView({
               ศูนย์กลางการจัดการบัญชีผู้ใช้งาน สิทธิ์ DOL และตั้งค่าบาร์โค้ดไปรษณีย์ไทย
             </p>
           </div>
-        </div>
-
-        {/* API Health & Navigation Controls */}
-        <div className="admin-bar-right">
-          {/* Service API Indicators */}
-          <div className="api-health-indicators">
-            <div className={`health-item ${services.postone?.online ? 'online' : 'offline'}`} title="API PostOne (Gen Barcode)">
-              <span className="health-dot"></span>
-              <span className="health-label">Gen Barcode</span>
-              {services.postone?.latency && (
-                <span className="health-latency">{services.postone.latency}s</span>
-              )}
-            </div>
-
-            <div className={`health-item ${services.eparcel?.online ? 'online' : 'offline'}`} title="API Preload e-Parcel">
-              <span className="health-dot"></span>
-              <span className="health-label">e-Parcel</span>
-              {services.eparcel?.latency && (
-                <span className="health-latency">{services.eparcel.latency}s</span>
-              )}
-            </div>
-          </div>
-
         </div>
       </header>
 

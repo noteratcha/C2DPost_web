@@ -11,7 +11,8 @@ export default function Navbar({
   onToggleTheme,
   isAdmin = false,
   adminActiveView = 'workspace',
-  onToggleAdminView
+  onToggleAdminView,
+  adminServices = null
 }) {
   const [showAboutModal, setShowAboutModal] = useState(false);
   const [isNavMenuOpen, setIsNavMenuOpen] = useState(false);
@@ -107,6 +108,32 @@ export default function Navbar({
 
           {/* Right Action Buttons */}
           <div className="navbar-right">
+            {/* API Health Badges — shown in Navbar when Admin view is active */}
+            {isAdmin && adminActiveView === 'admin' && adminServices && (
+              <div className="navbar-api-health">
+                <div
+                  className={`navbar-health-item ${adminServices.postone?.online ? 'online' : 'offline'}`}
+                  title="API PostOne Gen Barcode"
+                >
+                  <span className="navbar-health-dot"></span>
+                  <span className="navbar-health-label">Gen Barcode</span>
+                  {adminServices.postone?.latency > 0 && (
+                    <span className="navbar-health-latency">{adminServices.postone.latency}s</span>
+                  )}
+                </div>
+                <div
+                  className={`navbar-health-item ${adminServices.eparcel?.online ? 'online' : 'offline'}`}
+                  title="API Preload e-Parcel"
+                >
+                  <span className="navbar-health-dot"></span>
+                  <span className="navbar-health-label">e-Parcel</span>
+                  {adminServices.eparcel?.latency > 0 && (
+                    <span className="navbar-health-latency">{adminServices.eparcel.latency}s</span>
+                  )}
+                </div>
+              </div>
+            )}
+
             {user && (
               <>
                 <div className="user-profile-badge" title={`ผู้ใช้งาน: ${user}`}>
