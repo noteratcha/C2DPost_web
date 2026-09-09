@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>C2DPost Helper</title>
+  <style>
+    body {
+      width: 280px;
+      font-family: 'Segoe UI', Tahoma, sans-serif;
+      margin: 0;
+      padding: 16px;
+      background: #0f172a;
+      color: #f8fafc;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid #334155;
+    }
+    .logo-badge {
+      width: 32px;
+      height: 32px;
+      background: #059669;
+      color: white;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 16px;
+    }
+    .title {
+      font-size: 14px;
+      font-weight: bold;
+      color: #f8fafc;
+    }
+    .subtitle {
+      font-size: 11px;
+      color: #94a3b8;
+    }
+    .status-card {
+      background: #1e293b;
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 12px;
+      border: 1px solid #334155;
+    }
+    .status-indicator {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      color: #34d399;
+    }
+    .dot {
+      width: 10px;
+      height: 10px;
+      background: #10b981;
+      border-radius: 50%;
+      box-shadow: 0 0 8px #10b981;
+    }
+    .status-desc {
+      font-size: 11px;
+      color: #94a3b8;
+      margin-top: 6px;
+      line-height: 1.4;
+    }
+    .btn {
+      width: 100%;
+      padding: 8px 12px;
+      background: #059669;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+      box-sizing: border-box;
+      text-align: center;
+      text-decoration: none;
+      display: block;
+    }
+    .btn:hover {
+      background: #047857;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="logo-badge">C2</div>
+    <div>
+      <div class="title">C2DPost Helper</div>
+      <div class="subtitle">v1.0.0 (Thailand Post Bridge)</div>
+    </div>
+  </div>
+
+  <div class="status-card">
+    <div class="status-indicator">
+      <div class="dot"></div>
+      <span>พร้อมเชื่อมต่อระบบ</span>
+    </div>
+    <div class="status-desc">
+      พร้อมส่งต่อคำขอดึงบาร์โค้ดไปยัง PostOne ไปรษณีย์ไทยด้วย IP ประเทศไทยของคุณ
+    </div>
+  </div>
+
+  <a href="https://c2dpost-web.vercel.app" target="_blank" class="btn" id="openWebBtn">เปิดระบบ C2DPost Web</a>
+
+  <script src="popup.js"></script>
+</body>
+</html>

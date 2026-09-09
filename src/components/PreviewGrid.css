@@ -1,0 +1,396 @@
+.card-preview-table {
+  background: var(--bg-card, #ffffff);
+  border: 1px solid var(--border-color, #cbd5e1);
+  border-radius: 10px;
+  padding: 16px 20px 20px 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  min-height: 400px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Header Bar */
+.preview-header-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.preview-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #059669;
+}
+
+.preview-header-right {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.stat-label-item {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-muted, #475569);
+  white-space: nowrap;
+}
+
+.clickable-files-stat {
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: var(--bg-hover, #f1f5f9);
+  border: 1px solid var(--border-color, #e2e8f0);
+  transition: all 0.15s ease;
+}
+
+.clickable-files-stat:hover {
+  background: #059669;
+  color: #ffffff;
+  border-color: #059669;
+}
+
+.btn-clear-pill {
+  height: 30px;
+  padding: 0 16px;
+  background-color: #ef4444;
+  color: #ffffff;
+  border: none;
+  border-radius: 15px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.btn-clear-pill:not(:disabled):hover {
+  background-color: #dc2626;
+  transform: translateY(-1px);
+}
+
+.btn-clear-pill:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.search-box-pill {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.search-box-pill input {
+  width: 250px;
+  height: 30px;
+  padding: 0 28px 0 12px;
+  border-radius: 15px;
+  border: 1px solid var(--border-color, #cbd5e1);
+  background: var(--bg-input, #ffffff);
+  color: var(--text-main, #0f172a);
+  font-size: 0.82rem;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.search-box-pill input:focus {
+  border-color: #059669;
+  box-shadow: 0 0 0 2px rgba(5, 150, 105, 0.15);
+}
+
+.btn-clear-search-pill {
+  position: absolute;
+  right: 8px;
+  background: none;
+  border: none;
+  color: var(--text-muted, #94a3b8);
+  font-size: 1rem;
+  cursor: pointer;
+  line-height: 1;
+}
+
+/* Table Wrapper */
+.table-wrapper {
+  flex: 1;
+  overflow-x: auto;
+  border: 1px solid var(--border-color, #cbd5e1);
+  border-radius: 8px;
+  background: var(--bg-card, #ffffff);
+}
+
+.python-parity-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.86rem;
+  text-align: center;
+}
+
+.python-parity-table th {
+  background-color: #e2e8f0;
+  color: #0f172a;
+  font-weight: 700;
+  padding: 8px 10px;
+  border-bottom: 1px solid #cbd5e1;
+  border-right: 1px solid #cbd5e1;
+  white-space: nowrap;
+  user-select: none;
+}
+
+[data-theme="dark"] .python-parity-table th {
+  background-color: #1e293b;
+  color: #f8fafc;
+  border-color: #334155;
+}
+
+.python-parity-table td {
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border-color, #f1f5f9);
+  border-right: 1px solid var(--border-color, #f1f5f9);
+  color: var(--text-main, #334155);
+  vertical-align: middle;
+  transition: color 0.1s ease;
+}
+
+.python-parity-table tr.even-row td {
+  background-color: var(--bg-row-even, #f8fafc);
+}
+
+.python-parity-table tr.odd-row td {
+  background-color: var(--bg-card, #ffffff);
+}
+
+.python-parity-table tr:hover td {
+  color: #ea580c;
+}
+
+.python-parity-table tr.selected-row td {
+  background-color: #dcfce7 !important;
+  color: #166534;
+  font-weight: 600;
+}
+
+[data-theme="dark"] .python-parity-table tr.selected-row td {
+  background-color: rgba(5, 150, 105, 0.22) !important;
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .python-parity-table tr.selected-row td.col-receiver,
+[data-theme="dark"] .python-parity-table tr.selected-row td.col-ref {
+  color: #ffffff;
+}
+
+/* Tools Column */
+.col-tools {
+  width: 90px;
+}
+
+.tools-icons-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.btn-tool-icon {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #94a3b8;
+  transition: all 0.15s ease;
+}
+
+.btn-tool-delete:not(:disabled):hover {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+  transform: scale(1.1);
+}
+
+.btn-tool-delete:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.btn-tool-view:hover {
+  color: #3b82f6;
+  background: rgba(59, 130, 246, 0.1);
+  transform: scale(1.1);
+}
+
+/* Checkbox Column */
+.th-select,
+.col-checkbox {
+  width: 58px !important;
+  min-width: 58px !important;
+  max-width: 58px !important;
+  padding: 6px 2px !important;
+  text-align: center !important;
+  white-space: nowrap !important;
+  cursor: pointer;
+  user-select: none;
+  vertical-align: middle;
+}
+
+.chk-box-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 24px;
+  border-radius: 4px;
+  user-select: none;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.88rem;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap !important;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  background: rgba(148, 163, 184, 0.08);
+  color: #94a3b8;
+  transition: all 0.15s ease;
+  box-sizing: border-box;
+}
+
+.chk-box-badge .chk-bracket {
+  color: #64748b;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.chk-box-badge .chk-mark {
+  display: inline-block;
+  width: 14px;
+  text-align: center;
+  font-weight: 800;
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+.chk-box-badge.checked {
+  border-color: rgba(5, 150, 105, 0.4);
+  background: rgba(5, 150, 105, 0.1);
+  color: #059669;
+}
+
+.chk-box-badge.checked .chk-bracket {
+  color: #059669;
+}
+
+.chk-box-badge.checked .chk-mark {
+  color: #059669;
+}
+
+.col-checkbox:hover .chk-box-badge,
+.th-select:hover .chk-box-badge {
+  border-color: #059669;
+  background: rgba(5, 150, 105, 0.16);
+  color: #059669;
+}
+
+[data-theme="dark"] .chk-box-badge {
+  border-color: rgba(148, 163, 184, 0.2);
+  background: rgba(255, 255, 255, 0.04);
+  color: #64748b;
+}
+
+[data-theme="dark"] .chk-box-badge .chk-bracket {
+  color: #64748b;
+}
+
+[data-theme="dark"] .chk-box-badge.checked {
+  border-color: rgba(52, 211, 153, 0.4);
+  background: rgba(52, 211, 153, 0.14);
+  color: #34d399;
+}
+
+[data-theme="dark"] .chk-box-badge.checked .chk-bracket,
+[data-theme="dark"] .chk-box-badge.checked .chk-mark {
+  color: #34d399;
+}
+
+[data-theme="dark"] .col-checkbox:hover .chk-box-badge,
+[data-theme="dark"] .th-select:hover .chk-box-badge {
+  border-color: #34d399;
+  background: rgba(52, 211, 153, 0.22);
+  color: #34d399;
+}
+
+/* Text alignments */
+.col-receiver, .col-address {
+  text-align: left;
+}
+
+.col-barcode {
+  font-family: monospace;
+  font-weight: 600;
+}
+
+.barcode-text.has-bcode {
+  color: #0284c7;
+}
+
+.barcode-text.no-bcode {
+  color: #94a3b8;
+}
+
+/* API Status Badges */
+.api-badge {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 12px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.stat-success .api-badge {
+  background: rgba(16, 185, 129, 0.15);
+  color: #059669;
+}
+
+.stat-error .api-badge {
+  background: rgba(239, 68, 68, 0.15);
+  color: #dc2626;
+}
+
+.stat-pending .api-badge {
+  background: rgba(148, 163, 184, 0.15);
+  color: #64748b;
+}
+
+/* Empty State */
+.empty-table-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  text-align: center;
+}
+
+.empty-table-state .empty-icon {
+  font-size: 3rem;
+  margin-bottom: 12px;
+}
+
+.empty-table-state h4 {
+  margin: 0 0 6px 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text-main, #0f172a);
+}
+
+.empty-table-state p {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--text-muted, #64748b);
+}

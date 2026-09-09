@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="th" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/png" href="/logo.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>C2DPost Web - แปลงไฟล์ PDF สู่ Excel & บาร์โค้ดไปรษณีย์ไทย</title>
+    <script>
+      (function() {
+        try {
+          var saved = localStorage.getItem('c2dpost_theme');
+          if (saved === 'dark') {
+            document.documentElement.setAttribute('data-theme', 'dark');
+          } else {
+            document.documentElement.setAttribute('data-theme', 'light');
+          }
+        } catch(e) {}
+      })();
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&family=Prompt:wght@400;500;600;700&display=swap" rel="stylesheet">
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

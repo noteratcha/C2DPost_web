@@ -1,0 +1,511 @@
+/* ==========================================================================
+   RegistrationModal.css - Faithful replica of Python RegistrationWindow
+   ========================================================================== */
+
+.reg-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 2100;
+  animation: regFadeIn 0.2s ease-out;
+}
+
+@keyframes regFadeIn {
+  from { opacity: 0; transform: scale(0.98); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.reg-modal-card {
+  max-width: 620px;
+  width: 100%;
+  max-height: 92vh;
+  background: var(--color-card-solid, #ffffff);
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 16px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  color: var(--color-text, #1e293b);
+  transition: background-color 0.3s ease, border-color 0.3s ease;
+}
+
+/* Modal Header */
+.reg-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 24px;
+  border-bottom: 1px solid var(--color-border, #e2e8f0);
+  background: var(--color-card-solid, #ffffff);
+  flex-shrink: 0;
+}
+
+.reg-title-main {
+  font-family: 'Prompt', sans-serif;
+  font-size: 20px;
+  font-weight: 700;
+  color: #10b981;
+  margin: 0;
+  letter-spacing: -0.2px;
+}
+
+.reg-btn-close {
+  background: transparent;
+  border: none;
+  font-size: 18px;
+  color: var(--color-text-dim, #94a3b8);
+  cursor: pointer;
+  padding: 6px 10px;
+  border-radius: 8px;
+  transition: all 0.15s ease;
+  line-height: 1;
+}
+
+.reg-btn-close:hover {
+  background: var(--color-bg-secondary, #f1f5f9);
+  color: var(--color-text-heading, #0f172a);
+}
+
+/* Modal Scroll Body */
+.reg-modal-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 22px 24px 28px;
+  overscroll-behavior: contain;
+}
+
+.reg-form-container {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+/* Section Box */
+.reg-box-section {
+  background: var(--color-bg, #f8fafc);
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 12px;
+  padding: 18px 20px;
+  transition: opacity 0.25s ease, filter 0.25s ease;
+}
+
+.reg-box-section.section-locked {
+  opacity: 0.5;
+  pointer-events: none;
+  user-select: none;
+}
+
+.reg-sec-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--color-border, #e2e8f0);
+}
+
+.reg-sec-header h3 {
+  font-family: 'Prompt', sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  color: #0284c7;
+  margin: 0;
+}
+
+[data-theme='dark'] .reg-sec-header h3 {
+  color: #38bdf8;
+}
+
+.locked-pill {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 20px;
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.25);
+}
+
+.reg-sec-content {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* Form Fields */
+.reg-row {
+  display: flex;
+  gap: 14px;
+}
+
+.reg-field {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.reg-field label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text-muted, #475569);
+  letter-spacing: 0.1px;
+}
+
+.reg-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  background: var(--color-input-bg, #ffffff);
+  border: 1.5px solid var(--color-input-border, #cbd5e1);
+  border-radius: 8px;
+  color: #d97706;
+  font-size: 13.5px;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.reg-input:focus {
+  border-color: #10b981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
+}
+
+.reg-input:disabled {
+  background: var(--color-bg-secondary, #e2e8f0) !important;
+  color: var(--color-text-dim, #94a3b8) !important;
+  border-color: var(--color-border, #cbd5e1) !important;
+  cursor: not-allowed;
+}
+
+.reg-input.readonly-input {
+  background: var(--color-bg-secondary, #e2e8f0) !important;
+  color: var(--color-text, #475569) !important;
+  cursor: default;
+}
+
+.reg-input.border-red {
+  border-color: #ef4444 !important;
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.15) !important;
+}
+
+.reg-err-text {
+  font-size: 11px;
+  color: #ef4444;
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+/* Password Toggle */
+.reg-input-pwd-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.reg-input-pwd-wrap .reg-input {
+  padding-right: 42px;
+}
+
+.reg-pwd-toggle-btn {
+  position: absolute;
+  right: 6px;
+  background: transparent;
+  border: none;
+  font-size: 15px;
+  cursor: pointer;
+  color: #64748b;
+  padding: 6px 8px;
+  border-radius: 6px;
+  transition: all 0.15s;
+}
+
+.reg-pwd-toggle-btn:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+/* Verify API Auth Row */
+.reg-verify-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.reg-btn-verify {
+  height: 34px;
+  padding: 0 18px;
+  background: #0284c7;
+  color: #ffffff;
+  border-radius: 8px;
+  font-family: 'Prompt', sans-serif;
+  font-weight: 700;
+  font-size: 13px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(2, 132, 199, 0.25);
+}
+
+.reg-btn-verify:hover:not(:disabled) {
+  background: #0369a1;
+  transform: translateY(-1px);
+}
+
+.reg-btn-verify:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.reg-btn-verify.verified {
+  background: #10b981 !important;
+  opacity: 1 !important;
+  cursor: default !important;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.25);
+}
+
+.reg-verify-status {
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.reg-verify-status.success {
+  color: #10b981;
+}
+
+.reg-verify-status.fail,
+.reg-verify-status.error {
+  color: #ef4444;
+}
+
+.reg-verify-status.info {
+  color: #0284c7;
+}
+
+/* Add Contact Button */
+.reg-btn-add-contact {
+  align-self: flex-start;
+  padding: 7px 16px;
+  background: #64748b;
+  color: #ffffff;
+  font-family: 'Prompt', sans-serif;
+  font-weight: 700;
+  font-size: 12px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.reg-btn-add-contact:hover:not(:disabled) {
+  background: #475569;
+}
+
+.reg-btn-add-contact:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Section 4: PDPA Box */
+.reg-box-pdpa {
+  background: var(--color-bg, #f1f5f9);
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 12px;
+  padding: 16px 20px;
+  transition: opacity 0.25s ease;
+}
+
+.reg-box-pdpa.section-locked {
+  opacity: 0.5;
+  pointer-events: none;
+  user-select: none;
+}
+
+.pdpa-header {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--color-text-heading, #0f172a);
+  margin-bottom: 10px;
+}
+
+.pdpa-content-box {
+  background: var(--color-card-solid, #ffffff);
+  border: 1px solid var(--color-border, #cbd5e1);
+  border-radius: 8px;
+  padding: 14px 16px;
+}
+
+.pdpa-checkbox-label {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  cursor: pointer;
+}
+
+.pdpa-checkbox {
+  margin-top: 3px;
+  width: 18px;
+  height: 18px;
+  accent-color: #10b981;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.pdpa-full-text {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--color-text-muted, #334155);
+}
+
+.pdpa-full-text p {
+  margin: 0 0 6px 0;
+  font-weight: 600;
+}
+
+.pdpa-full-text ol {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+/* Action Buttons */
+.reg-actions-row {
+  display: flex;
+  gap: 14px;
+  margin-top: 4px;
+}
+
+.reg-btn-submit {
+  flex: 1;
+  height: 46px;
+  background: #10b981;
+  color: #ffffff;
+  font-family: 'Prompt', sans-serif;
+  font-weight: 700;
+  font-size: 16px;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+.reg-btn-submit:hover:not(:disabled) {
+  background: #059669;
+  transform: translateY(-1px);
+}
+
+.reg-btn-submit:disabled {
+  background: #94a3b8;
+  box-shadow: none;
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.reg-btn-cancel {
+  flex: 1;
+  height: 46px;
+  background: #64748b;
+  color: #ffffff;
+  font-family: 'Prompt', sans-serif;
+  font-weight: 700;
+  font-size: 16px;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.reg-btn-cancel:hover {
+  background: #475569;
+  transform: translateY(-1px);
+}
+
+/* Status Message (lbl_msg) below buttons */
+.reg-lbl-msg {
+  text-align: center;
+  font-family: 'Prompt', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  white-space: pre-line;
+  line-height: 1.5;
+  padding: 12px 16px;
+  border-radius: 8px;
+  animation: regFadeIn 0.2s ease-out;
+}
+
+.reg-lbl-msg.success {
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+}
+
+.reg-lbl-msg.error {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+}
+
+/* Dark Mode Overrides */
+[data-theme='dark'] .reg-box-section {
+  background: rgba(30, 41, 59, 0.6);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+[data-theme='dark'] .reg-box-pdpa {
+  background: rgba(30, 41, 59, 0.8);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+[data-theme='dark'] .pdpa-content-box {
+  background: rgba(15, 23, 42, 0.6);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+[data-theme='dark'] .pdpa-full-text {
+  color: #cbd5e1;
+}
+
+[data-theme='dark'] .reg-input {
+  color: #fbbf24;
+}
+
+[data-theme='dark'] .reg-input:disabled,
+[data-theme='dark'] .reg-input.readonly-input {
+  background: rgba(15, 23, 42, 0.5) !important;
+  color: #64748b !important;
+  border-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+/* Mobile Responsiveness */
+@media (max-width: 540px) {
+  .reg-row {
+    flex-direction: column;
+    gap: 12px;
+  }
+  
+  .reg-modal-card {
+    max-height: 96vh;
+    border-radius: 12px;
+  }
+  
+  .reg-modal-header {
+    padding: 14px 18px;
+  }
+  
+  .reg-title-main {
+    font-size: 17px;
+  }
+  
+  .reg-modal-scroll {
+    padding: 16px 18px 22px;
+  }
+}
