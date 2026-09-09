@@ -292,6 +292,72 @@ export default function Navbar({
                     </a>
                   </div>
 
+                  {/* Section Label: คู่มือ & ความช่วยเหลือ */}
+                  <div className="menu-section-label">คู่มือ & ความช่วยเหลือ</div>
+
+                  <div className="menu-nav-links">
+                    <a
+                      href="https://canva.link/dyl3brb47lyph8r"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="menu-link-card"
+                      onClick={() => setIsNavMenuOpen(false)}
+                      title="เปิดดูคู่มือการใช้งานบน Canva"
+                    >
+                      <div className="link-card-left">
+                        <div className="link-avatar-icon icon-manual">
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
+                            <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
+                          </svg>
+                        </div>
+                        <div className="link-text-meta">
+                          <div className="link-title-row">
+                            <span className="link-title">คู่มือการใช้งานระบบ</span>
+                            <span className="link-tag-ext">Canva</span>
+                          </div>
+                          <span className="link-subtitle">สื่อการสอนและขั้นตอนการใช้งาน</span>
+                        </div>
+                      </div>
+                      <div className="link-arrow-action">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                          <line x1="7" y1="17" x2="17" y2="7"></line>
+                          <polyline points="7 7 17 7 17 17"></polyline>
+                        </svg>
+                      </div>
+                    </a>
+
+                    <a
+                      href="https://lin.ee/UzWqlKP"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="menu-link-card"
+                      onClick={() => setIsNavMenuOpen(false)}
+                      title="ติดต่อเจ้าหน้าที่ส่วน ทข.ปข.10 ผ่าน LINE Official"
+                    >
+                      <div className="link-card-left">
+                        <div className="link-avatar-icon icon-line">
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
+                          </svg>
+                        </div>
+                        <div className="link-text-meta">
+                          <div className="link-title-row">
+                            <span className="link-title">ติดต่อเจ้าหน้าที่</span>
+                            <span className="link-tag-ext">LINE OA</span>
+                          </div>
+                          <span className="link-subtitle">สอบถามปัญหาการใช้งาน</span>
+                        </div>
+                      </div>
+                      <div className="link-arrow-action">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                          <line x1="7" y1="17" x2="17" y2="7"></line>
+                          <polyline points="7 7 17 7 17 17"></polyline>
+                        </svg>
+                      </div>
+                    </a>
+                  </div>
+
                   {/* Section Label: เกี่ยวกับ & การตั้งค่า */}
                   <div className="menu-section-label">ข้อมูล & การแสดงผล</div>
 

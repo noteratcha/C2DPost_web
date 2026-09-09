@@ -43,33 +43,6 @@ export default function AboutModal({ isOpen, onClose }) {
             </ul>
           </div>
 
-          <div className="about-links-section">
-            <a 
-              href="https://canva.link/dyl3brb47lyph8r" 
-              target="_blank" 
-              rel="noopener noreferrer" 
-              className="about-link-pill"
-              title="เปิดดูคู่มือการใช้งานบน Canva"
-            >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
-                <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
-              </svg>
-              <span>คู่มือการใช้งานระบบ (Canva)</span>
-            </a>
-            <a 
-              href="https://lin.ee/UzWqlKP" 
-              target="_blank" 
-              rel="noopener noreferrer" 
-              className="about-link-pill"
-              title="ติดต่อเจ้าหน้าที่ส่วน ทข.ปข.10 ผ่าน LINE Official"
-            >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
-              </svg>
-              <span>ติดต่อเจ้าหน้าที่ (LINE Official)</span>
-            </a>
-          </div>
         </div>
 
         <div className="modal-footer-actions">
