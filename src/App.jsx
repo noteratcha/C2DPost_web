@@ -172,7 +172,7 @@ export default function App() {
         Password: 'demo_password',
         Prefix: 'RN',
         Organization: 'สำนักงานที่ดินจังหวัดนครพนม สาขาเรณูนคร',
-        Status: 'เจ้าหน้าที่'
+        Status: 'DOL'
       };
     }
     return people.find((p) => (p.UserName || '').toLowerCase() === (user || '').toLowerCase()) || null;

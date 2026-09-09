@@ -121,7 +121,7 @@ export default function Navbar({
                       {currentPerson ? currentPerson.UserName || user : user}
                     </span>
                     <span className="user-display-role">
-                      {currentPerson?.Status || 'เจ้าหน้าที่'}
+                      {currentPerson?.Status || 'DOL'}
                     </span>
                   </div>
                 </div>
