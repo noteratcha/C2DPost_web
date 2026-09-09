@@ -1,0 +1,222 @@
+.custom-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  animation: fadeInModal 0.2s ease-out;
+}
+
+.about-modal-box {
+  background: #ffffff;
+  color: #0f172a;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 16px;
+  width: 90%;
+  max-width: 480px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  padding: 26px 24px;
+  animation: scaleInModal 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+:root[data-theme="dark"] .about-modal-box {
+  background: #1e293b;
+  color: #f8fafc;
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+}
+
+.modal-icon-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  margin-bottom: 18px;
+}
+
+.modal-icon-header .icon-circle {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 12px;
+  background: rgba(5, 150, 105, 0.12);
+  color: #059669;
+}
+
+:root[data-theme="dark"] .modal-icon-header .icon-circle {
+  background: rgba(16, 185, 129, 0.2);
+  color: #34d399;
+}
+
+.modal-icon-header h3 {
+  margin: 0 0 8px 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+:root[data-theme="dark"] .modal-icon-header h3 {
+  color: #f8fafc;
+}
+
+.about-version-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 14px;
+  background: #f1f5f9;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #475569;
+}
+
+:root[data-theme="dark"] .about-version-badge {
+  background: rgba(15, 23, 42, 0.6);
+  border-color: rgba(255, 255, 255, 0.08);
+  color: #94a3b8;
+}
+
+.modal-body-content {
+  font-size: 0.92rem;
+  line-height: 1.6;
+  margin-bottom: 22px;
+}
+
+.about-section-title {
+  margin: 0 0 10px 0;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #334155;
+}
+
+:root[data-theme="dark"] .about-section-title {
+  color: #cbd5e1;
+}
+
+.doc-type-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 16px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.doc-type-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.95rem;
+  padding: 8px 12px;
+  background: #f8fafc;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+:root[data-theme="dark"] .doc-type-list li {
+  background: rgba(15, 23, 42, 0.5);
+  border-color: rgba(255, 255, 255, 0.05);
+  color: #f1f5f9;
+}
+
+.doc-type-list .bullet-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #059669;
+  flex-shrink: 0;
+}
+
+:root[data-theme="dark"] .doc-type-list .bullet-dot {
+  background: #10b981;
+}
+
+.doc-desc {
+  font-size: 0.8rem;
+  color: #64748b;
+  margin-left: auto;
+}
+
+:root[data-theme="dark"] .doc-desc {
+  color: #94a3b8;
+}
+
+.about-links-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px dashed rgba(0, 0, 0, 0.08);
+}
+
+:root[data-theme="dark"] .about-links-section {
+  border-top-color: rgba(255, 255, 255, 0.1);
+}
+
+.about-link-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: rgba(5, 150, 105, 0.08);
+  color: #059669;
+  border-radius: 8px;
+  text-decoration: none;
+  font-size: 0.84rem;
+  font-weight: 600;
+  transition: all 0.15s ease;
+}
+
+.about-link-pill:hover {
+  background: rgba(5, 150, 105, 0.15);
+  transform: translateX(2px);
+}
+
+:root[data-theme="dark"] .about-link-pill {
+  background: rgba(16, 185, 129, 0.12);
+  color: #34d399;
+}
+
+:root[data-theme="dark"] .about-link-pill:hover {
+  background: rgba(16, 185, 129, 0.22);
+}
+
+.modal-footer-actions {
+  display: flex;
+  justify-content: center;
+}
+
+.btn-modal-ok {
+  background: #059669;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  padding: 9px 40px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+
+.btn-modal-ok:hover {
+  background: #047857;
+  transform: translateY(-1px);
+}
+
+@keyframes fadeInModal {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes scaleInModal {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}

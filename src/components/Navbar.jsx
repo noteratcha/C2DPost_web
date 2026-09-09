@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import SupportedDocsModal from './SupportedDocsModal';
+import AboutModal from './AboutModal';
 import './Navbar.css';
 
 export default function Navbar({ 
@@ -10,7 +10,7 @@ export default function Navbar({
   theme = 'light', 
   onToggleTheme 
 }) {
-  const [showDocsModal, setShowDocsModal] = useState(false);
+  const [showAboutModal, setShowAboutModal] = useState(false);
   const [isStatusMenuOpen, setIsStatusMenuOpen] = useState(false);
   const [isChecking, setIsChecking] = useState(false);
   const [lastCheckTime, setLastCheckTime] = useState('');
@@ -220,15 +220,14 @@ export default function Navbar({
               e-AR
             </a>
 
-            {/* Info button */}
+            {/* About menu button */}
             <button
               type="button"
-              className="btn-header-info"
-              onClick={() => setShowDocsModal(true)}
-              title="เอกสารที่รองรับ"
-              aria-label="เอกสารที่รองรับ"
+              className="btn-header-link btn-header-about"
+              onClick={() => setShowAboutModal(true)}
+              title="เกี่ยวกับระบบ C2DPost Web"
             >
-              ⓘ
+              About
             </button>
 
             {/* Theme Toggle Button */}
@@ -288,9 +287,9 @@ export default function Navbar({
         </div>
       </header>
 
-      <SupportedDocsModal 
-        isOpen={showDocsModal} 
-        onClose={() => setShowDocsModal(false)} 
+      <AboutModal 
+        isOpen={showAboutModal} 
+        onClose={() => setShowAboutModal(false)} 
       />
     </>
   );
