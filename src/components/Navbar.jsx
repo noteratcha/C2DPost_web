@@ -336,7 +336,6 @@ export default function Navbar({
                         <div className="link-text-meta">
                           <div className="link-title-row">
                             <span className="link-title">คู่มือการใช้งานระบบ</span>
-                            <span className="link-tag-ext">Canva</span>
                           </div>
                           <span className="link-subtitle">สื่อการสอนและขั้นตอนการใช้งาน</span>
                         </div>
@@ -366,7 +365,6 @@ export default function Navbar({
                         <div className="link-text-meta">
                           <div className="link-title-row">
                             <span className="link-title">ติดต่อเจ้าหน้าที่</span>
-                            <span className="link-tag-ext">LINE OA</span>
                           </div>
                           <span className="link-subtitle">สอบถามปัญหาการใช้งาน</span>
                         </div>
@@ -405,7 +403,6 @@ export default function Navbar({
                         <div className="link-text-meta">
                           <div className="link-title-row">
                             <span className="link-title">About</span>
-                            <span className="link-tag-version">v2026</span>
                           </div>
                           <span className="link-subtitle">เกี่ยวกับระบบ & รูปแบบเอกสารที่รองรับ</span>
                         </div>
