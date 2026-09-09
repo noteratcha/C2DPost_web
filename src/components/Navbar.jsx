@@ -90,14 +90,14 @@ export default function Navbar({
               <div className="brand-primary-row">
                 <span className="brand-title-accent">C2DPost</span>
               </div>
-              <h1 className="header-office-title" title={user ? orgName : 'โปรแกรมแปลงข้อมูลจากไฟล์ PDF เพื่อเตรียมข้อมูลสำหรับระบบ DPost ด้วย API'}>
+              <h1 className="header-office-title" title={user ? orgName : 'โปรแกรมแปลงไฟล์ PDF สู่ระบบฝากส่งไปรษณีย์ DPost'}>
                 {user && (
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="office-pin-icon">
                     <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
                     <circle cx="12" cy="10" r="3"></circle>
                   </svg>
                 )}
-                <span>{user ? orgName : 'โปรแกรมแปลงข้อมูลจากไฟล์ PDF เพื่อเตรียมข้อมูลสำหรับระบบ DPost ด้วย API'}</span>
+                <span>{user ? orgName : 'โปรแกรมแปลงไฟล์ PDF สู่ระบบฝากส่งไปรษณีย์ DPost'}</span>
               </h1>
             </div>
           </div>
