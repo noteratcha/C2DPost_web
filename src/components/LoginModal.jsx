@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { APP_VERSION } from '../config';
 import RegistrationModal from './RegistrationModal';
 import './LoginModal.css';
 
@@ -153,6 +154,19 @@ export default function LoginModal({ onLogin, people = [], loading = false, erro
               className="login-link-btn"
             >
               ติดต่อเจ้าหน้าที่
+            </a>
+          </div>
+
+          {/* Version footer matching Python app */}
+          <div className="login-version-footer">
+            <a
+              href="https://drive.google.com/drive/folders/1ksrVAQVwkHDBE7qiqLT2ndyPHPQhz6vZ"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="version-link"
+              title="โฟลเดอร์รวมตัวติดตั้งและอัปเดตเวอร์ชัน"
+            >
+              {APP_VERSION} (เวอร์ชันล่าสุด)
             </a>
           </div>
         </div>

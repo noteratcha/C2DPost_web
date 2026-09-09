@@ -1,4 +1,5 @@
 import React from 'react';
+import { APP_VERSION } from '../config';
 import './AboutModal.css';
 
 export default function AboutModal({ isOpen, onClose }) {
@@ -17,7 +18,7 @@ export default function AboutModal({ isOpen, onClose }) {
           </div>
           <h3>เกี่ยวกับระบบ (About)</h3>
           <div className="about-version-badge">
-            <span>C2DPost Web Edition v2026.0909.2008 — ส่วน ทข.ปข.10</span>
+            <span>C2DPost Web Edition {APP_VERSION} — ส่วน ทข.ปข.10</span>
           </div>
         </div>
 
