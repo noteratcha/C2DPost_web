@@ -274,36 +274,6 @@ export default function AdminManagementView({
             </div>
           </div>
 
-          {/* Switch to PDF Workspace */}
-          {onSwitchToWorkspace && (
-            <button
-              type="button"
-              className="btn-admin-switch-workspace"
-              onClick={onSwitchToWorkspace}
-              title="สลับไปยังหน้าแปลงเอกสาร PDF สู่ Excel"
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                <polyline points="14 2 14 8 20 8"></polyline>
-              </svg>
-              <span>หน้าแปลงเอกสาร</span>
-            </button>
-          )}
-
-          {/* Logout Button */}
-          <button
-            type="button"
-            className="btn-admin-logout"
-            onClick={onLogout}
-            title="ออกจากระบบ"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-              <polyline points="16 17 21 12 16 7"></polyline>
-              <line x1="21" y1="12" x2="9" y2="12"></line>
-            </svg>
-            <span>ออกจากระบบ</span>
-          </button>
         </div>
       </header>
 
