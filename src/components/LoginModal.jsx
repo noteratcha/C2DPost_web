@@ -50,7 +50,8 @@ export default function LoginModal({ onLogin, people = [], loading = false, erro
       <div className="login-wrapper">
         <div className="login-modal-card">
           <div className="login-brand">
-            <img src="/logo.png" alt="C2DPost Logo" className="login-logo-img" />
+            <img src="/logo.png" alt="C2DPost Logo" className="login-logo-img logo-light-only" />
+            <img src="/logo_dark.png" alt="C2DPost Logo" className="login-logo-img logo-dark-only" />
             <h2 className="login-title-green">C2DPost Login</h2>
           </div>
 

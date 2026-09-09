@@ -84,7 +84,7 @@ export default function Navbar({
           {/* Left: Modern Brand & Organization Identity */}
           <div className="navbar-left-group">
             <div className="brand-logo-wrap">
-              <img src="/logo.png" alt="C2DPost" className="brand-logo-img" />
+              <img src="/logo_dark.png" alt="C2DPost" className="brand-logo-img" />
             </div>
             <div className="brand-identity-stack">
               <div className="brand-primary-row">

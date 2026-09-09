@@ -42,13 +42,14 @@
 }
 
 .brand-logo-img {
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
+  width: 42px;
+  height: 42px;
   object-fit: contain;
-  background: #ffffff;
-  padding: 2.5px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+  box-shadow: none;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.3));
   transition: transform 0.2s ease;
 }
 
