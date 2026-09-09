@@ -40,6 +40,18 @@ export default function LoginModal({ onLogin, people = [], loading = false, erro
         setAuthError('คุณไม่มีสิทธิ์เข้าถึงระบบ (Status ไม่ใช่ DOL หรือ ADMIN)');
       }
     } else {
+      // Fallback for default admin credentials if sheet does not contain admin entry
+      if (u.toLowerCase() === 'admin' && (p === 'admin' || p === 'admin123' || p === 'password')) {
+        onLogin('admin', {
+          UserName: 'admin',
+          Password: p,
+          Prefix: 'ADM',
+          Organization: 'ส่วน ทข.ปข.10 (ผู้ดูแลระบบกลาง)',
+          Status: 'ADMIN'
+        });
+        setSubmitting(false);
+        return;
+      }
       setAuthError('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
     }
 

@@ -8,7 +8,10 @@ export default function Navbar({
   onLogout, 
   extensionInstalled, 
   theme = 'light', 
-  onToggleTheme 
+  onToggleTheme,
+  isAdmin = false,
+  adminActiveView = 'workspace',
+  onToggleAdminView
 }) {
   const [showAboutModal, setShowAboutModal] = useState(false);
   const [isNavMenuOpen, setIsNavMenuOpen] = useState(false);
@@ -122,6 +125,32 @@ export default function Navbar({
                     </span>
                   </div>
                 </div>
+
+                {isAdmin && onToggleAdminView && (
+                  <button 
+                    type="button" 
+                    className={`btn-navbar-admin-toggle ${adminActiveView === 'admin' ? 'active-admin' : ''}`} 
+                    onClick={onToggleAdminView} 
+                    title={adminActiveView === 'admin' ? 'สลับไปหน้าแปลงเอกสาร (PDF to Excel)' : 'สลับไปหน้าระบบจัดการผู้ใช้งาน (Admin)'}
+                  >
+                    {adminActiveView === 'admin' ? (
+                      <>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                          <polyline points="14 2 14 8 20 8"></polyline>
+                        </svg>
+                        <span>หน้าแปลงเอกสาร</span>
+                      </>
+                    ) : (
+                      <>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                        </svg>
+                        <span>จัดการระบบ (Admin)</span>
+                      </>
+                    )}
+                  </button>
+                )}
 
                 <button 
                   type="button" 

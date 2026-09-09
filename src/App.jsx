@@ -4,6 +4,7 @@ import ExtensionGate from './components/ExtensionGate';
 import LoginModal from './components/LoginModal';
 import ActionToolbar from './components/ActionToolbar';
 import PreviewGrid from './components/PreviewGrid';
+import AdminManagementView from './components/AdminManagementView';
 import { parseCsv } from './utils/parseCsv';
 import { convertPdfs, exportAllFiles, exportPdf } from './utils/api';
 import { fetchBarcodesFromExtension } from './utils/extensionBridge';
@@ -16,6 +17,7 @@ const STORAGE_THEME_KEY = 'c2dpost_theme';
 export default function App() {
   const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
   const isDemo = urlParams && urlParams.get('demo') === '1';
+  const isDemoAdmin = isDemo && (urlParams.get('admin') === '1' || urlParams.get('role') === 'admin');
 
   const [theme, setTheme] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -35,7 +37,16 @@ export default function App() {
   };
 
   const [extensionUnlocked, setExtensionUnlocked] = useState(() => isDemo || false);
-  const [user, setUser] = useState(() => (isDemo ? 'renu_officer' : localStorage.getItem(STORAGE_USER_KEY) || ''));
+  const [user, setUser] = useState(() => {
+    if (isDemoAdmin) return 'admin';
+    if (isDemo) return 'renu_officer';
+    return typeof window !== 'undefined' ? localStorage.getItem(STORAGE_USER_KEY) || '' : '';
+  });
+  const [adminActiveView, setAdminActiveView] = useState(() => {
+    if (isDemoAdmin) return 'admin';
+    const saved = typeof window !== 'undefined' ? localStorage.getItem(STORAGE_USER_KEY) || '' : '';
+    return saved.toLowerCase() === 'admin' ? 'admin' : 'workspace';
+  });
   const [people, setPeople] = useState([]);
   const [loadingSheet, setLoadingSheet] = useState(true);
   const [sheetError, setSheetError] = useState(false);
@@ -146,6 +157,15 @@ export default function App() {
   }, [loadPeople]);
 
   const currentPerson = useMemo(() => {
+    if (isDemoAdmin) {
+      return {
+        UserName: 'admin',
+        Password: 'admin_password',
+        Prefix: 'ADM',
+        Organization: 'ส่วน ทข.ปข.10 (ผู้ดูแลระบบกลาง)',
+        Status: 'ADMIN'
+      };
+    }
     if (isDemo) {
       return {
         UserName: 'renu_officer',
@@ -156,17 +176,31 @@ export default function App() {
       };
     }
     return people.find((p) => (p.UserName || '').toLowerCase() === (user || '').toLowerCase()) || null;
-  }, [people, user, isDemo]);
+  }, [people, user, isDemo, isDemoAdmin]);
+
+  const isAdmin = useMemo(() => {
+    if ((user || '').toLowerCase() === 'admin') return true;
+    const status = (currentPerson?.Status || '').trim().toUpperCase();
+    return status === 'ADMIN' || status === 'ADMINISTRATOR';
+  }, [user, currentPerson]);
 
   const handleLogin = (username, personData) => {
     localStorage.setItem(STORAGE_USER_KEY, username);
     setUser(username);
+    const status = (personData?.Status || '').trim().toUpperCase();
+    if (username.toLowerCase() === 'admin' || status === 'ADMIN' || status === 'ADMINISTRATOR') {
+      setAdminActiveView('admin');
+    } else {
+      setAdminActiveView('workspace');
+    }
   };
 
   const handleLogout = () => {
     localStorage.removeItem(STORAGE_USER_KEY);
     setUser('');
+    setAdminActiveView('workspace');
     setSelectedFiles([]);
+    setFileStatuses({});
     setRecords([]);
     setStatusText('ยังไม่ได้เลือกไฟล์');
     setProgress(null);
@@ -638,6 +672,9 @@ export default function App() {
         extensionInstalled={extensionUnlocked} 
         theme={theme}
         onToggleTheme={toggleTheme}
+        isAdmin={isAdmin}
+        adminActiveView={adminActiveView}
+        onToggleAdminView={() => setAdminActiveView(prev => prev === 'admin' ? 'workspace' : 'admin')}
       />
 
       {/* 3. Dedicated Login Screen (Shown when NOT logged in) */}
@@ -654,34 +691,45 @@ export default function App() {
 
       {/* 4. Main Workspace (Shown ONLY when logged in) */}
       {extensionUnlocked && user && (
-        <main className="main-content python-layout-main">
-          <div className="python-container">
-            {/* Card 1: เลือกเอกสาร PDF */}
-            <ActionToolbar
-              records={records}
-              statusText={statusText}
-              progress={progress}
-              isProcessing={isProcessing}
-              isSendingApi={isSendingApi}
-              onFilesSelected={handleFilesSelected}
-              onFetchBarcodes={handleFetchBarcodes}
-              onExportExcel={handleExportExcel}
-              onExportEnvelope={handleExportEnvelope}
-              onSendEparcel={handleSendEparcel}
-            />
+        isAdmin && adminActiveView === 'admin' ? (
+          <AdminManagementView
+            user={user}
+            people={people}
+            loadingPeople={loadingSheet}
+            onRefreshPeople={loadPeople}
+            onLogout={handleLogout}
+            onSwitchToWorkspace={() => setAdminActiveView('workspace')}
+          />
+        ) : (
+          <main className="main-content python-layout-main">
+            <div className="python-container">
+              {/* Card 1: เลือกเอกสาร PDF */}
+              <ActionToolbar
+                records={records}
+                statusText={statusText}
+                progress={progress}
+                isProcessing={isProcessing}
+                isSendingApi={isSendingApi}
+                onFilesSelected={handleFilesSelected}
+                onFetchBarcodes={handleFetchBarcodes}
+                onExportExcel={handleExportExcel}
+                onExportEnvelope={handleExportEnvelope}
+                onSendEparcel={handleSendEparcel}
+              />
 
-            {/* Card 2: ตารางแสดงข้อมูล */}
-            <PreviewGrid 
-              records={records} 
-              selectedFiles={selectedFiles}
-              fileStatuses={fileStatuses}
-              onUpdateRecord={handleUpdateRecord} 
-              onDeleteRecord={handleDeleteRecord} 
-              onClearAll={handleClearAll}
-              onViewPdf={handleViewPdf}
-            />
-          </div>
-        </main>
+              {/* Card 2: ตารางแสดงข้อมูล */}
+              <PreviewGrid 
+                records={records} 
+                selectedFiles={selectedFiles}
+                fileStatuses={fileStatuses}
+                onUpdateRecord={handleUpdateRecord} 
+                onDeleteRecord={handleDeleteRecord} 
+                onClearAll={handleClearAll}
+                onViewPdf={handleViewPdf}
+              />
+            </div>
+          </main>
+        )
       )}
     </div>
   );

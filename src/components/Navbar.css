@@ -1021,3 +1021,46 @@
 .btn-standalone-logout:active {
   transform: translateY(0) scale(0.97);
 }
+
+/* Admin View Toggle Button in Navbar */
+.btn-navbar-admin-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 38px;
+  padding: 0 12px;
+  background: rgba(79, 70, 229, 0.25);
+  color: #e0e7ff;
+  border: 1px solid rgba(129, 140, 248, 0.45);
+  border-radius: 10px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  user-select: none;
+  white-space: nowrap;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.btn-navbar-admin-toggle:hover {
+  background: #4f46e5;
+  border-color: #6366f1;
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(79, 70, 229, 0.45);
+  transform: translateY(-1px);
+}
+
+.btn-navbar-admin-toggle.active-admin {
+  background: rgba(16, 185, 129, 0.25);
+  border-color: rgba(52, 211, 153, 0.45);
+  color: #a7f3d0;
+}
+
+.btn-navbar-admin-toggle.active-admin:hover {
+  background: #059669;
+  border-color: #10b981;
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(5, 150, 105, 0.45);
+}
+

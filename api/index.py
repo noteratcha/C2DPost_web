@@ -207,6 +207,67 @@ def register_user(req: RegisterUserRequest):
             "message": f"การเชื่อมต่อล้มเหลว: {str(e)}"
         }
 
+@app.post("/api/admin/update_user")
+async def admin_update_user(request: Request):
+    """
+    Proxies user management update requests to Google Apps Script
+    to avoid browser CORS restrictions.
+    """
+    import requests
+    SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwxNG-AHRfeR8FiY9AYQ-uqQeCjwerT2rRIcXFfAy5JIrEHzfYb8CERcLl9vukKf6ch/exec"
+    try:
+        data = await request.json()
+        if "action" not in data:
+            data["action"] = "update_user"
+
+        r = requests.post(SCRIPT_URL, json=data, timeout=20, allow_redirects=False)
+        if r.status_code in (301, 302, 303, 307):
+            loc = r.headers.get("Location")
+            if loc:
+                r = requests.get(loc, timeout=20)
+        try:
+            return r.json()
+        except:
+            text = r.text.strip()
+            if "success" in text.lower():
+                return {"status": "success", "message": "บันทึกข้อมูลเรียบร้อยแล้ว"}
+            return {"status": "error", "message": text or f"Response code: {r.status_code}"}
+    except Exception as e:
+        return {"status": "error", "message": f"การเชื่อมต่อล้มเหลว: {str(e)}"}
+
+@app.get("/api/admin/check_services")
+def check_services():
+    """
+    Checks Thailand Post external API endpoints health and latency matching Python GUI.
+    """
+    import requests
+    import time
+    import urllib3
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+    
+    results = {
+        "postone": {"name": "Gen barcode (PostOne)", "online": False, "latency": None},
+        "eparcel": {"name": "Preload e-Parcel", "online": False, "latency": None}
+    }
+    
+    try:
+        t0 = time.time()
+        requests.get("https://postone.thailandpost.com", timeout=5, verify=False)
+        results["postone"]["online"] = True
+        results["postone"]["latency"] = round(time.time() - t0, 2)
+    except Exception:
+        results["postone"]["online"] = False
+        
+    try:
+        t0 = time.time()
+        requests.get("https://r_dservice.thailandpost.com", timeout=5, verify=False)
+        results["eparcel"]["online"] = True
+        results["eparcel"]["latency"] = round(time.time() - t0, 2)
+    except Exception:
+        results["eparcel"]["online"] = False
+        
+    return {"success": True, "services": results}
+
 @app.post("/api/convert")
 async def convert_pdfs(files: List[UploadFile] = File(...)):
     """
