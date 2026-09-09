@@ -105,35 +105,38 @@ export default function Navbar({
           {/* Right Action Buttons */}
           <div className="navbar-right">
             {user && (
-              <div className="user-profile-capsule">
-                <div className="user-avatar-badge" title={`ผู้ใช้งาน: ${user}`}>
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                    <circle cx="12" cy="7" r="4"></circle>
-                  </svg>
+              <>
+                <div className="user-profile-badge" title={`ผู้ใช้งาน: ${user}`}>
+                  <div className="user-avatar-badge">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                      <circle cx="12" cy="7" r="4"></circle>
+                    </svg>
+                  </div>
+                  <div className="user-info-stack">
+                    <span className="user-display-name" title={currentPerson ? currentPerson.UserName || user : user}>
+                      {currentPerson ? currentPerson.UserName || user : user}
+                    </span>
+                    <span className="user-display-role">
+                      {currentPerson?.Status || 'เจ้าหน้าที่'}
+                    </span>
+                  </div>
                 </div>
-                <div className="user-info-stack">
-                  <span className="user-display-name" title={currentPerson ? currentPerson.UserName || user : user}>
-                    {currentPerson ? currentPerson.UserName || user : user}
-                  </span>
-                  <span className="user-display-role">
-                    {currentPerson?.Status || 'เจ้าหน้าที่'}
-                  </span>
-                </div>
+
                 <button 
                   type="button" 
-                  className="btn-capsule-logout" 
+                  className="btn-standalone-logout" 
                   onClick={onLogout} 
                   title="ออกจากระบบ (Sign out)"
                 >
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
                     <polyline points="16 17 21 12 16 7"/>
                     <line x1="21" y1="12" x2="9" y2="12"/>
                   </svg>
                   <span>ออกจากระบบ</span>
                 </button>
-              </div>
+              </>
             )}
 
             {/* Hamburger Menu (Combining all 5 parts: Status, DPost, e-AR, About, Dark/Light) */}
