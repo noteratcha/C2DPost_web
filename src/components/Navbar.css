@@ -904,19 +904,23 @@
   background-color: rgba(255, 255, 255, 0.25);
 }
 
-/* User Profile Badge (Standalone user information pill) */
+/* User Profile Badge (Standalone user information pill - active auto-sizing to text length) */
 .user-profile-badge {
   display: inline-flex;
   align-items: center;
-  gap: 9px;
+  gap: 8px;
   height: 38px;
-  padding: 0 12px 0 8px;
+  width: auto;
+  min-width: 0;
+  max-width: fit-content;
+  padding: 0 10px 0 8px;
   background: rgba(0, 0, 0, 0.16);
   border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: 10px;
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   transition: all 0.18s ease;
+  flex-shrink: 0;
 }
 
 :root[data-theme="dark"] .user-profile-badge {
@@ -947,6 +951,7 @@
   justify-content: center;
   text-align: left;
   min-width: 0;
+  width: auto;
 }
 
 .user-display-name {
@@ -955,9 +960,8 @@
   color: #ffffff;
   line-height: 1.15;
   white-space: nowrap;
-  max-width: 140px;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  width: auto;
+  max-width: none;
 }
 
 .user-display-role {
@@ -965,10 +969,19 @@
   color: #a7f3d0;
   line-height: 1;
   white-space: nowrap;
+  width: auto;
 }
 
 :root[data-theme="dark"] .user-display-role {
   color: #6ee7b7;
+}
+
+@media (max-width: 768px) {
+  .user-display-name {
+    max-width: 160px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
 }
 
 /* Standalone Logout Button (Distinct, independent button) */
