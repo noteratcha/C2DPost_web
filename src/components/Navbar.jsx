@@ -81,35 +81,56 @@ export default function Navbar({
     <>
       <header className="main-navbar python-theme-navbar">
         <div className="navbar-container">
-          {/* Left Title (Clean, without inline status dots) */}
+          {/* Left: Modern Brand & Organization Identity */}
           <div className="navbar-left-group">
             <div className="brand-logo-wrap">
               <img src="/logo.png" alt="C2DPost" className="brand-logo-img" />
             </div>
-            <h1 className="header-office-title" title={orgName}>
-              {orgName}
-            </h1>
+            <div className="brand-identity-stack">
+              <div className="brand-primary-row">
+                <span className="brand-title-accent">C2DPost Web</span>
+                <span className="brand-status-chip">ระบบบริการ</span>
+              </div>
+              <h1 className="header-office-title" title={orgName}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="office-pin-icon">
+                  <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                  <circle cx="12" cy="10" r="3"></circle>
+                </svg>
+                <span>{orgName}</span>
+              </h1>
+            </div>
           </div>
 
           {/* Right Action Buttons */}
           <div className="navbar-right">
             {user && (
-              <div className="user-section">
-                <div className="user-info">
-                  <span className="user-name">{currentPerson ? currentPerson.UserName || user : user}</span>
+              <div className="user-profile-capsule">
+                <div className="user-avatar-badge" title={`ผู้ใช้งาน: ${user}`}>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="12" cy="7" r="4"></circle>
+                  </svg>
+                </div>
+                <div className="user-info-stack">
+                  <span className="user-display-name" title={currentPerson ? currentPerson.UserName || user : user}>
+                    {currentPerson ? currentPerson.UserName || user : user}
+                  </span>
+                  <span className="user-display-role">
+                    {currentPerson?.Status || 'เจ้าหน้าที่'}
+                  </span>
                 </div>
                 <button 
                   type="button" 
-                  className="btn-logout-danger" 
+                  className="btn-capsule-logout" 
                   onClick={onLogout} 
-                  title="ออกจากระบบ"
+                  title="ออกจากระบบ (Sign out)"
                 >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
                     <polyline points="16 17 21 12 16 7"/>
                     <line x1="21" y1="12" x2="9" y2="12"/>
                   </svg>
-                  ออกจากระบบ
+                  <span>ออกจากระบบ</span>
                 </button>
               </div>
             )}
