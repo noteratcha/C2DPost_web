@@ -248,7 +248,7 @@ export default function ExtensionGate({ onUnlocked, theme = 'light', onToggleThe
               <div className="step-content">
                 <strong>โหลดโฟลเดอร์ส่วนขยาย</strong>
                 <p>
-                  กดปุ่ม <strong>"โหลดส่วนขยายที่คลายการบีบอัดแล้ว" (Load unpacked)</strong> ที่มุมบนซ้าย แล้วเลือกโฟลเดอร์ที่แตกไฟล์ไว้
+                  กดปุ่ม <strong>"โหลดส่วนขยายแล้ว ให้คลายการบีบอัด (Unzip)"</strong> ที่มุมบนซ้าย แล้วเลือกโฟลเดอร์ที่แตกไฟล์ไว้
                 </p>
               </div>
             </div>
