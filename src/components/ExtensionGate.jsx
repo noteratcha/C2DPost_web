@@ -96,9 +96,6 @@ export default function ExtensionGate({ onUnlocked, theme = 'light', onToggleThe
         <div className="gate-actions-container">
           {/* Option 1: Chrome Web Store (Official) */}
           <div className="action-card official-store">
-            <div className="action-card-badge status-pending">
-              <span className="badge-icon">⏳</span> กำลังรอ Google ตรวจสอบ
-            </div>
             <div className="action-card-header">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="store-icon">
                 <circle cx="12" cy="12" r="10"/>
@@ -129,9 +126,6 @@ export default function ExtensionGate({ onUnlocked, theme = 'light', onToggleThe
 
           {/* Option 2: Immediate ZIP Install */}
           <div className="action-card zip-install">
-            <div className="action-card-badge status-ready">
-              <span className="badge-icon">⚡</span> พร้อมใช้งานทันที
-            </div>
             <div className="action-card-header">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="zip-icon">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
