@@ -105,7 +105,9 @@ export default function ExtensionGate({ onUnlocked, theme = 'light', onToggleThe
                 <line x1="10.88" y1="21.94" x2="15.46" y2="14"/>
               </svg>
               <div>
-                <strong>ทางเลือกที่ 1: Chrome Web Store (ทางการ)</strong>
+                <strong>
+                  <span className="opt-label opt-1">ทางเลือกที่ 1:</span> Chrome Web Store (ทางการ)
+                </strong>
                 <p>คลิกเดียวติดตั้งลง Chrome ได้เลย (เปิดใช้งานทันทีหลัง Google อนุมัติ)</p>
               </div>
             </div>
@@ -133,7 +135,9 @@ export default function ExtensionGate({ onUnlocked, theme = 'light', onToggleThe
                 <line x1="12" y1="15" x2="12" y2="3"/>
               </svg>
               <div>
-                <strong>ทางเลือกที่ 2: ติดตั้งผ่านไฟล์ .ZIP (ไม่ต้องรออนุมัติ)</strong>
+                <strong>
+                  <span className="opt-label opt-2">ทางเลือกที่ 2:</span> ติดตั้งผ่านไฟล์ .ZIP (ไม่ต้องรออนุมัติ)
+                </strong>
                 <p>ดาวน์โหลดและติดตั้งในโหมดนักพัฒนา ใช้งานได้ทันทีในปัจจุบัน</p>
               </div>
             </div>
