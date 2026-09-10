@@ -6,6 +6,7 @@ export default function ExtensionGate({ onUnlocked, theme = 'light', onToggleThe
   const [checking, setChecking] = useState(true);
   const [installed, setInstalled] = useState(false);
   const [manualCheckLoading, setManualCheckLoading] = useState(false);
+  const [hasCheckedNotice, setHasCheckedNotice] = useState(false);
 
   useEffect(() => {
     // 1. Initial check
@@ -13,6 +14,16 @@ export default function ExtensionGate({ onUnlocked, theme = 'light', onToggleThe
       setInstalled(isOk);
       setChecking(false);
       if (isOk && onUnlocked) onUnlocked();
+
+      // Check if user previously triggered a refresh check and still not detected
+      try {
+        if (!isOk && sessionStorage.getItem('c2dpost_recheck_triggered') === 'true') {
+          sessionStorage.removeItem('c2dpost_recheck_triggered');
+          setHasCheckedNotice(true);
+        }
+      } catch {
+        // ignore
+      }
     });
 
     // 2. Continuous subscription (fires when extension is installed while page is open)
@@ -41,10 +52,24 @@ export default function ExtensionGate({ onUnlocked, theme = 'light', onToggleThe
 
   const handleManualCheck = async () => {
     setManualCheckLoading(true);
-    const isOk = await checkExtensionInstalled(1500);
-    setInstalled(isOk);
-    setManualCheckLoading(false);
-    if (isOk && onUnlocked) onUnlocked();
+    // 1. ตรวจสอบด่วนว่าส่วนขยายพร้อมทำงานแล้วหรือไม่
+    const isOk = await checkExtensionInstalled(400);
+    if (isOk) {
+      setInstalled(true);
+      setManualCheckLoading(false);
+      if (onUnlocked) onUnlocked();
+      return;
+    }
+
+    // 2. หากยังไม่พบ บันทึกสถานะเพื่อให้หลังรีเฟรชแสดงข้อความแนะนำ
+    try {
+      sessionStorage.setItem('c2dpost_recheck_triggered', 'true');
+    } catch {
+      // ignore
+    }
+
+    // 3. รีเฟรชหน้าเว็บทันที เพื่อให้ Google Chrome โหลดส่วนขยายเข้าสู่แท็บนี้
+    window.location.reload();
   };
 
   if (checking) {
@@ -230,29 +255,52 @@ export default function ExtensionGate({ onUnlocked, theme = 'light', onToggleThe
           </div>
         </div>
 
+        {hasCheckedNotice && (
+          <div className="gate-recheck-alert">
+            <div className="alert-badge-icon">⚠️</div>
+            <div className="alert-content">
+              <strong>รีเฟรชหน้าเว็บแล้ว แต่ยังตรวจไม่พบส่วนขยาย C2DPost Helper</strong>
+              <p>
+                หากท่านติดตั้งแล้ว กรุณาตรวจสอบ:
+                <br />1. ไปที่ <code>chrome://extensions</code> แล้วเปิดสวิตช์ <strong>"เปิดใช้งาน" (Enabled)</strong>
+                <br />2. หากคอมพิวเตอร์เปิดโปรแกรม Antivirus หรือเครือข่ายความปลอดภัย ให้ตรวจสอบว่ามีการปิดกั้นส่วนเสริมหรือไม่
+              </p>
+            </div>
+            <button 
+              type="button" 
+              className="alert-close-btn" 
+              onClick={() => setHasCheckedNotice(false)}
+              title="ปิดการแจ้งเตือน"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
         <div className="gate-footer">
           <button 
             type="button" 
             className="btn-recheck"
             onClick={handleManualCheck}
             disabled={manualCheckLoading}
+            title="คลิกเพื่อรีเฟรชหน้านี้และตรวจสอบใหม่"
           >
             {manualCheckLoading ? (
               <>
-                <span className="btn-spinner"></span> กำลังตรวจสอบ...
+                <span className="btn-spinner"></span> กำลังรีเฟรชหน้านี้...
               </>
             ) : (
               <>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
                 </svg>
-                ติดตั้งเสร็จแล้ว คลิกเพื่อตรวจสอบอีกครั้ง
+                ติดตั้งเสร็จแล้ว คลิกเพื่อรีเฟรชหน้านี้และตรวจสอบ
               </>
             )}
           </button>
           <div className="auto-detect-hint">
             <span className="pulse-dot"></span>
-            ระบบกำลังตรวจจับอัตโนมัติ ทันทีที่ติดตั้งเสร็จหน้านี้จะเปิดให้อัตโนมัติทันที
+            คลิกปุ่มด้านบนเพื่อรีเฟรชหน้าเว็บ หรือกด F5 บนคีย์บอร์ดได้เช่นกัน
           </div>
         </div>
       </div>
