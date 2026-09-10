@@ -2,10 +2,20 @@ import { useState, useEffect } from 'react';
 import { checkExtensionInstalled, subscribeExtensionReady } from '../utils/extensionBridge';
 import './ExtensionGate.css';
 
-export default function ExtensionGate({ onUnlocked }) {
+export default function ExtensionGate({ onUnlocked, onBypass }) {
   const [checking, setChecking] = useState(true);
   const [installed, setInstalled] = useState(false);
   const [manualCheckLoading, setManualCheckLoading] = useState(false);
+
+  const handleBypass = () => {
+    try {
+      localStorage.setItem('c2dpost_bypass_ext', 'true');
+    } catch (err) {
+      console.error('Failed to write to localStorage:', err);
+    }
+    if (onBypass) onBypass();
+    else if (onUnlocked) onUnlocked();
+  };
 
   useEffect(() => {
     // 1. Initial check
@@ -83,13 +93,13 @@ export default function ExtensionGate({ onUnlocked }) {
         </div>
 
         <div className="gate-actions-container">
-          {/* Option 1: Chrome Web Store (Official) */}
-          <div className="action-card official-store">
-            <div className="action-card-badge status-pending">
-              <span className="badge-icon">⏳</span> กำลังรอ Google ตรวจสอบ
+          {/* Option 1: Chrome Web Store (Official - Approved) */}
+          <div className="action-card official-store approved">
+            <div className="action-card-badge status-approved">
+              <span className="badge-icon">✓</span> ผ่านการอนุมัติแล้ว (แนะนำ)
             </div>
             <div className="action-card-header">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="store-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="store-icon approved">
                 <circle cx="12" cy="12" r="10"/>
                 <circle cx="12" cy="12" r="4"/>
                 <line x1="21.17" y1="8" x2="12" y2="8"/>
@@ -97,17 +107,17 @@ export default function ExtensionGate({ onUnlocked }) {
                 <line x1="10.88" y1="21.94" x2="15.46" y2="14"/>
               </svg>
               <div>
-                <strong>ทางเลือกที่ 1: Chrome Web Store (ทางการ)</strong>
-                <p>คลิกเดียวติดตั้งลง Chrome ได้เลย (เปิดใช้งานทันทีหลัง Google อนุมัติ)</p>
+                <strong>ทางเลือกที่ 1: ติดตั้งจาก Chrome Web Store</strong>
+                <p>คลิกเดียวติดตั้งลงเบราว์เซอร์ได้ทันที ผ่านการอนุมัติความปลอดภัยแล้ว</p>
               </div>
             </div>
             <a 
               href="https://chromewebstore.google.com/detail/cdkmibacceaacdiopcekkmfifaocapgk" 
               target="_blank" 
               rel="noopener noreferrer"
-              className="btn-store-link"
+              className="btn-store-link btn-store-approved"
             >
-              ดูหน้าส่วนขยายบน Chrome Web Store
+              ติดตั้งจาก Chrome Web Store
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
                 <polyline points="15 3 21 3 21 9"/>
@@ -145,6 +155,32 @@ export default function ExtensionGate({ onUnlocked }) {
               ดาวน์โหลดไฟล์ C2DPost Helper (.zip)
             </a>
           </div>
+        </div>
+
+        {/* Option 3: Antivirus / Corporate Security Bypass */}
+        <div className="gate-bypass-section">
+          <div className="bypass-header">
+            <span className="bypass-tag">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+              </svg>
+              เครื่องติด Antivirus หรือหน่วยงานบล็อกส่วนขยาย?
+            </span>
+          </div>
+          <p className="bypass-desc">
+            หากคอมพิวเตอร์ของท่านมี Antivirus บล็อกการดาวน์โหลด หรือไม่ได้รับสิทธิ์ติดตั้งส่วนขยาย ท่านสามารถ <strong>ข้ามขั้นตอนนี้และเข้าใช้งานระบบแปลงไฟล์ PDF เป็น Excel, ดูตัวอย่างข้อมูล และพิมพ์เอกสารได้ตามปกติ 100%</strong>
+          </p>
+          <button 
+            type="button" 
+            className="btn-bypass-gate"
+            onClick={handleBypass}
+          >
+            เข้าสู่ระบบและเริ่มใช้งานทันที (โหมดไม่มีส่วนขยาย)
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+              <polyline points="12 5 19 12 12 19"></polyline>
+            </svg>
+          </button>
         </div>
 
         <div className="gate-steps">

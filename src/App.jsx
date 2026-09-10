@@ -36,7 +36,20 @@ export default function App() {
     setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
   };
 
-  const [extensionUnlocked, setExtensionUnlocked] = useState(() => isDemo || false);
+  const [isExtensionBypassed, setIsExtensionBypassed] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('c2dpost_bypass_ext') === 'true';
+    }
+    return false;
+  });
+
+  const [extensionUnlocked, setExtensionUnlocked] = useState(() => {
+    if (isDemo) return true;
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('c2dpost_bypass_ext') === 'true';
+    }
+    return false;
+  });
   const [user, setUser] = useState(() => {
     if (isDemoAdmin) return 'admin';
     if (isDemo) return 'renu_officer';
@@ -355,6 +368,7 @@ export default function App() {
 
     try {
       let barcodes = [];
+      let isSimulated = false;
       // Try fetching from extension bridge with timeout race
       try {
         const extRes = await Promise.race([
@@ -363,9 +377,12 @@ export default function App() {
         ]);
         if (extRes && extRes.success && extRes.barcodes && extRes.barcodes.length > 0) {
           barcodes = extRes.barcodes;
+        } else {
+          throw new Error('No barcodes returned');
         }
       } catch (bridgeErr) {
-        // Fallback if extension not loaded or demo mode
+        // Fallback if extension not loaded or in bypass mode
+        isSimulated = true;
         const prefix = 'RE';
         const start = 518924000 + Math.floor(Math.random() * 9000);
         for (let i = 0; i < numRecords; i++) {
@@ -387,7 +404,11 @@ export default function App() {
         return copy;
       });
 
-      setStatusText(`ดึงบาร์โค้ดเพิ่มสำเร็จ จำนวน ${barcodes.length} หมายเลข`);
+      if (isSimulated) {
+        setStatusText(`สร้างหมายเลขบาร์โค้ดจำลองแล้ว จำนวน ${barcodes.length} รายการ (โหมดไม่มีส่วนขยาย)`);
+      } else {
+        setStatusText(`ดึงบาร์โค้ดเพิ่มสำเร็จ จำนวน ${barcodes.length} หมายเลข`);
+      }
     } catch (err) {
       console.error('Fetch barcodes failed:', err);
       setStatusText('เกิดข้อผิดพลาดในการดึงบาร์โค้ด');
@@ -662,7 +683,16 @@ export default function App() {
     <div className="app-layout">
       {/* 1. Chrome Extension Gatekeeper */}
       {!extensionUnlocked && (
-        <ExtensionGate onUnlocked={() => setExtensionUnlocked(true)} />
+        <ExtensionGate 
+          onUnlocked={() => {
+            setExtensionUnlocked(true);
+            setIsExtensionBypassed(false);
+          }} 
+          onBypass={() => {
+            setExtensionUnlocked(true);
+            setIsExtensionBypassed(true);
+          }}
+        />
       )}
 
       {/* 2. Main Navigation (Python theme) */}
@@ -670,7 +700,8 @@ export default function App() {
         user={user} 
         currentPerson={currentPerson} 
         onLogout={handleLogout} 
-        extensionInstalled={extensionUnlocked} 
+        extensionInstalled={extensionUnlocked && !isExtensionBypassed} 
+        extensionBypassed={isExtensionBypassed}
         theme={theme}
         onToggleTheme={toggleTheme}
         isAdmin={isAdmin}
