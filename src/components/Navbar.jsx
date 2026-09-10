@@ -7,7 +7,6 @@ export default function Navbar({
   currentPerson, 
   onLogout, 
   extensionInstalled, 
-  extensionBypassed = false,
   theme = 'light', 
   onToggleTheme,
   isAdmin = false,
@@ -299,14 +298,8 @@ export default function Navbar({
                           </svg>
                           <span>Extension Helper</span>
                         </div>
-                        <span className={`status-badge-chip ${extensionInstalled ? 'success' : extensionBypassed ? 'warning' : 'danger'}`}>
-                          {extensionInstalled ? (
-                            <><span className="chip-dot"></span> ติดตั้งแล้ว</>
-                          ) : extensionBypassed ? (
-                            <><span className="chip-dot"></span> โหมดไม่มีส่วนขยาย</>
-                          ) : (
-                            'ไม่พบ'
-                          )}
+                        <span className={`status-badge-chip ${extensionInstalled ? 'success' : 'danger'}`}>
+                          {extensionInstalled ? <><span className="chip-dot"></span> ติดตั้งแล้ว</> : 'ไม่พบ'}
                         </span>
                       </div>
                     </div>
