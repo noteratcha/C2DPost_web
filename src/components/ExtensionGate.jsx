@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { checkExtensionInstalled, subscribeExtensionReady } from '../utils/extensionBridge';
 import './ExtensionGate.css';
 
-export default function ExtensionGate({ onUnlocked }) {
+export default function ExtensionGate({ onUnlocked, theme = 'light', onToggleTheme }) {
   const [checking, setChecking] = useState(true);
   const [installed, setInstalled] = useState(false);
   const [manualCheckLoading, setManualCheckLoading] = useState(false);
@@ -66,6 +66,17 @@ export default function ExtensionGate({ onUnlocked }) {
   return (
     <div className="gate-screen">
       <div className="gate-card">
+        {onToggleTheme && (
+          <button 
+            type="button" 
+            className="gate-theme-toggle" 
+            onClick={onToggleTheme}
+            title={theme === 'dark' ? 'เปลี่ยนเป็นธีมสว่าง (Light Mode)' : 'เปลี่ยนเป็นธีมมืด (Dark Mode)'}
+          >
+            {theme === 'dark' ? '☀️' : '🌙'}
+          </button>
+        )}
+
         <div className="gate-badge-lock">
           <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <rect width="18" height="11" x="3" y="11" rx="2" ry="2"/>

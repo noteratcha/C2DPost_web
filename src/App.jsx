@@ -662,7 +662,11 @@ export default function App() {
     <div className="app-layout">
       {/* 1. Chrome Extension Gatekeeper */}
       {!extensionUnlocked && (
-        <ExtensionGate onUnlocked={() => setExtensionUnlocked(true)} />
+        <ExtensionGate 
+          onUnlocked={() => setExtensionUnlocked(true)} 
+          theme={theme}
+          onToggleTheme={toggleTheme}
+        />
       )}
 
       {/* 2. Main Navigation (Python theme) */}
