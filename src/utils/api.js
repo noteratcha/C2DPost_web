@@ -183,3 +183,139 @@ export async function exportAllFiles(records, files = [], onProgress) {
 
   return results;
 }
+
+/**
+ * Fetch deposit report from Thailand Post e-Parcel API
+ *
+ * @param {Object} params
+ * @param {string} params.date - Date in DD/MM/YYYY format (e.g. 14/09/2026)
+ * @param {string} [params.username] - e-Parcel username
+ * @param {string} [params.password] - e-Parcel password
+ * @returns {Promise<{success: boolean, date: string, is_mock: boolean, summary: Object, records: Array}>}
+ */
+export async function fetchReceivedReport({ date, username = '', password = '' }) {
+  const response = await fetch(`${API_BASE}/reports/received`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ date, username, password })
+  });
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    const errorMsg = data.message || data.detail || `เกิดข้อผิดพลาดในการดึงรายงาน (HTTP ${response.status})`;
+    throw new Error(errorMsg);
+  }
+
+  return data;
+}
+
+/**
+ * Fetch delivery timeline for a single barcode via getHistoryStatus.
+ *
+ * @param {Object} params
+ * @param {string} params.barcode - 13-digit Thailand Post barcode
+ * @param {string} [params.username] - e-Parcel username
+ * @param {string} [params.password] - e-Parcel password
+ * @returns {Promise<{success: boolean, barcode: string, is_mock: boolean, events: Array}>}
+ */
+export async function fetchTrackingHistory({ barcode, username = '', password = '' }) {
+  const response = await fetch(`${API_BASE}/reports/tracking`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ barcode, username, password })
+  });
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    const errorMsg = data.message || data.detail || `เกิดข้อผิดพลาดในการดึงประวัติสถานะ (HTTP ${response.status})`;
+    throw new Error(errorMsg);
+  }
+
+  return data;
+}
+
+/**
+ * Auto-reconcile: batch-check a list of barcodes to see which
+ * items have already been received at the post office (รับฝากแล้ว).
+ *
+ * @param {Object} params
+ * @param {Array<string>} params.barcodes
+ * @param {string} [params.username]
+ * @param {string} [params.password]
+ * @returns {Promise<{success: boolean, total_checked: number, received_count: number, results: Array}>}
+ */
+export async function reconcileRecords({ barcodes, username = '', password = '' }) {
+  const response = await fetch(`${API_BASE}/reports/reconcile`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ barcodes, username, password })
+  });
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    const errorMsg = data.message || data.detail || `เกิดข้อผิดพลาดในการตรวจสอบรับฝาก (HTTP ${response.status})`;
+    throw new Error(errorMsg);
+  }
+
+  return data;
+}
+
+/**
+ * Export Deposit Report to Excel (.xlsx)
+ *
+ * @param {Object} payload
+ * @param {Array} payload.records
+ * @param {Object} [payload.summary]
+ * @param {string} [payload.date]
+ * @param {string} [payload.organization]
+ */
+export async function exportDepositReportExcel({ records, summary = {}, date = '', organization = '' }) {
+  const response = await fetch(`${API_BASE}/reports/export-excel`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ records, summary, date, organization })
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ detail: response.statusText }));
+    throw new Error(err.detail || 'ไม่สามารถสร้างไฟล์ Excel รายงานรับฝากได้');
+  }
+
+  const cleanDate = (date || '').replace(/\//g, '-');
+  const fallback = `Deposit_Report_${cleanDate || Date.now()}.xlsx`;
+  const filename = getFilenameFromHeader(response.headers.get('Content-Disposition'), fallback);
+  const blob = await response.blob();
+  downloadBlob(blob, filename);
+}
+
+/**
+ * Export Deposit Report to Landscape PDF (.pdf)
+ *
+ * @param {Object} payload
+ * @param {Array} payload.records
+ * @param {Object} [payload.summary]
+ * @param {string} [payload.date]
+ * @param {string} [payload.organization]
+ */
+export async function exportDepositReportPdf({ records, summary = {}, date = '', organization = '' }) {
+  const response = await fetch(`${API_BASE}/reports/export-pdf`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ records, summary, date, organization })
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ detail: response.statusText }));
+    throw new Error(err.detail || 'ไม่สามารถสร้างไฟล์ PDF รายงานรับฝากได้');
+  }
+
+  const cleanDate = (date || '').replace(/\//g, '-');
+  const fallback = `Deposit_Report_${cleanDate || Date.now()}.pdf`;
+  const filename = getFilenameFromHeader(response.headers.get('Content-Disposition'), fallback);
+  const blob = await response.blob();
+  downloadBlob(blob, filename);
+}
+

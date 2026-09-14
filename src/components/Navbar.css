@@ -1018,8 +1018,71 @@
   transform: translateY(-1px);
 }
 
-.btn-standalone-logout:active {
+/* Deposit Report Button in Navbar */
+.btn-navbar-report {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 38px;
+  padding: 0 12px;
+  background: rgba(16, 185, 129, 0.18);
+  color: #a7f3d0;
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  border-radius: 10px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  user-select: none;
+  white-space: nowrap;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+:root[data-theme="light"] .btn-navbar-report {
+  background: rgba(16, 185, 129, 0.12);
+  color: #065f46;
+  border-color: rgba(16, 185, 129, 0.35);
+}
+
+:root[data-theme="dark"] .btn-navbar-report {
+  background: rgba(16, 185, 129, 0.22);
+  border-color: rgba(16, 185, 129, 0.45);
+  color: #6ee7b7;
+}
+
+.btn-navbar-report:hover {
+  background: #10b981;
+  border-color: #10b981;
+  color: #ffffff;
+  box-shadow: 0 3px 12px rgba(16, 185, 129, 0.45);
+  transform: translateY(-1px);
+}
+
+.btn-navbar-report:active {
   transform: translateY(0) scale(0.97);
+}
+
+.link-avatar-icon.icon-report {
+  background: rgba(16, 185, 129, 0.15);
+  color: #059669;
+}
+
+:root[data-theme="dark"] .link-avatar-icon.icon-report {
+  background: rgba(16, 185, 129, 0.25);
+  color: #34d399;
+}
+
+.link-tag-ext.report-tag {
+  background: rgba(16, 185, 129, 0.15);
+  color: #059669;
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+:root[data-theme="dark"] .link-tag-ext.report-tag {
+  background: rgba(16, 185, 129, 0.25);
+  color: #34d399;
+  border-color: rgba(16, 185, 129, 0.4);
 }
 
 /* Admin View Toggle Button in Navbar */

@@ -12,7 +12,8 @@ export default function Navbar({
   isAdmin = false,
   adminActiveView = 'workspace',
   onToggleAdminView,
-  adminServices = null
+  adminServices = null,
+  onOpenDepositReport = null
 }) {
   const [showAboutModal, setShowAboutModal] = useState(false);
   const [isNavMenuOpen, setIsNavMenuOpen] = useState(false);
@@ -176,6 +177,23 @@ export default function Navbar({
                         <span>จัดการระบบ (Admin)</span>
                       </>
                     )}
+                  </button>
+                )}
+
+                {onOpenDepositReport && (
+                  <button 
+                    type="button" 
+                    className="btn-navbar-report" 
+                    onClick={onOpenDepositReport} 
+                    title="เปิดรายงานตรวจสอบการรับฝากไปรษณีย์ (e-Parcel Deposit Report)"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                      <polyline points="14 2 14 8 20 8"></polyline>
+                      <line x1="16" y1="13" x2="8" y2="13"></line>
+                      <line x1="16" y1="17" x2="8" y2="17"></line>
+                    </svg>
+                    <span>รายงานรับฝาก</span>
                   </button>
                 )}
 
@@ -440,8 +458,43 @@ export default function Navbar({
                   {/* Section Label: เกี่ยวกับ & การตั้งค่า */}
                   <div className="menu-section-label">ข้อมูล & การแสดงผล</div>
 
-                  {/* 3. About Section */}
+                  {/* 3. Report & About Section */}
                   <div className="menu-nav-links">
+                    {onOpenDepositReport && (
+                      <button
+                        type="button"
+                        className="menu-link-card btn-card"
+                        onClick={() => {
+                          setIsNavMenuOpen(false);
+                          onOpenDepositReport();
+                        }}
+                        title="เปิดรายงานการรับฝากไปรษณีย์"
+                      >
+                        <div className="link-card-left">
+                          <div className="link-avatar-icon icon-report">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                              <polyline points="14 2 14 8 20 8"></polyline>
+                              <line x1="16" y1="13" x2="8" y2="13"></line>
+                              <line x1="16" y1="17" x2="8" y2="17"></line>
+                            </svg>
+                          </div>
+                          <div className="link-text-meta">
+                            <div className="link-title-row">
+                              <span className="link-title">รายงานการรับฝาก</span>
+                              <span className="link-tag-ext report-tag">e-Parcel</span>
+                            </div>
+                            <span className="link-subtitle">ตรวจสอบรายการที่ไปรษณีย์รับฝากแล้ว</span>
+                          </div>
+                        </div>
+                        <div className="link-chevron-action">
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="9 18 15 12 9 6"></polyline>
+                          </svg>
+                        </div>
+                      </button>
+                    )}
+
                     <button
                       type="button"
                       className="menu-link-card btn-card"

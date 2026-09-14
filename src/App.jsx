@@ -5,8 +5,10 @@ import LoginModal from './components/LoginModal';
 import ActionToolbar from './components/ActionToolbar';
 import PreviewGrid from './components/PreviewGrid';
 import AdminManagementView from './components/AdminManagementView';
+import DepositReportModal from './components/DepositReportModal';
+import TrackingTimelineModal from './components/TrackingTimelineModal';
 import { parseCsv } from './utils/parseCsv';
-import { convertPdfs, exportAllFiles, exportPdf } from './utils/api';
+import { convertPdfs, exportAllFiles, exportPdf, reconcileRecords } from './utils/api';
 import { fetchBarcodesFromExtension } from './utils/extensionBridge';
 import { SPREADSHEET_ID } from './config';
 import './App.css';
@@ -51,6 +53,10 @@ export default function App() {
   const [people, setPeople] = useState([]);
   const [loadingSheet, setLoadingSheet] = useState(true);
   const [sheetError, setSheetError] = useState(false);
+  const [isDepositReportOpen, setIsDepositReportOpen] = useState(false);
+  const [isReconciling, setIsReconciling] = useState(false);
+  const [reconcileNotice, setReconcileNotice] = useState(null);
+  const [trackingInfo, setTrackingInfo] = useState(null); // { barcode, receiver, invNo }
 
   // App Main State
   const [selectedFiles, setSelectedFiles] = useState(() => {
@@ -624,6 +630,7 @@ export default function App() {
     setSelectedFiles([]);
     setFileStatuses({});
     setRecords([]);
+    setReconcileNotice(null);
     setStatusText('ยังไม่ได้เลือกไฟล์');
     setProgress(null);
   };
@@ -658,6 +665,108 @@ export default function App() {
     }
   };
 
+  // 10. Handle View Tracking Timeline (single barcode)
+  const handleViewTracking = (row) => {
+    const barcode = String(row.BARCODE_NO || '').trim();
+    if (!barcode) {
+      alert("รายการนี้ยังไม่มีหมายเลขบาร์โค้ด กรุณากด 'ดึงหมายเลข' ก่อนครับ");
+      return;
+    }
+    setTrackingInfo({
+      barcode,
+      receiver: row.RECEIVER || '',
+      invNo: row.INV_NO || row['REF NO'] || ''
+    });
+  };
+
+  // 11. Handle Auto-Reconcile (batch check received status vs post office)
+  const handleCheckDeposit = async () => {
+    const rowsWithBarcode = records.filter(r => r.BARCODE_NO && String(r.BARCODE_NO).trim() !== '');
+    if (rowsWithBarcode.length === 0) {
+      alert('ไม่มีรายการที่มีหมายเลขบาร์โค้ด กรุณาดึงหมายเลขก่อนตรวจสอบ');
+      return;
+    }
+
+    setIsReconciling(true);
+    setStatusText(`กำลังตรวจสอบสถานะรับฝาก ${rowsWithBarcode.length} รายการ...`);
+
+    try {
+      const username = currentPerson?.UserName || '';
+      const password = currentPerson?.Password || '';
+      const barcodes = rowsWithBarcode.map(r => String(r.BARCODE_NO).trim());
+
+      const result = await reconcileRecords({ barcodes, username, password });
+
+      if (!result.success) {
+        throw new Error(result.message || 'ไม่สามารถตรวจสอบได้');
+      }
+
+      // Map received info back onto records
+      const resultMap = {};
+      (result.results || []).forEach(r => {
+        resultMap[String(r.barcode).trim()] = r;
+      });
+
+      setRecords(prev => prev.map(row => {
+        const bcode = String(row.BARCODE_NO || '').trim();
+        const info = resultMap[bcode];
+        if (!info) return row;
+
+        if (info.received) {
+          return {
+            ...row,
+            DEPOSIT_STATUS: '✓ รับฝากแล้ว',
+            DEPOSIT_RECEIVED: true,
+            DEPOSIT_DATE: info.received_date || '',
+            DEPOSIT_POSTOFFICE: info.received_postoffice || ''
+          };
+        }
+        return {
+          ...row,
+          DEPOSIT_STATUS: info.status_description || 'ยังไม่พบการรับฝาก',
+          DEPOSIT_RECEIVED: false,
+          DEPOSIT_DATE: '',
+          DEPOSIT_POSTOFFICE: ''
+        };
+      }));
+
+      const receivedCount = result.received_count || 0;
+      const totalChecked = result.total_checked || rowsWithBarcode.length;
+      setStatusText(`ตรวจสอบรับฝากสำเร็จ: รับฝากแล้ว ${receivedCount} / ${totalChecked} รายการ`);
+
+      // Set reconcile notice state for UI banner above table
+      setReconcileNotice({
+        api_notice: result.api_notice || null,
+        is_mock: Boolean(result.is_mock),
+        received_count: receivedCount,
+        total_checked: totalChecked
+      });
+
+      let alertMsg = `ตรวจสอบสถานะรับฝากเรียบร้อยแล้ว!\n\n` +
+        `รายการที่ไปรษณีย์รับฝากแล้ว: ${receivedCount} รายการ\n` +
+        `รายการที่ยังไม่รับฝาก: ${totalChecked - receivedCount} รายการ\n\n` +
+        `แถวที่รับฝากแล้วจะถูกไฮไลต์สีเขียว`;
+
+      if (result.api_notice) {
+        alertMsg += `\n\n⚠️ ข้อสังเกตระบบ e-Parcel:\n${result.api_notice}\n(เซิร์ฟเวอร์อาจไม่สามารถเข้าถึงฐานข้อมูลจริงได้เนื่องจากติดเงื่อนไข IP Whitelist ของไปรษณีย์ไทย)`;
+      } else if (result.is_mock) {
+        alertMsg += `\n\nℹ️ โหมดสาธิต (Demo Mode): กำลังแสดงผลการตรวจสอบแบบจำลอง`;
+      }
+
+      alert(alertMsg);
+
+      if (result.api_notice) {
+        console.warn('Reconcile API notice:', result.api_notice);
+      }
+    } catch (err) {
+      console.error('Reconcile error:', err);
+      setStatusText('เกิดข้อผิดพลาดในการตรวจสอบรับฝาก');
+      alert(`ไม่สามารถตรวจสอบสถานะรับฝากได้:\n${err.message || err}`);
+    } finally {
+      setIsReconciling(false);
+    }
+  };
+
   return (
     <div className="app-layout">
       {/* 1. Chrome Extension Gatekeeper */}
@@ -681,6 +790,7 @@ export default function App() {
         adminActiveView={adminActiveView}
         onToggleAdminView={() => setAdminActiveView(prev => prev === 'admin' ? 'workspace' : 'admin')}
         adminServices={adminServices}
+        onOpenDepositReport={() => setIsDepositReportOpen(true)}
       />
 
       {/* 3. Dedicated Login Screen (Shown when NOT logged in) */}
@@ -722,6 +832,8 @@ export default function App() {
                 onExportExcel={handleExportExcel}
                 onExportEnvelope={handleExportEnvelope}
                 onSendEparcel={handleSendEparcel}
+                isReconciling={isReconciling}
+                onCheckDeposit={handleCheckDeposit}
               />
 
               {/* Card 2: ตารางแสดงข้อมูล */}
@@ -729,15 +841,34 @@ export default function App() {
                 records={records} 
                 selectedFiles={selectedFiles}
                 fileStatuses={fileStatuses}
+                reconcileNotice={reconcileNotice}
+                onDismissReconcileNotice={() => setReconcileNotice(null)}
                 onUpdateRecord={handleUpdateRecord} 
                 onDeleteRecord={handleDeleteRecord} 
                 onClearAll={handleClearAll}
                 onViewPdf={handleViewPdf}
+                onViewTracking={handleViewTracking}
               />
             </div>
           </main>
         )
       )}
+
+      {/* 5. Deposit Report Modal */}
+      <DepositReportModal
+        isOpen={isDepositReportOpen}
+        onClose={() => setIsDepositReportOpen(false)}
+        currentPerson={currentPerson}
+      />
+
+      {/* 6. Tracking Timeline Modal */}
+      <TrackingTimelineModal
+        isOpen={!!trackingInfo}
+        barcode={trackingInfo?.barcode || ''}
+        recInfo={trackingInfo || null}
+        currentPerson={currentPerson}
+        onClose={() => setTrackingInfo(null)}
+      />
     </div>
   );
 }

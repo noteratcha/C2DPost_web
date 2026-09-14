@@ -36,7 +36,7 @@ except Exception as e:
     print(f"Warning: Failed to load Tahoma font: {e}")
     FONT_REGISTERED = False
 
-__version__ = "2026.0826.1944"
+__version__ = "2026.0914.1157"
 
 # Thailand Post API Credentials
 API_KEY = "V9JN25IFH5hdZYc1k8NNRVgnLYXyQLzc"
@@ -1065,6 +1065,281 @@ def generate_custom_envelopes_pdf(dataframe, output_pdf_path):
         
     with open(output_pdf_path, "wb") as f_out:
         writer.write(f_out)
+
+def generate_deposit_report_excel(records, summary, meta, output_excel_path):
+    """
+    Generates styled Excel report for Thailand Post deposit reconciliation using openpyxl.
+    """
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Deposit_Report"
+
+    HEADER_FILL = PatternFill(start_color="059669", end_color="059669", fill_type="solid")
+    HEADER_FONT = Font(name="Tahoma", size=10, bold=True, color="FFFFFF")
+    TITLE_FONT = Font(name="Tahoma", size=14, bold=True, color="0F172A")
+    SUBTITLE_FONT = Font(name="Tahoma", size=9, bold=False, color="475569")
+    TOTAL_FONT = Font(name="Tahoma", size=10, bold=True, color="0F172A")
+    DATA_FONT = Font(name="Tahoma", size=9)
+    BOLD_DATA_FONT = Font(name="Tahoma", size=9, bold=True)
+    
+    THIN_BORDER = Border(
+        left=Side(style='thin', color='CBD5E1'),
+        right=Side(style='thin', color='CBD5E1'),
+        top=Side(style='thin', color='CBD5E1'),
+        bottom=Side(style='thin', color='CBD5E1')
+    )
+    TOTAL_BORDER = Border(
+        top=Side(style='thin', color='0F172A'),
+        bottom=Side(style='double', color='0F172A')
+    )
+
+    org_name = meta.get("organization") or "สำนักงานที่ดิน"
+    report_date = meta.get("date") or datetime.now().strftime("%d/%m/%Y")
+    total_items = summary.get("total_items", len(records))
+    total_weight = summary.get("total_weight", 0.0)
+    total_fee = summary.get("total_fee", 0.0)
+    received_count = summary.get("received_count", len(records))
+
+    # Title & Metadata
+    ws.merge_cells("A1:J1")
+    ws["A1"] = f"รายงานสรุปรายการรับฝากไปรษณีย์ (e-Parcel Deposit Report) — {org_name}"
+    ws["A1"].font = TITLE_FONT
+    ws["A1"].alignment = Alignment(horizontal="left", vertical="center")
+    ws.row_dimensions[1].height = 28
+
+    ws.merge_cells("A2:J2")
+    ws["A2"] = f"ประจำวันที่: {report_date}  |  รายการทั้งหมด: {total_items} ฉบับ  |  รับฝากสำเร็จ: {received_count} ฉบับ  |  น้ำหนักรวม: {total_weight:,.1f} กรัม  |  ยอดค่าบริการรวม: ฿{total_fee:,.2f}"
+    ws["A2"].font = SUBTITLE_FONT
+    ws["A2"].alignment = Alignment(horizontal="left", vertical="center")
+    ws.row_dimensions[2].height = 20
+
+    # Headers
+    headers = [
+        "ลำดับ", "หมายเลข Barcode", "เลขที่คำขอ", "ชื่อผู้รับ",
+        "ที่อยู่ปลายทาง", "วัน-เวลารับฝาก", "ปณ.รับฝาก", "น้ำหนัก (g)",
+        "ค่าบริการ (฿)", "สถานะ"
+    ]
+    header_row = 4
+    ws.row_dimensions[header_row].height = 24
+    for col_idx, h_text in enumerate(headers, start=1):
+        cell = ws.cell(row=header_row, column=col_idx, value=h_text)
+        cell.fill = HEADER_FILL
+        cell.font = HEADER_FONT
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+        cell.border = THIN_BORDER
+
+    # Data rows
+    start_data_row = 5
+    for i, r in enumerate(records):
+        cur_row = start_data_row + i
+        ws.row_dimensions[cur_row].height = 20
+        
+        full_addr = f"{r.get('receiver_address', '')} {r.get('receiver_amphur', '')} {r.get('receiver_province', '')} {r.get('receiver_zipcode', '')}".strip()
+        weight = float(r.get("weight") or 0.0)
+        fee = float(r.get("fee") or 0.0)
+
+        row_values = [
+            i + 1,
+            r.get("barcode", ""),
+            r.get("inv_no", ""),
+            r.get("receiver_name", ""),
+            full_addr,
+            r.get("received_date", ""),
+            r.get("received_postoffice", ""),
+            weight,
+            fee,
+            r.get("status_description", "รับฝากเข้าระบบแล้ว")
+        ]
+        
+        for col_idx, val in enumerate(row_values, start=1):
+            cell = ws.cell(row=cur_row, column=col_idx, value=val)
+            cell.font = DATA_FONT
+            cell.border = THIN_BORDER
+            
+            if col_idx == 1:
+                cell.alignment = Alignment(horizontal="center", vertical="center")
+            elif col_idx in (2, 3):
+                cell.alignment = Alignment(horizontal="center", vertical="center")
+                cell.font = BOLD_DATA_FONT
+            elif col_idx in (6, 7, 10):
+                cell.alignment = Alignment(horizontal="center", vertical="center")
+            elif col_idx == 8:
+                cell.alignment = Alignment(horizontal="right", vertical="center")
+                cell.number_format = '#,##0.0'
+            elif col_idx == 9:
+                cell.alignment = Alignment(horizontal="right", vertical="center")
+                cell.number_format = '#,##0.00'
+            else:
+                cell.alignment = Alignment(horizontal="left", vertical="center")
+
+    # Summary Row
+    end_data_row = start_data_row + len(records) - 1 if records else start_data_row
+    total_row_idx = end_data_row + 1 if records else start_data_row + 1
+    ws.row_dimensions[total_row_idx].height = 24
+    
+    ws.merge_cells(start_row=total_row_idx, start_column=1, end_row=total_row_idx, end_column=7)
+    tot_label = ws.cell(row=total_row_idx, column=1, value=f"รวมทั้งสิ้น ({len(records)} รายการ)")
+    tot_label.font = TOTAL_FONT
+    tot_label.alignment = Alignment(horizontal="right", vertical="center")
+    
+    for c in range(1, 8):
+        ws.cell(row=total_row_idx, column=c).border = TOTAL_BORDER
+
+    w_cell = ws.cell(row=total_row_idx, column=8)
+    if records:
+        w_cell.value = f"=SUM(H{start_data_row}:H{end_data_row})"
+    else:
+        w_cell.value = 0.0
+    w_cell.font = TOTAL_FONT
+    w_cell.alignment = Alignment(horizontal="right", vertical="center")
+    w_cell.number_format = '#,##0.0'
+    w_cell.border = TOTAL_BORDER
+
+    f_cell = ws.cell(row=total_row_idx, column=9)
+    if records:
+        f_cell.value = f"=SUM(I{start_data_row}:I{end_data_row})"
+    else:
+        f_cell.value = 0.0
+    f_cell.font = TOTAL_FONT
+    f_cell.alignment = Alignment(horizontal="right", vertical="center")
+    f_cell.number_format = '#,##0.00'
+    f_cell.border = TOTAL_BORDER
+
+    st_cell = ws.cell(row=total_row_idx, column=10, value="")
+    st_cell.border = TOTAL_BORDER
+
+    # Column Auto-fit
+    for col in ws.columns:
+        col_letter = get_column_letter(col[0].column)
+        max_len = 0
+        for cell in col:
+            if cell.row in (1, 2):
+                continue
+            v = str(cell.value or '')
+            if len(v) > max_len:
+                max_len = len(v)
+        ws.column_dimensions[col_letter].width = max(max_len + 4, 11)
+        
+    ws.column_dimensions['E'].width = 30
+
+    wb.save(output_excel_path)
+
+def generate_deposit_report_pdf(records, summary, meta, output_pdf_path):
+    """
+    Generates official government-format PDF report for deposit reconciliation.
+    """
+    doc = SimpleDocTemplate(output_pdf_path, pagesize=landscape(A4),
+                            rightMargin=1.2*cm, leftMargin=1.2*cm,
+                            topMargin=1.2*cm, bottomMargin=1.2*cm)
+    elements = []
+    styles = getSampleStyleSheet()
+    font_name = 'Tahoma' if FONT_REGISTERED else 'Helvetica'
+    font_bold = 'Tahoma-Bold' if FONT_REGISTERED else 'Helvetica-Bold'
+
+    style_title = ParagraphStyle('ReportTitle', parent=styles['Normal'], fontName=font_bold, fontSize=16, leading=22, alignment=TA_CENTER)
+    style_subtitle = ParagraphStyle('ReportSubTitle', parent=styles['Normal'], fontName=font_name, fontSize=10, leading=16, alignment=TA_CENTER)
+    style_th = ParagraphStyle('ReportTH', parent=styles['Normal'], fontName=font_bold, fontSize=9, leading=12, alignment=TA_CENTER, textColor=colors.white)
+    style_td_c = ParagraphStyle('ReportTDC', parent=styles['Normal'], fontName=font_name, fontSize=8.5, leading=11, alignment=TA_CENTER)
+    style_td_l = ParagraphStyle('ReportTDL', parent=styles['Normal'], fontName=font_name, fontSize=8.5, leading=11, alignment=TA_LEFT)
+    style_td_r = ParagraphStyle('ReportTDR', parent=styles['Normal'], fontName=font_name, fontSize=8.5, leading=11, alignment=TA_RIGHT)
+    style_td_bold_r = ParagraphStyle('ReportTDBoldR', parent=styles['Normal'], fontName=font_bold, fontSize=8.5, leading=11, alignment=TA_RIGHT)
+    style_sig = ParagraphStyle('ReportSig', parent=styles['Normal'], fontName=font_name, fontSize=9.5, leading=18, alignment=TA_CENTER)
+
+    org_name = meta.get("organization") or "สำนักงานที่ดิน"
+    report_date = meta.get("date") or datetime.now().strftime("%d/%m/%Y")
+    total_items = summary.get("total_items", len(records))
+    total_weight = summary.get("total_weight", 0.0)
+    total_fee = summary.get("total_fee", 0.0)
+    received_count = summary.get("received_count", len(records))
+
+    elements.append(Paragraph(apply_thai_pua(f"รายงานสรุปการรับฝากเอกสารส่งทางไปรษณีย์ (e-Parcel Deposit Report)"), style_title))
+    elements.append(Spacer(1, 0.2*cm))
+    elements.append(Paragraph(apply_thai_pua(f"<b>หน่วยงาน:</b> {org_name}  |  <b>วันที่นำส่ง:</b> {report_date}  |  <b>ยอดรวม:</b> {total_items} ฉบับ (รับฝากแล้ว {received_count} ฉบับ)  |  <b>น้ำหนักรวม:</b> {total_weight:,.1f} กรัม  |  <b>ยอดค่าบริการ:</b> ฿{total_fee:,.2f}"), style_subtitle))
+    elements.append(Spacer(1, 0.4*cm))
+
+    # Table Header
+    th_headers = ["ลำดับ", "หมายเลข Barcode", "เลขที่คำขอ", "ชื่อผู้รับ", "ที่อยู่ปลายทาง", "วัน-เวลารับฝาก", "ปณ.รับฝาก", "น้ำหนัก (g)", "ค่าบริการ (฿)"]
+    col_widths = [1.0*cm, 3.5*cm, 3.0*cm, 4.0*cm, 6.2*cm, 3.4*cm, 2.5*cm, 1.8*cm, 1.9*cm]
+
+    table_data = [[Paragraph(apply_thai_pua(h), style_th) for h in th_headers]]
+
+    for i, r in enumerate(records):
+        full_addr = f"{r.get('receiver_address', '')} {r.get('receiver_amphur', '')} {r.get('receiver_province', '')} {r.get('receiver_zipcode', '')}".strip()
+        weight = float(r.get("weight") or 0.0)
+        fee = float(r.get("fee") or 0.0)
+        
+        row = [
+            Paragraph(str(i + 1), style_td_c),
+            Paragraph(f"<b>{r.get('barcode', '')}</b>", style_td_c),
+            Paragraph(r.get("inv_no", "-"), style_td_c),
+            Paragraph(apply_thai_pua(r.get("receiver_name", "")), style_td_l),
+            Paragraph(apply_thai_pua(full_addr), style_td_l),
+            Paragraph(r.get("received_date", "-"), style_td_c),
+            Paragraph(apply_thai_pua(r.get("received_postoffice", "-")), style_td_c),
+            Paragraph(f"{weight:,.1f}", style_td_r),
+            Paragraph(f"{fee:,.2f}", style_td_r)
+        ]
+        table_data.append(row)
+
+    # Summary Row
+    summary_row = [
+        Paragraph(apply_thai_pua(f"<b>รวมทั้งสิ้น ({len(records)} รายการ)</b>"), style_td_bold_r),
+        "", "", "", "", "", "",
+        Paragraph(f"<b>{total_weight:,.1f}</b>", style_td_bold_r),
+        Paragraph(f"<b>{total_fee:,.2f}</b>", style_td_bold_r)
+    ]
+    table_data.append(summary_row)
+
+    report_table = Table(table_data, colWidths=col_widths, repeatRows=1)
+    
+    t_style = [
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#059669')),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CBD5E1')),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ('SPAN', (0, len(table_data) - 1), (6, len(table_data) - 1)),
+        ('BACKGROUND', (0, len(table_data) - 1), (-1, len(table_data) - 1), colors.HexColor('#F1F5F9'))
+    ]
+    
+    for r_idx in range(1, len(records) + 1):
+        if r_idx % 2 == 0:
+            t_style.append(('BACKGROUND', (0, r_idx), (-1, r_idx), colors.HexColor('#F8FAFC')))
+            
+    report_table.setStyle(TableStyle(t_style))
+    elements.append(report_table)
+    elements.append(Spacer(1, 0.8*cm))
+
+    # Signature Block
+    sig_land = (
+        "ลงชื่อ .............................................................. ผู้ส่งมอบเอกสาร<br/>"
+        "( .............................................................. )<br/>"
+        f"เจ้าหน้าที่ {apply_thai_pua(org_name)}<br/>"
+        "วันที่ ............. / ............. / ............."
+    )
+    sig_post = (
+        "ลงชื่อ .............................................................. ผู้รับฝากไปรษณีย์<br/>"
+        "( .............................................................. )<br/>"
+        "เจ้าหน้าที่ รับฝากไปรษณีย์ไทย<br/>"
+        "วันที่ ............. / ............. / ............."
+    )
+    
+    sig_data = [
+        [Paragraph(apply_thai_pua(sig_land), style_sig), Paragraph(apply_thai_pua(sig_post), style_sig)]
+    ]
+    sig_table = Table(sig_data, colWidths=[13.6*cm, 13.6*cm])
+    sig_table.setStyle(TableStyle([
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+    ]))
+    elements.append(sig_table)
+
+    doc.build(elements)
 
 def main():
     print(f"C2DPost (Version {__version__})")

@@ -7,11 +7,13 @@ export default function ActionToolbar({
   progress = null, // { val: number, current: number, total: number, percent: number }
   isProcessing = false,
   isSendingApi = false,
+  isReconciling = false,
   onFilesSelected,
   onFetchBarcodes,
   onExportExcel,
   onExportEnvelope,
-  onSendEparcel
+  onSendEparcel,
+  onCheckDeposit
 }) {
   const fileInputRef = useRef(null);
 
@@ -35,6 +37,9 @@ export default function ActionToolbar({
 
   // 5. btn_envelope: enabled ONLY when all records have API_STATUS == '✓ สำเร็จ'
   const canEnvelope = allApiSuccess && !isProcessing;
+
+  // 6. btn_check_deposit (Auto-Reconcile): enabled when at least one barcode exists
+  const canCheckDeposit = totalRecords > 0 && !hasMissingBarcode && !isProcessing && !isSendingApi && !isReconciling;
 
   const handleFileInputChange = (e) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -171,6 +176,28 @@ export default function ActionToolbar({
               onClick={onSendEparcel}
             >
               {isSendingApi ? 'กำลังส่งข้อมูล...' : 'ส่งข้อมูล e-Parcel'}
+            </button>
+          </div>
+
+          {/* ตรวจสอบรับฝาก (Auto-Reconcile) */}
+          <div 
+            className="btn-tooltip-wrapper"
+            data-tooltip="ตรวจสอบว่ารายการใดไปรษณีย์รับฝากเข้าระบบแล้วบ้าง (ไฮไลต์แถวสีเขียว)"
+          >
+            <button
+              type="button"
+              className="btn-card-action btn-check-deposit"
+              disabled={!canCheckDeposit}
+              onClick={onCheckDeposit}
+            >
+              {isReconciling ? (
+                <>
+                  <span className="btn-spinner-small"></span>
+                  <span>กำลังตรวจสอบ...</span>
+                </>
+              ) : (
+                'ตรวจสอบรับฝาก'
+              )}
             </button>
           </div>
         </div>

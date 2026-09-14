@@ -1,0 +1,263 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import { fetchTrackingHistory } from '../utils/api';
+import './TrackingTimelineModal.css';
+
+export default function TrackingTimelineModal({ isOpen, barcode, recInfo, currentPerson, onClose }) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [trackData, setTrackData] = useState(null);
+
+  const handleFetch = useCallback(async (bcode) => {
+    if (!bcode) return;
+    setLoading(true);
+    setError('');
+    setTrackData(null);
+    try {
+      const username = currentPerson?.UserName || '';
+      const password = currentPerson?.Password || '';
+      const result = await fetchTrackingHistory({ barcode: bcode, username, password });
+      if (result.success) {
+        setTrackData(result);
+      } else {
+        setError(result.message || 'ไม่สามารถดึงประวัติสถานะได้');
+      }
+    } catch (err) {
+      setError(err.message || 'เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์');
+    } finally {
+      setLoading(false);
+    }
+  }, [currentPerson]);
+
+  useEffect(() => {
+    if (isOpen && barcode) {
+      handleFetch(barcode);
+    }
+  }, [isOpen, barcode, handleFetch]);
+
+  // Escape key handler
+  useEffect(() => {
+    function handleKeyDown(e) {
+      if (e.key === 'Escape' && isOpen) {
+        onClose();
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
+  if (!isOpen) return null;
+
+  const events = trackData?.events || [];
+  // chronological: oldest first
+  const sortedEvents = [...events].sort((a, b) => (a.seq || 0) - (b.seq || 0));
+  const hasReceived = sortedEvents.some(ev => {
+    const text = `${ev.status_description || ''} ${ev.status || ''}`;
+    return text.includes('รับฝาก') || ['1', '001', 'p001'].includes(String(ev.status || '').toLowerCase());
+  });
+
+  return (
+    <div className="track-modal-overlay" onClick={onClose}>
+      <div className="track-modal-container" onClick={(e) => e.stopPropagation()}>
+        {/* Header */}
+        <div className="track-modal-header">
+          <div className="track-header-info">
+            <div className="track-icon-pill">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                <polyline points="8 8 11 8 13 13 16 13"></polyline>
+              </svg>
+            </div>
+            <div>
+              <h3 className="track-modal-title">ประวัติสถานะรายชิ้น (Tracking Timeline)</h3>
+              <p className="track-modal-subtitle">
+                ไทม์ไลน์การนำส่งพัสดุจากระบบ e-Parcel ไปรษณีย์ไทย
+              </p>
+            </div>
+          </div>
+          <button type="button" className="track-btn-close" onClick={onClose} title="ปิดหน้าต่าง (Esc)">
+            ✕
+          </button>
+        </div>
+
+        {/* Barcode Summary */}
+        <div className="track-summary-bar">
+          <div className="track-summary-barcode">
+            <span className="track-summary-label">หมายเลข Barcode</span>
+            <span className="track-barcode-mono">{barcode || '-'}</span>
+          </div>
+          {recInfo && (
+            <div className="track-summary-receiver">
+              <span className="track-summary-label">ผู้รับ / เลขที่อ้างอิง</span>
+              <span className="track-summary-value">
+                {recInfo.receiver || '-'} {recInfo.invNo ? `(${recInfo.invNo})` : ''}
+              </span>
+            </div>
+          )}
+          <div className="track-summary-status">
+            {hasReceived ? (
+              <span className="track-final-pill success">
+                <span className="track-status-dot"></span>
+                รับฝากเข้าระบบแล้ว
+              </span>
+            ) : (
+              <span className="track-final-pill pending">
+                <span className="track-status-dot"></span>
+                อยู่ระหว่างการจัดส่ง
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Alerts */}
+        {error && (
+          <div className="track-alert error">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="8" x2="12" y2="12"></line>
+              <line x1="12" y1="16" x2="12.01" y2="16"></line>
+            </svg>
+            <span>{error}</span>
+          </div>
+        )}
+
+        {trackData?.api_notice && !error && (
+          <div className="track-alert warning">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+              <line x1="12" y1="9" x2="12" y2="13"></line>
+              <line x1="12" y1="17" x2="12.01" y2="17"></line>
+            </svg>
+            <span>
+              <strong>ข้อสังเกตจากระบบ e-Parcel:</strong> {trackData.api_notice} (ระบบอาจแสดงข้อมูลจำลองหรือข้อมูลสำรองเนื่องจากข้อจำกัด IP)
+            </span>
+          </div>
+        )}
+
+        {trackData?.is_mock && !error && (
+          <div className="track-alert info">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="16" x2="12" y2="12"></line>
+              <line x1="12" y1="8" x2="12.01" y2="8"></line>
+            </svg>
+            <span>
+              <strong>โหมดสาธิต (Demo Mode):</strong> กำลังแสดงไทม์ไลน์จำลองของหมายเลข {barcode}
+            </span>
+          </div>
+        )}
+
+        {/* Timeline Stepper */}
+        <div className="track-timeline-body">
+          {loading ? (
+            <div className="track-loading-state">
+              <span className="track-spinner large"></span>
+              <p>กำลังดึงประวัติสถานะจากไปรษณีย์ไทย...</p>
+            </div>
+          ) : sortedEvents.length === 0 ? (
+            <div className="track-empty-state">
+              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="8" x2="12" y2="12"></line>
+                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+              </svg>
+              <p className="track-empty-title">ไม่พบข้อมูลประวัติสถานะ</p>
+              <p className="track-empty-desc">อาจยังไม่มีข้อมูลในระบบ หรือหมายเลขบาร์โค้ดไม่ถูกต้อง</p>
+            </div>
+          ) : (
+            <ol className="track-stepper-list">
+              {sortedEvents.map((ev, idx) => {
+                const isLast = idx === sortedEvents.length - 1;
+                const isReceived = _isReceivedText(`${ev.status_description || ''} ${ev.status || ''}`) ||
+                  ['1', '001', 'p001'].includes(String(ev.status || '').toLowerCase());
+                return (
+                  <li key={ev.seq || idx} className={`track-step-item ${isLast ? 'last' : ''} ${isReceived ? 'received' : ''}`}>
+                    <div className="track-step-marker">
+                      <span className={`track-step-dot ${isReceived ? 'ok' : ''}`}>{isReceived ? '✓' : idx + 1}</span>
+                      {!isLast && <span className="track-step-line"></span>}
+                    </div>
+                    <div className="track-step-content">
+                      <div className="track-step-head">
+                        <span className={`track-step-title ${isReceived ? 'text-emerald' : ''}`}>
+                          {ev.status_description || 'อัปเดตสถานะ'}
+                        </span>
+                        {isReceived && <span className="track-received-badge">รับฝากแล้ว</span>}
+                      </div>
+                      <div className="track-step-datetime">
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                          <circle cx="12" cy="12" r="10"></circle>
+                          <polyline points="12 6 12 12 16 14"></polyline>
+                        </svg>
+                        <span>{ev.datetime || '-'}</span>
+                      </div>
+                      {ev.location && (
+                        <div className="track-step-location">
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                            <circle cx="12" cy="10" r="3"></circle>
+                          </svg>
+                          <span>{ev.location}</span>
+                        </div>
+                      )}
+                      {ev.signature && (
+                        <div className="track-step-signature">
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="12" cy="7" r="4"></circle>
+                          </svg>
+                          <span>{ev.signature}</span>
+                        </div>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
+            </ol>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="track-modal-footer">
+          <div className="track-footer-info">
+            {trackData && !loading && (
+              <>
+                แสดง <strong>{sortedEvents.length}</strong> เหตุการณ์ • ล่าสุด: “
+                <strong>{sortedEvents[sortedEvents.length - 1]?.status_description || '-'}</strong>”
+              </>
+            )}
+          </div>
+          <div className="track-footer-actions">
+            <button
+              type="button"
+              className="btn-track-refresh"
+              onClick={() => handleFetch(barcode)}
+              disabled={loading}
+            >
+              {loading ? (
+                <>
+                  <span className="track-spinner small"></span>
+                  <span>กำลังโหลด...</span>
+                </>
+              ) : (
+                <>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                    <polyline points="23 4 23 10 17 10"></polyline>
+                    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                  </svg>
+                  <span>รีเฟรชสถานะ</span>
+                </>
+              )}
+            </button>
+            <button type="button" className="btn-track-close" onClick={onClose}>
+              ปิดหน้าต่าง
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function _isReceivedText(text) {
+  return (text || '').includes('รับฝาก');
+}

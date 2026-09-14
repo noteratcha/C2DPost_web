@@ -1,3 +1,6 @@
 .vercel
 desktop.ini
 *.ini
+__pycache__/
+*.pyc
+

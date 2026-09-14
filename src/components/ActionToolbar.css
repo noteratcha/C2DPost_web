@@ -134,6 +134,14 @@
   transform: translateY(-1px);
 }
 
+.btn-check-deposit {
+  background-color: #0ea5e9;
+}
+.btn-check-deposit:not(:disabled):hover {
+  background-color: #0284c7;
+  transform: translateY(-1px);
+}
+
 /* Center Status Box */
 .center-status-box-wrap {
   flex: 1;

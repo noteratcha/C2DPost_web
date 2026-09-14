@@ -20,6 +20,8 @@ from core.convert_dpost import (
     generate_combined_pdf,
     generate_delivery_note_pdf,
     generate_custom_envelopes_pdf,
+    generate_deposit_report_excel,
+    generate_deposit_report_pdf,
     __version__
 )
 
@@ -61,6 +63,116 @@ class SendEparcelRequest(BaseModel):
     username: str
     password: str
     items: List[dict]
+
+class ReceivedReportRequest(BaseModel):
+    date: str  # Format: "DD/MM/YYYY"
+    username: Optional[str] = ""
+    password: Optional[str] = ""
+
+class DepositExportRequest(BaseModel):
+    records: List[dict]
+    summary: Optional[dict] = {}
+    date: Optional[str] = ""
+    organization: Optional[str] = "สำนักงานที่ดิน"
+
+class TrackingRequest(BaseModel):
+    barcode: str
+    username: Optional[str] = ""
+    password: Optional[str] = ""
+
+class ReconcileRequest(BaseModel):
+    barcodes: List[str]
+    username: Optional[str] = ""
+    password: Optional[str] = ""
+
+def _normalize_payload_list(raw):
+    """Defensively extract a list from various e-Parcel API response shapes."""
+    if isinstance(raw, dict):
+        for key in ("data", "items", "result", "orders", "Response", "response"):
+            if isinstance(raw.get(key), list):
+                return raw[key]
+        return []
+    if isinstance(raw, list):
+        return raw
+    return []
+
+def _parse_tracking_events(raw, barcode):
+    """Normalize getHistoryStatus response into a chronological timeline of events."""
+    items = _normalize_payload_list(raw)
+    events = []
+    for i, ev in enumerate(items):
+        ev_dict = {}
+        if isinstance(ev, dict):
+            ev_dict = ev
+        elif isinstance(ev, str):
+            ev_dict = {"status_description": ev.strip()}
+        else:
+            continue
+
+        status = str(ev_dict.get("status") or ev_dict.get("statusCode") or ev_dict.get("status_code") or "").strip()
+        desc = str(ev_dict.get("statusDescription") or ev_dict.get("status_description")
+                   or ev_dict.get("statusName") or ev_dict.get("description") or "").strip()
+        dt = str(ev_dict.get("createdDate") or ev_dict.get("created_date")
+                 or ev_dict.get("date") or ev_dict.get("datetime") or ev_dict.get("eventDate") or "").strip()
+        loc = str(ev_dict.get("postcodeName") or ev_dict.get("location") or ev_dict.get("officeName")
+                  or ev_dict.get("postoffice") or "").strip()
+        sig = str(ev_dict.get("signature") or ev_dict.get("employee") or "").strip()
+
+        events.append({
+            "seq": i + 1,
+            "status": status,
+            "status_description": desc or status or "อัปเดตสถานะ",
+            "datetime": dt,
+            "location": loc,
+            "signature": sig
+        })
+    return events
+
+def _is_received_text(text):
+    """Heuristic: does a status string indicate the item was received at the post office?"""
+    text = (text or "").lower()
+    if "รับฝาก" in text or "รับฝากเข้าระบบ" in text:
+        return True
+    return False
+
+def _is_received_status_code(code):
+    code = str(code or "").strip().lower()
+    return code in ("1", "001", "p001", "received", "success")
+
+def _is_received_event(ev):
+    if _is_received_text(ev.get("status_description")):
+        return True
+    if _is_received_status_code(ev.get("status")):
+        return True
+    return False
+
+def _build_demo_tracking(barcode, clean_date="14/09/2026"):
+    return [
+        {
+            "seq": 1,
+            "status": "001",
+            "status_description": "รับฝากเข้าระบบแล้ว",
+            "datetime": f"{clean_date} 11:24:50",
+            "location": "ปณ.เรณูนคร",
+            "signature": "เจ้าหน้าที่รับฝาก"
+        },
+        {
+            "seq": 2,
+            "status": "002",
+            "status_description": "อยู่ระหว่างนำส่งไปยังปลายทาง",
+            "datetime": f"{clean_date} 13:05:12",
+            "location": "ศูนย์คัดแยกนครพนม",
+            "signature": "ระบบอัตโนมัติ"
+        },
+        {
+            "seq": 3,
+            "status": "003",
+            "status_description": "ถึงที่ทำการไปรษณีย์ปลายทาง",
+            "datetime": f"{clean_date} 15:40:33",
+            "location": "ปณ.เมืองนครพนม",
+            "signature": "ระบบอัตโนมัติ"
+        }
+    ]
 
 @app.get("/api/health")
 def health_check():
@@ -128,6 +240,470 @@ def send_eparcel(req: SendEparcelRequest):
             "status_code": 500,
             "error": str(e)
         }
+
+@app.post("/api/reports/received")
+def get_received_report(req: ReceivedReportRequest):
+    """
+    Fetches daily deposit report from Thailand Post e-Parcel API (getAllOrderReceived).
+    Accepts date in DD/MM/YYYY format and user credentials.
+    """
+    import re
+    import requests
+    from requests.auth import HTTPBasicAuth
+    import urllib3
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+    
+    clean_date = req.date.strip()
+    if not re.match(r'^\d{2}/\d{2}/\d{4}$', clean_date):
+        raise HTTPException(
+            status_code=400, 
+            detail="รูปแบบวันที่ไม่ถูกต้อง กรุณาใช้วันที่ในรูปแบบ DD/MM/YYYY เช่น 14/09/2026"
+        )
+        
+    username = (req.username or "").strip()
+    password = (req.password or "").strip()
+
+    # Check for demo mode / mock fallback
+    is_demo_user = username.lower() in ("admin", "renu_officer", "demo", "usertest", "")
+    
+    raw_data = None
+    api_error = None
+    
+    if username and password and not is_demo_user:
+        try:
+            url = f"https://r_dservice.thailandpost.com/webservice/getAllOrderReceived?date={clean_date}"
+            headers = {"Content-Type": "application/json"}
+            response = requests.get(
+                url,
+                headers=headers,
+                auth=HTTPBasicAuth(username, password),
+                timeout=25,
+                verify=False
+            )
+            
+            if response.status_code == 401:
+                return JSONResponse(
+                    status_code=401,
+                    content={
+                        "success": False,
+                        "error": "unauthorized",
+                        "message": "ชื่อผู้ใช้หรือรหัสผ่านสำหรับระบบไปรษณีย์ e-Parcel ไม่ถูกต้อง"
+                    }
+                )
+                
+            if response.status_code == 200:
+                try:
+                    resp_json = response.json()
+                    if isinstance(resp_json, list):
+                        raw_data = resp_json
+                    elif isinstance(resp_json, dict) and "data" in resp_json and isinstance(resp_json["data"], list):
+                        raw_data = resp_json["data"]
+                    else:
+                        raw_data = []
+                except Exception:
+                    raw_data = []
+            else:
+                api_error = f"API ตอบกลับสถานะ {response.status_code}: {response.text[:200]}"
+        except Exception as e:
+            api_error = f"การเชื่อมต่อไปยังระบบ e-Parcel ล้มเหลว: {str(e)}"
+
+    # If live API wasn't called or failed for demo account, generate realistic demo data
+    if raw_data is None:
+        if is_demo_user or api_error:
+            raw_data = [
+                {
+                    "barcode": "EF193867005TH",
+                    "invNo": "นพ0020.05/889",
+                    "customerName": "นายสมชาย มั่งคั่ง",
+                    "customerAddress": "123 หมู่ 4 ต.เรณู",
+                    "customerAmphur": "เรณูนคร",
+                    "customerProvince": "นครพนม",
+                    "customerZipcode": "48170",
+                    "productWeight": 85.0,
+                    "emsPrice": 42.0,
+                    "servicePrice": 0.0,
+                    "insurancePrice": 0.0,
+                    "status": "1",
+                    "statusDescription": "รับฝากเข้าระบบแล้ว",
+                    "createdDate": f"{clean_date} 09:30:15",
+                    "receivedDate": f"{clean_date} 11:24:50",
+                    "postcodeName": "ปณ.เรณูนคร",
+                    "signature": "เจ้าหน้าที่รับฝาก"
+                },
+                {
+                    "barcode": "EF193867014TH",
+                    "invNo": "นพ0020.05/890",
+                    "customerName": "นางสมศรี ศรีมงคล",
+                    "customerAddress": "45/1 หมู่ 2 ต.โพนทอง",
+                    "customerAmphur": "เรณูนคร",
+                    "customerProvince": "นครพนม",
+                    "customerZipcode": "48170",
+                    "productWeight": 120.0,
+                    "emsPrice": 52.0,
+                    "servicePrice": 0.0,
+                    "insurancePrice": 0.0,
+                    "status": "1",
+                    "statusDescription": "รับฝากเข้าระบบแล้ว",
+                    "createdDate": f"{clean_date} 09:32:00",
+                    "receivedDate": f"{clean_date} 11:25:12",
+                    "postcodeName": "ปณ.เรณูนคร",
+                    "signature": "เจ้าหน้าที่รับฝาก"
+                },
+                {
+                    "barcode": "EF193867028TH",
+                    "invNo": "นพ0020.05/891",
+                    "customerName": "นายประเสริฐ ชัยชนะ",
+                    "customerAddress": "88 หมู่ 6 ต.ท่าลาด",
+                    "customerAmphur": "เรณูนคร",
+                    "customerProvince": "นครพนม",
+                    "customerZipcode": "48170",
+                    "productWeight": 95.0,
+                    "emsPrice": 42.0,
+                    "servicePrice": 0.0,
+                    "insurancePrice": 0.0,
+                    "status": "1",
+                    "statusDescription": "รับฝากเข้าระบบแล้ว",
+                    "createdDate": f"{clean_date} 09:35:40",
+                    "receivedDate": f"{clean_date} 11:26:05",
+                    "postcodeName": "ปณ.เรณูนคร",
+                    "signature": "เจ้าหน้าที่รับฝาก"
+                }
+            ]
+        else:
+            raw_data = []
+
+    # Data Normalization
+    normalized_records = []
+    total_weight = 0.0
+    total_fee = 0.0
+
+    for i, item in enumerate(raw_data):
+        weight = float(item.get("productWeight") or item.get("weight") or 0.0)
+        ems_price = float(item.get("emsPrice") or item.get("ems_price") or 0.0)
+        svc_price = float(item.get("servicePrice") or item.get("service_price") or 0.0)
+        ins_price = float(item.get("insurancePrice") or item.get("insurance_price") or 0.0)
+        fee = ems_price + svc_price + ins_price
+        
+        total_weight += weight
+        total_fee += fee
+
+        norm_item = {
+            "seq": i + 1,
+            "barcode": (item.get("barcode") or "").strip(),
+            "inv_no": (item.get("invNo") or item.get("inv_no") or "").strip(),
+            "receiver_name": (item.get("customerName") or item.get("receiver_name") or "").strip(),
+            "receiver_address": (item.get("customerAddress") or item.get("receiver_address") or "").strip(),
+            "receiver_amphur": (item.get("customerAmphur") or item.get("receiver_amphur") or "").strip(),
+            "receiver_province": (item.get("customerProvince") or item.get("receiver_province") or "").strip(),
+            "receiver_zipcode": (item.get("customerZipcode") or item.get("receiver_zipcode") or "").strip(),
+            "status": str(item.get("status") or "1").strip(),
+            "status_description": (item.get("statusDescription") or item.get("status_description") or "รับฝากเข้าระบบแล้ว").strip(),
+            "created_date": (item.get("createdDate") or item.get("created_date") or "").strip(),
+            "received_date": (item.get("receivedDate") or item.get("received_date") or "").strip(),
+            "received_postoffice": (item.get("postcodeName") or item.get("received_postoffice") or "ที่ทำการไปรษณีย์").strip(),
+            "weight": round(weight, 2),
+            "fee": round(fee, 2),
+            "signature": (item.get("signature") or "").strip()
+        }
+        normalized_records.append(norm_item)
+
+    return {
+        "success": True,
+        "date": clean_date,
+        "is_mock": is_demo_user or bool(api_error),
+        "api_notice": api_error if (api_error and not is_demo_user) else None,
+        "summary": {
+            "total_items": len(normalized_records),
+            "total_weight": round(total_weight, 2),
+            "total_fee": round(total_fee, 2),
+            "received_count": len(normalized_records),
+            "pending_count": 0
+        },
+        "records": normalized_records
+    }
+
+@app.post("/api/reports/tracking")
+def get_tracking(req: TrackingRequest):
+    """
+    Fetches the delivery timeline for a single barcode via getHistoryStatus.
+    Normalizes into a chronological stepper-friendly list of events.
+    """
+    import requests
+    from requests.auth import HTTPBasicAuth
+    import urllib3
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+    barcode = (req.barcode or "").strip()
+    if not barcode:
+        raise HTTPException(status_code=400, detail="กรุณาระบุหมายเลขบาร์โค้ด")
+
+    username = (req.username or "").strip()
+    password = (req.password or "").strip()
+    is_demo_user = username.lower() in ("admin", "renu_officer", "demo", "usertest", "")
+
+    events = None
+    api_error = None
+
+    if username and password and not is_demo_user:
+        try:
+            url = f"https://r_dservice.thailandpost.com/webservice/getHistoryStatus?barcode={barcode}"
+            headers = {"Content-Type": "application/json"}
+            response = requests.get(url, headers=headers, auth=HTTPBasicAuth(username, password), timeout=25, verify=False)
+
+            if response.status_code == 401:
+                return JSONResponse(
+                    status_code=401,
+                    content={
+                        "success": False,
+                        "error": "unauthorized",
+                        "message": "ชื่อผู้ใช้หรือรหัสผ่านสำหรับระบบไปรษณีย์ e-Parcel ไม่ถูกต้อง"
+                    }
+                )
+
+            if response.status_code == 200:
+                try:
+                    raw = response.json()
+                except Exception:
+                    raw = response.text
+                events = _parse_tracking_events(raw, barcode) or []
+            else:
+                api_error = f"API ตอบกลับสถานะ {response.status_code}: {response.text[:200]}"
+        except Exception as e:
+            api_error = f"การเชื่อมต่อไปยังระบบ e-Parcel ล้มเหลว: {str(e)}"
+
+    if events is None:
+        if is_demo_user and not api_error:
+            events = _build_demo_tracking(barcode)
+        elif api_error and not username:
+            events = []
+        else:
+            events = [] if api_error else []
+
+    return {
+        "success": True,
+        "barcode": barcode,
+        "is_mock": bool(is_demo_user or api_error and not is_demo_user),
+        "api_notice": api_error if (api_error and not is_demo_user) else None,
+        "events": events
+    }
+
+@app.post("/api/reports/reconcile")
+def reconcile_received(req: ReconcileRequest):
+    """
+    Auto-reconcile: checks a batch of barcodes against Thailand Post e-Parcel
+    to determine which items have already been received at the post office.
+    """
+    import requests
+    from requests.auth import HTTPBasicAuth
+    import urllib3
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+    barcodes = []
+    seen = set()
+    for b in (req.barcodes or []):
+        clean = str(b or "").strip()
+        if clean and clean not in seen:
+            seen.add(clean)
+            barcodes.append(clean)
+
+    if not barcodes:
+        raise HTTPException(status_code=400, detail="ไม่มีหมายเลขบาร์โค้ดให้ตรวจสอบ")
+
+    username = (req.username or "").strip()
+    password = (req.password or "").strip()
+    is_demo_user = username.lower() in ("admin", "renu_officer", "demo", "usertest", "")
+
+    order_map = {}
+    api_error = None
+
+    if username and password and not is_demo_user:
+        try:
+            url = "https://r_dservice.thailandpost.com/webservice/getOrderByBarcodes"
+            headers = {"Content-Type": "application/json"}
+            payload = {"barcodes": barcodes}
+            response = requests.post(url, json=payload, headers=headers,
+                                     auth=HTTPBasicAuth(username, password), timeout=30, verify=False)
+
+            if response.status_code == 401:
+                return JSONResponse(
+                    status_code=401,
+                    content={
+                        "success": False,
+                        "error": "unauthorized",
+                        "message": "ชื่อผู้ใช้หรือรหัสผ่านสำหรับระบบไปรษณีย์ e-Parcel ไม่ถูกต้อง"
+                    }
+                )
+
+            if response.status_code == 200:
+                try:
+                    raw = response.json()
+                except Exception:
+                    raw = response.text
+
+                items = _normalize_payload_list(raw)
+                for item in items:
+                    if not isinstance(item, dict):
+                        continue
+                    bcode = str(item.get("barcode") or "").strip()
+                    if not bcode:
+                        continue
+                    status = str(item.get("status") or item.get("statusCode") or item.get("status_code") or "").strip()
+                    desc = str(item.get("statusDescription") or item.get("status_description")
+                               or item.get("statusName") or "").strip()
+                    received_date = str(item.get("receivedDate") or item.get("received_date")
+                                        or item.get("createdDate") or item.get("created_date") or "").strip()
+                    po = str(item.get("postcodeName") or item.get("received_postoffice") or "").strip()
+                    received = _is_received_text(desc) or _is_received_status_code(status)
+                    order_map[bcode] = {
+                        "barcode": bcode,
+                        "received": received,
+                        "status": status,
+                        "status_description": desc,
+                        "received_date": received_date,
+                        "received_postoffice": po
+                    }
+            else:
+                api_error = f"API ตอบกลับสถานะ {response.status_code}: {response.text[:200]}"
+        except Exception as e:
+            api_error = f"การเชื่อมต่อไปยังระบบ e-Parcel ล้มเหลว: {str(e)}"
+
+        # Fallback: per-barcode getHistoryStatus when the batch endpoint returned nothing usable
+        if not order_map and not api_error:
+            for barcode in barcodes:
+                try:
+                    hurl = f"https://r_dservice.thailandpost.com/webservice/getHistoryStatus?barcode={barcode}"
+                    hresp = requests.get(hurl, headers={"Content-Type": "application/json"},
+                                         auth=HTTPBasicAuth(username, password), timeout=25, verify=False)
+                    if hresp.status_code == 200:
+                        try:
+                            hraw = hresp.json()
+                        except Exception:
+                            hraw = hresp.text
+                        events = _parse_tracking_events(hraw, barcode)
+                        received_events = [ev for ev in events if _is_received_event(ev)]
+                        latest = events[0] if events else {}
+                        received = len(received_events) > 0
+                        order_map[barcode] = {
+                            "barcode": barcode,
+                            "received": received,
+                            "status": latest.get("status", ""),
+                            "status_description": latest.get("status_description", ""),
+                            "received_date": received_events[0].get("datetime", "") if received_events else latest.get("datetime", ""),
+                            "received_postoffice": latest.get("location", "")
+                        }
+                except Exception:
+                    order_map[barcode] = {
+                        "barcode": barcode,
+                        "received": False,
+                        "status": "",
+                        "status_description": "",
+                        "received_date": "",
+                        "received_postoffice": ""
+                    }
+
+    # Demo mode: simulate realistic receiving pattern per barcode
+    if is_demo_user and not order_map:
+        for i, barcode in enumerate(barcodes):
+            received = (sum(ord(c) for c in barcode) % 3) != 0
+            order_map[barcode] = {
+                "barcode": barcode,
+                "received": received,
+                "status": "1" if received else "",
+                "status_description": "รับฝากเข้าระบบแล้ว" if received else "ยังไม่มีการรับฝากเข้าระบบ",
+                "received_date": "14/09/2026 11:24:50" if received else "",
+                "received_postoffice": "ปณ.เรณูนคร" if received else ""
+            }
+
+    # Fill any barcodes still missing (live API returned nothing at all)
+    for barcode in barcodes:
+        if barcode not in order_map:
+            order_map[barcode] = {
+                "barcode": barcode,
+                "received": False,
+                "status": "",
+                "status_description": "ไม่พบข้อมูล / ยังไม่ตรวจสอบ",
+                "received_date": "",
+                "received_postoffice": ""
+            }
+
+    results = [order_map[b] for b in barcodes]
+
+    return {
+        "success": True,
+        "is_mock": bool(is_demo_user or api_error and not is_demo_user),
+        "api_notice": api_error if (api_error and not is_demo_user) else None,
+        "total_checked": len(results),
+        "received_count": sum(1 for r in results if r["received"]),
+        "results": results
+    }
+
+@app.post("/api/reports/export-excel")
+async def export_deposit_report_excel_endpoint(req: DepositExportRequest):
+    """
+    Exports deposit report items as a beautifully styled Excel (.xlsx) file.
+    """
+    if not req.records:
+        raise HTTPException(status_code=400, detail="No records provided for deposit report")
+        
+    try:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            tmp_excel_path = os.path.join(temp_dir, f"Deposit_Report_{timestamp}.xlsx")
+            
+            meta = {
+                "organization": req.organization or "สำนักงานที่ดิน",
+                "date": req.date or datetime.now().strftime("%d/%m/%Y")
+            }
+            
+            generate_deposit_report_excel(req.records, req.summary or {}, meta, tmp_excel_path)
+            
+            with open(tmp_excel_path, "rb") as f:
+                excel_bytes = io.BytesIO(f.read())
+                
+            clean_date_file = (req.date or timestamp).replace("/", "-")
+            filename = f"Deposit_Report_{clean_date_file}.xlsx"
+            
+            return StreamingResponse(
+                excel_bytes,
+                media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+            )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate Deposit Report Excel: {str(e)}")
+
+@app.post("/api/reports/export-pdf")
+async def export_deposit_report_pdf_endpoint(req: DepositExportRequest):
+    """
+    Exports deposit report items as an official government-style Landscape A4 PDF.
+    """
+    if not req.records:
+        raise HTTPException(status_code=400, detail="No records provided for deposit report")
+        
+    try:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            tmp_pdf_path = os.path.join(temp_dir, f"Deposit_Report_{timestamp}.pdf")
+            
+            meta = {
+                "organization": req.organization or "สำนักงานที่ดิน",
+                "date": req.date or datetime.now().strftime("%d/%m/%Y")
+            }
+            
+            generate_deposit_report_pdf(req.records, req.summary or {}, meta, tmp_pdf_path)
+            
+            with open(tmp_pdf_path, "rb") as f:
+                pdf_bytes = io.BytesIO(f.read())
+                
+            clean_date_file = (req.date or timestamp).replace("/", "-")
+            filename = f"Deposit_Report_{clean_date_file}.pdf"
+            
+            return StreamingResponse(
+                pdf_bytes,
+                media_type="application/pdf",
+                headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+            )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate Deposit Report PDF: {str(e)}")
 
 @app.post("/api/verify_user")
 def verify_user(req: VerifyUserRequest):

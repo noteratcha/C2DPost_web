@@ -6,10 +6,13 @@ export default function PreviewGrid({
   records = [],
   selectedFiles = [],
   fileStatuses = {},
+  reconcileNotice = null,
+  onDismissReconcileNotice,
   onUpdateRecord,
   onDeleteRecord,
   onClearAll,
-  onViewPdf
+  onViewPdf,
+  onViewTracking
 }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [showFileListModal, setShowFileListModal] = useState(false);
@@ -163,6 +166,52 @@ export default function PreviewGrid({
         </div>
       </div>
 
+      {/* Reconcile Notice Banner */}
+      {reconcileNotice && (
+        <div className={`reconcile-banner ${reconcileNotice.api_notice ? 'warning' : 'info'}`}>
+          <div className="reconcile-banner-content">
+            <span className="reconcile-banner-icon">
+              {reconcileNotice.api_notice ? '⚠️' : 'ℹ️'}
+            </span>
+            <div className="reconcile-banner-text">
+              {reconcileNotice.api_notice ? (
+                <>
+                  <div className="reconcile-banner-main">
+                    <strong>ข้อสังเกตจากระบบ e-Parcel:</strong> {reconcileNotice.api_notice}
+                  </div>
+                  <div className="reconcile-banner-sub">
+                    (การตรวจสอบจาก Vercel US อาจติดเงื่อนไข IP Whitelist ของไปรษณีย์ไทย ระบบจึงแสดงสถานะที่ไม่สามารถเข้าถึงได้ กรุณาตรวจสอบผ่านเครือข่ายภายในหรือแอปพลิเคชัน Desktop)
+                  </div>
+                </>
+              ) : reconcileNotice.is_mock ? (
+                <>
+                  <div className="reconcile-banner-main">
+                    <strong>โหมดสาธิต (Demo Mode):</strong> กำลังแสดงผลการตรวจสอบรับฝากแบบจำลองสำหรับบัญชีทดสอบ
+                  </div>
+                  <div className="reconcile-banner-sub">
+                    (ตรวจพบรับฝาก {reconcileNotice.received_count} จาก {reconcileNotice.total_checked} รายการ — แถวที่รับฝากแล้วจะแสดงพื้นหลังสีเขียว)
+                  </div>
+                </>
+              ) : (
+                <div className="reconcile-banner-main">
+                  <strong>ผลการตรวจสอบรับฝาก:</strong> รับฝากแล้ว {reconcileNotice.received_count} จาก {reconcileNotice.total_checked} รายการ
+                </div>
+              )}
+            </div>
+          </div>
+          {onDismissReconcileNotice && (
+            <button
+              type="button"
+              className="reconcile-banner-close"
+              onClick={onDismissReconcileNotice}
+              title="ปิดการแจ้งเตือนนี้"
+            >
+              ✕
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Table Frame */}
       <div className="table-wrapper">
         {records.length === 0 ? (
@@ -176,7 +225,7 @@ export default function PreviewGrid({
             <thead>
               <tr>
                 {/* 1. เครื่องมือ */}
-                <th className="th-tools" style={{ width: '90px' }}>เครื่องมือ</th>
+                <th className="th-tools" style={{ width: '125px' }}>เครื่องมือ</th>
 
                 {/* 2. [ ✓ ] */}
                 <th 
@@ -212,6 +261,9 @@ export default function PreviewGrid({
 
                 {/* 9. การส่งข้อมูล */}
                 <th style={{ minWidth: '140px' }}>การส่งข้อมูล</th>
+
+                {/* 10. การรับฝาก */}
+                <th style={{ minWidth: '135px' }}>การรับฝาก</th>
               </tr>
             </thead>
             <tbody>
@@ -238,6 +290,8 @@ export default function PreviewGrid({
 
                 const zipcode = String(row.RECEIVER_ZIPCODE || row['RECEIVER ZIPCODE'] || '').trim() || '-';
                 const apiStatus = row.API_STATUS || 'ยังไม่ส่งข้อมูล';
+                const depositReceived = row.DEPOSIT_RECEIVED === true;
+                const depositStatus = row.DEPOSIT_STATUS || 'ยังไม่ตรวจสอบ';
 
                 const isApiSuccess = apiStatus.includes('✓ สำเร็จ');
                 const isApiError = apiStatus.includes('✗');
@@ -245,7 +299,7 @@ export default function PreviewGrid({
                 return (
                   <tr 
                     key={originalIndex} 
-                    className={`${idx % 2 === 0 ? 'even-row' : 'odd-row'} ${isSelected ? 'selected-row' : ''}`}
+                    className={`${idx % 2 === 0 ? 'even-row' : 'odd-row'} ${isSelected ? 'selected-row' : ''} ${depositReceived ? 'reconciled-row' : ''}`}
                   >
                     {/* Tools Column: Delete & View PDF */}
                     <td className="col-tools">
@@ -273,6 +327,18 @@ export default function PreviewGrid({
                           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                             <circle cx="11" cy="11" r="8"></circle>
                             <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                          </svg>
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-tool-icon btn-tool-track"
+                          onClick={() => onViewTracking && onViewTracking(row)}
+                          title={barcode ? 'ดูประวัติสถานะรายชิ้น (Tracking)' : 'กรุณาดึงหมายเลขบาร์โค้ดก่อน'}
+                          disabled={!barcode}
+                        >
+                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <polyline points="12 6 12 12 16 14"></polyline>
                           </svg>
                         </button>
                       </div>
@@ -316,6 +382,29 @@ export default function PreviewGrid({
                     {/* การส่งข้อมูล */}
                     <td className={`col-api-status ${isApiSuccess ? 'stat-success' : isApiError ? 'stat-error' : 'stat-pending'}`}>
                       <span className="api-badge">{apiStatus}</span>
+                    </td>
+
+                    {/* การรับฝาก */}
+                    <td className={`col-deposit-status ${depositReceived ? 'dep-success' : 'dep-pending'}`}>
+                      {barcode ? (
+                        <span className={`deposit-badge ${depositReceived ? 'ok' : 'idle'}`}>
+                          {depositReceived ? (
+                            <>
+                              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                                <polyline points="20 6 9 17 4 12"></polyline>
+                              </svg>
+                              <span title={depositStatus}>{depositStatus}</span>
+                            </>
+                          ) : (
+                            <>
+                              <span className="dep-dot"></span>
+                              <span title={depositStatus}>{depositStatus}</span>
+                            </>
+                          )}
+                        </span>
+                      ) : (
+                        <span className="deposit-badge idle">-</span>
+                      )}
                     </td>
                   </tr>
                 );
