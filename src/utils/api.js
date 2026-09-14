@@ -327,41 +327,62 @@ export async function exportDepositReportPdf({ records, summary = {}, date = '',
  */
 export async function logBarcodesToUseBarcode(items, username) {
   if (!items || items.length === 0) return { success: true, logged_count: 0 };
-  
-  // 1. First priority: Python Serverless API (/api/log-barcodes)
-  try {
-    const response = await fetch(`${API_BASE}/log-barcodes`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        username: username || 'Unknown',
-        items: items
-      })
-    });
-    if (response.ok) {
-      const data = await response.json();
-      if (data && data.success) return data;
-    }
-  } catch (error) {
-    console.warn('Backend log-barcodes encountered issue, attempting direct client fallback:', error);
-  }
 
-  // 2. Client-side direct fallback to Google Apps Script (bypasses server timeout)
+  const now = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  const nowStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+
+  // Format items with timestamp and username
+  const formattedItems = items.map((it) => ({
+    timestamp: it.timestamp || nowStr,
+    username: it.username || username || 'Unknown',
+    barcode: it.barcode || '',
+    details: it.details || ''
+  }));
+
+  const USE_BARCODE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyznLrLf7Qgi0glxzytW8uhpZfnu5Jkh_eUibgJxBe8z9dmBDs7ndM6deT6x8v59Q/exec';
+  const COUNT_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyElrFXMUEN4pqhpNWD7lxQ_z1l1pCIOny1Ipk9yOEwuWTnASplduekZxzZWFRGSdHh/exec';
+  const USER_LOG_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzNEBcaLUc7UWSXtLuf3VnaTR4pP_4Xfxwaq8zKOQHGolyQL9UT2RAGKaT8jtBCzko/exec';
+
   try {
-    const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyznLrLf7Qgi0glxzytW8uhpZfnu5Jkh_eUibgJxBe8z9dmBDs7ndM6deT6x8v59Q/exec';
-    await fetch(GOOGLE_SCRIPT_URL, {
+    // 1. Direct call from user browser to UseBarcode Google Apps Script
+    fetch(USE_BARCODE_SCRIPT_URL, {
       method: 'POST',
       mode: 'no-cors',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify({
         action: 'log_detailed_barcodes',
-        data: items
+        data: formattedItems
       })
-    });
-    return { success: true, logged_count: items.length, mode: 'client_fallback' };
-  } catch (clientErr) {
-    console.warn('Client fallback logging failed:', clientErr);
-    return { success: false, error: clientErr.message };
+    }).catch((e) => console.warn('Direct UseBarcode log failed:', e));
+
+    // 2. Count tracking (EMS, R, eCo)
+    const emsCount = formattedItems.filter(b => /^[EJ]/i.test(b.barcode)).length;
+    const rCount = formattedItems.filter(b => /^[RB]/i.test(b.barcode)).length;
+    const ecoCount = formattedItems.filter(b => /^O/i.test(b.barcode)).length;
+    fetch(`${COUNT_SCRIPT_URL}?action=log_barcode&ems=${emsCount}&r=${rCount}&eco=${ecoCount}`, {
+      method: 'GET',
+      mode: 'no-cors'
+    }).catch(() => {});
+
+    // 3. User action log (TimeUse)
+    let bcodeSample = formattedItems.map(b => b.barcode).join(', ');
+    if (bcodeSample.length > 100) bcodeSample = bcodeSample.slice(0, 97) + '...';
+    fetch(USER_LOG_SCRIPT_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({
+        timestamp: nowStr,
+        username: username || 'Unknown',
+        status: `Fetch Barcodes (${formattedItems.length} items) - C2DPost Web (เลข: ${bcodeSample})`
+      })
+    }).catch(() => {});
+
+    return { success: true, logged_count: formattedItems.length };
+  } catch (err) {
+    console.warn('logBarcodesToUseBarcode failed:', err);
+    return { success: false, error: err.message };
   }
 }
 
