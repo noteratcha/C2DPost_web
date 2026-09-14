@@ -395,8 +395,8 @@ def get_received_report(req: ReceivedReportRequest):
     username = (req.username or "").strip()
     password = (req.password or "").strip()
 
-    # Check for demo mode / mock fallback
-    is_demo_user = username.lower() in ("admin", "renu_officer", "demo", "usertest", "")
+    # Check for demo mode / mock fallback (only if credentials are missing or explicitly demo)
+    is_demo_user = not username or not password or username.lower() == "demo"
     
     raw_data = None
     api_error = None
@@ -427,9 +427,17 @@ def get_received_report(req: ReceivedReportRequest):
                 try:
                     resp_json = response.json()
                     if isinstance(resp_json, list):
-                        raw_data = resp_json
+                        # Handle Thailand Post empty notice e.g. [{"errorCode":"088","errorDetail":"No Receive Product.","status":false}]
+                        if len(resp_json) > 0 and isinstance(resp_json[0], dict) and resp_json[0].get("errorCode"):
+                            raw_data = []
+                            api_error = resp_json[0].get("errorDetail") or "ไม่พบรายการรับฝากสำหรับบัญชีนี้ในวันที่เลือก (No Receive Product)"
+                        else:
+                            raw_data = resp_json
                     elif isinstance(resp_json, dict) and "data" in resp_json and isinstance(resp_json["data"], list):
                         raw_data = resp_json["data"]
+                    elif isinstance(resp_json, dict) and resp_json.get("errorCode"):
+                        raw_data = []
+                        api_error = resp_json.get("errorDetail") or "ไม่พบรายการรับฝากสำหรับบัญชีนี้ในวันที่เลือก (No Receive Product)"
                     else:
                         raw_data = []
                 except Exception:
@@ -439,9 +447,9 @@ def get_received_report(req: ReceivedReportRequest):
         except Exception as e:
             api_error = f"การเชื่อมต่อไปยังระบบ e-Parcel ล้มเหลว: {str(e)}"
 
-    # If live API wasn't called or failed for demo account, generate realistic demo data
+    # If live API wasn't called or failed, only use demo data for explicit demo user
     if raw_data is None:
-        if is_demo_user or api_error:
+        if is_demo_user:
             raw_data = [
                 {
                     "barcode": "EF193867005TH",
@@ -542,8 +550,8 @@ def get_received_report(req: ReceivedReportRequest):
     return {
         "success": True,
         "date": clean_date,
-        "is_mock": is_demo_user or bool(api_error),
-        "api_notice": api_error if (api_error and not is_demo_user) else None,
+        "is_mock": bool(is_demo_user),
+        "api_notice": api_error if not is_demo_user else None,
         "summary": {
             "total_items": len(normalized_records),
             "total_weight": round(total_weight, 2),
@@ -571,7 +579,7 @@ def get_tracking(req: TrackingRequest):
 
     username = (req.username or "").strip()
     password = (req.password or "").strip()
-    is_demo_user = username.lower() in ("admin", "renu_officer", "demo", "usertest", "")
+    is_demo_user = not username or not password or username.lower() == "demo"
 
     events = None
     api_error = None
@@ -606,16 +614,14 @@ def get_tracking(req: TrackingRequest):
     if events is None:
         if is_demo_user and not api_error:
             events = _build_demo_tracking(barcode)
-        elif api_error and not username:
-            events = []
         else:
-            events = [] if api_error else []
+            events = []
 
     return {
         "success": True,
         "barcode": barcode,
-        "is_mock": bool(is_demo_user or api_error and not is_demo_user),
-        "api_notice": api_error if (api_error and not is_demo_user) else None,
+        "is_mock": bool(is_demo_user),
+        "api_notice": api_error if not is_demo_user else None,
         "events": events
     }
 
@@ -643,7 +649,7 @@ def reconcile_received(req: ReconcileRequest):
 
     username = (req.username or "").strip()
     password = (req.password or "").strip()
-    is_demo_user = username.lower() in ("admin", "renu_officer", "demo", "usertest", "")
+    is_demo_user = not username or not password or username.lower() == "demo"
 
     order_map = {}
     api_error = None
@@ -762,8 +768,8 @@ def reconcile_received(req: ReconcileRequest):
 
     return {
         "success": True,
-        "is_mock": bool(is_demo_user or api_error and not is_demo_user),
-        "api_notice": api_error if (api_error and not is_demo_user) else None,
+        "is_mock": bool(is_demo_user),
+        "api_notice": api_error if not is_demo_user else None,
         "total_checked": len(results),
         "received_count": sum(1 for r in results if r["received"]),
         "results": results
