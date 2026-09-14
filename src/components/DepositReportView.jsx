@@ -29,7 +29,6 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
   const [reportData, setReportData] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterTab, setFilterTab] = useState('all'); // 'all' | 'received'
-  const [syncNotice, setSyncNotice] = useState('');
 
   // Fetch report function
   const handleFetchReport = useCallback(async (dateToFetch) => {
@@ -42,7 +41,6 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
     const apiDate = toApiDateFormat(targetIso);
     setLoading(true);
     setError('');
-    setSyncNotice('');
 
     try {
       const username = currentPerson?.UserName || '';
@@ -55,6 +53,9 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
 
       if (result.success) {
         setReportData(result);
+        if (onSyncRecords && result.records && result.records.length > 0) {
+          onSyncRecords(result.records);
+        }
       } else {
         setError(result.message || 'ไม่สามารถดึงข้อมูลรายงานได้');
       }
@@ -63,7 +64,7 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
     } finally {
       setLoading(false);
     }
-  }, [selectedDate, currentPerson]);
+  }, [selectedDate, currentPerson, onSyncRecords]);
 
   // Initial load
   useEffect(() => {
@@ -79,19 +80,6 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
     const iso = toInputDateFormat(d);
     setSelectedDate(iso);
     handleFetchReport(iso);
-  };
-
-  // Sync to workspace
-  const handleTriggerSync = () => {
-    if (!reportData || !reportData.records || reportData.records.length === 0) {
-      alert('ไม่มีข้อมูลในรายงานสำหรับซิงก์');
-      return;
-    }
-    if (onSyncRecords) {
-      onSyncRecords(reportData.records);
-      setSyncNotice(`ซิงก์ผลรับฝาก ${reportData.records.length} รายการ กับตารางแปลงไฟล์หลักเรียบร้อยแล้ว`);
-      setTimeout(() => setSyncNotice(''), 4000);
-    }
   };
 
   // Filtered records based on search and tab
@@ -267,15 +255,6 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
         </div>
 
         {/* Alerts & Notices */}
-        {syncNotice && (
-          <div className="deposit-alert success">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <polyline points="20 6 9 17 4 12"></polyline>
-            </svg>
-            <span>{syncNotice}</span>
-          </div>
-        )}
-
         {error && (
           <div className="deposit-alert error">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -492,23 +471,6 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
             </div>
 
             <div className="deposit-footer-actions">
-              {onSyncRecords && (
-                <button
-                  type="button"
-                  className="btn-footer-sync"
-                  onClick={handleTriggerSync}
-                  disabled={loading || filteredRecords.length === 0}
-                  title="นำผลรับฝากไปไฮไลต์และอัปเดตสถานะในตารางแปลงไฟล์หน้าแรก"
-                >
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-                    <polyline points="23 4 23 10 17 10"></polyline>
-                    <polyline points="1 20 1 14 7 14"></polyline>
-                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
-                  </svg>
-                  <span>ซิงก์กับตารางหลัก</span>
-                </button>
-              )}
-
               <button
                 type="button"
                 className="btn-footer-excel"
