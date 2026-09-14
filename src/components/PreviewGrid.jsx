@@ -261,9 +261,6 @@ export default function PreviewGrid({
 
                 {/* 9. การส่งข้อมูล */}
                 <th style={{ minWidth: '140px' }}>การส่งข้อมูล</th>
-
-                {/* 10. การรับฝาก */}
-                <th style={{ minWidth: '135px' }}>การรับฝาก</th>
               </tr>
             </thead>
             <tbody>
@@ -382,29 +379,6 @@ export default function PreviewGrid({
                     {/* การส่งข้อมูล */}
                     <td className={`col-api-status ${isApiSuccess ? 'stat-success' : isApiError ? 'stat-error' : 'stat-pending'}`}>
                       <span className="api-badge">{apiStatus}</span>
-                    </td>
-
-                    {/* การรับฝาก */}
-                    <td className={`col-deposit-status ${depositReceived ? 'dep-success' : 'dep-pending'}`}>
-                      {barcode ? (
-                        <span className={`deposit-badge ${depositReceived ? 'ok' : 'idle'}`}>
-                          {depositReceived ? (
-                            <>
-                              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
-                                <polyline points="20 6 9 17 4 12"></polyline>
-                              </svg>
-                              <span title={depositStatus}>{depositStatus}</span>
-                            </>
-                          ) : (
-                            <>
-                              <span className="dep-dot"></span>
-                              <span title={depositStatus}>{depositStatus}</span>
-                            </>
-                          )}
-                        </span>
-                      ) : (
-                        <span className="deposit-badge idle">-</span>
-                      )}
                     </td>
                   </tr>
                 );
