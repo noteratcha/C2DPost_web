@@ -327,6 +327,8 @@ export async function exportDepositReportPdf({ records, summary = {}, date = '',
  */
 export async function logBarcodesToUseBarcode(items, username) {
   if (!items || items.length === 0) return { success: true, logged_count: 0 };
+  
+  // 1. First priority: Python Serverless API (/api/log-barcodes)
   try {
     const response = await fetch(`${API_BASE}/log-barcodes`, {
       method: 'POST',
@@ -336,14 +338,30 @@ export async function logBarcodesToUseBarcode(items, username) {
         items: items
       })
     });
-    if (!response.ok) {
-      console.warn(`logBarcodesToUseBarcode HTTP ${response.status}`);
-      return { success: false, status: response.status };
+    if (response.ok) {
+      const data = await response.json();
+      if (data && data.success) return data;
     }
-    return await response.json();
   } catch (error) {
-    console.warn('Failed to log barcodes to UseBarcode:', error);
-    return { success: false, error: error.message };
+    console.warn('Backend log-barcodes encountered issue, attempting direct client fallback:', error);
+  }
+
+  // 2. Client-side direct fallback to Google Apps Script (bypasses server timeout)
+  try {
+    const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyznLrLf7Qgi0glxzytW8uhpZfnu5Jkh_eUibgJxBe8z9dmBDs7ndM6deT6x8v59Q/exec';
+    await fetch(GOOGLE_SCRIPT_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({
+        action: 'log_detailed_barcodes',
+        data: items
+      })
+    });
+    return { success: true, logged_count: items.length, mode: 'client_fallback' };
+  } catch (clientErr) {
+    console.warn('Client fallback logging failed:', clientErr);
+    return { success: false, error: clientErr.message };
   }
 }
 

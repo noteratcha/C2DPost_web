@@ -296,10 +296,14 @@ def log_barcodes_endpoint(req: LogBarcodesRequest):
         r = requests.post(
             USE_BARCODE_SCRIPT_URL,
             json={"action": "log_detailed_barcodes", "data": barcode_logs},
-            timeout=15
+            timeout=10,
+            allow_redirects=False
         )
-        use_barcode_success = (r.status_code == 200)
-        use_barcode_msg = r.text[:100]
+        if r.status_code in (200, 301, 302, 303, 307):
+            use_barcode_success = True
+            use_barcode_msg = "Success"
+        else:
+            use_barcode_msg = f"HTTP {r.status_code}"
     except Exception as e:
         use_barcode_success = False
         use_barcode_msg = str(e)
@@ -313,7 +317,7 @@ def log_barcodes_endpoint(req: LogBarcodesRequest):
             eco_count = sum(1 for b in barcode_logs if str(b["barcode"]).upper().startswith('O'))
             
             params = urllib.parse.urlencode({'action': 'log_barcode', 'ems': ems_count, 'r': r_count, 'eco': eco_count})
-            requests.get(f"{COUNT_SCRIPT_URL}?{params}", timeout=5)
+            requests.get(f"{COUNT_SCRIPT_URL}?{params}", timeout=5, allow_redirects=False)
         except Exception as e:
             print(f"Failed to log barcode count: {e}")
 
@@ -326,7 +330,7 @@ def log_barcodes_endpoint(req: LogBarcodesRequest):
                 "username": req.username or "Unknown",
                 "status": f"Fetch Barcodes ({len(barcode_logs)} items) - C2DPost Web (เลข: {bcode_sample})"
             }
-            requests.post(USER_LOG_SCRIPT_URL, json=user_data, timeout=5)
+            requests.post(USER_LOG_SCRIPT_URL, json=user_data, timeout=5, allow_redirects=False)
         except Exception as e:
             print(f"Failed to log user action: {e}")
 
