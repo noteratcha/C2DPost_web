@@ -386,4 +386,45 @@ export async function logBarcodesToUseBarcode(items, username) {
   }
 }
 
+/**
+ * Update Column E "ส่งข้อมูล e-Parcel" to "yes" in UseBarcode Google Sheet
+ *
+ * @param {Array<string>} barcodes - list of barcode numbers
+ * @param {string} [status="yes"] - status to write into column E
+ */
+export async function updateEparcelStatusInSheet(barcodes, status = 'yes') {
+  if (!barcodes || barcodes.length === 0) return { success: true };
+
+  const USE_BARCODE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyznLrLf7Qgi0glxzytW8uhpZfnu5Jkh_eUibgJxBe8z9dmBDs7ndM6deT6x8v59Q/exec';
+
+  const payload = {
+    action: 'update_eparcel_status',
+    barcodes: barcodes,
+    status: status
+  };
+
+  try {
+    // 1. Direct fetch from browser to Google Apps Script (no-cors)
+    fetch(USE_BARCODE_SCRIPT_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(payload)
+    }).catch((e) => console.warn('Direct updateEparcelStatus failed:', e));
+
+    // 2. Also call backend proxy as backup
+    fetch(`${API_BASE}/update-eparcel-status`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }).catch(() => {});
+
+    return { success: true, count: barcodes.length };
+  } catch (err) {
+    console.warn('updateEparcelStatusInSheet error:', err);
+    return { success: false, error: err.message };
+  }
+}
+
+
 

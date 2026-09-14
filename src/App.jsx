@@ -8,7 +8,7 @@ import AdminManagementView from './components/AdminManagementView';
 import DepositReportModal from './components/DepositReportModal';
 import TrackingTimelineModal from './components/TrackingTimelineModal';
 import { parseCsv } from './utils/parseCsv';
-import { convertPdfs, exportAllFiles, exportPdf, reconcileRecords, logBarcodesToUseBarcode } from './utils/api';
+import { convertPdfs, exportAllFiles, exportPdf, reconcileRecords, logBarcodesToUseBarcode, updateEparcelStatusInSheet } from './utils/api';
 import { fetchBarcodesFromExtension } from './utils/extensionBridge';
 import { SPREADSHEET_ID } from './config';
 import './App.css';
@@ -574,6 +574,14 @@ export default function App() {
         });
       });
 
+      // อัปเดตคอลัมน์ E "ส่งข้อมูล e-Parcel" เป็น "yes" ในชีต UseBarcode สำหรับหมายเลขที่ส่งสำเร็จ
+      const successfulBarcodes = sentBarcodes.filter(b => !errorMap[b]);
+      if (successfulBarcodes.length > 0) {
+        updateEparcelStatusInSheet(successfulBarcodes, 'yes')
+          .then(res => console.log('[UseBarcode] บันทึกคอลัมน์ E "ส่งข้อมูล e-Parcel" = yes สำเร็จ:', successfulBarcodes))
+          .catch(err => console.warn('[UseBarcode] อัปเดตสถานะ e-Parcel ไม่สำเร็จ:', err));
+      }
+
       const errCount = Object.keys(errorMap).length;
       if (errCount === 0) {
         setStatusText(`ส่งข้อมูล e-Parcel จำนวน ${items.length} รายการ สำเร็จ!`);
@@ -587,6 +595,7 @@ export default function App() {
       // In demo mode, simulate success
       if (isDemo) {
         setRecords(prev => prev.map(row => ({ ...row, API_STATUS: '✓ สำเร็จ' })));
+        updateEparcelStatusInSheet(sentBarcodes, 'yes').catch(() => {});
         setStatusText(`ส่งข้อมูล e-Parcel จำนวน ${items.length} รายการ สำเร็จ!`);
         alert(`ส่งข้อมูล e-Parcel จำนวน ${items.length} รายการ สำเร็จ!\nManifest: ${manifestNo}`);
       } else {

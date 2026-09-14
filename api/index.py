@@ -89,6 +89,10 @@ class LogBarcodesRequest(BaseModel):
     username: Optional[str] = "Unknown"
     items: List[dict]
 
+class UpdateEparcelStatusRequest(BaseModel):
+    barcodes: List[str]
+    status: Optional[str] = "yes"
+
 def _normalize_payload_list(raw):
     """Defensively extract a list from various e-Parcel API response shapes."""
     if isinstance(raw, dict):
@@ -341,6 +345,33 @@ def log_barcodes_endpoint(req: LogBarcodesRequest):
         "logged_count": len(barcode_logs),
         "response": use_barcode_msg
     }
+
+@app.post("/api/update-eparcel-status")
+def update_eparcel_status_endpoint(req: UpdateEparcelStatusRequest):
+    """
+    Updates Column E 'ส่งข้อมูล e-Parcel' to 'yes' for matching barcodes in UseBarcode Google Sheet.
+    """
+    import requests
+    USE_BARCODE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyznLrLf7Qgi0glxzytW8uhpZfnu5Jkh_eUibgJxBe8z9dmBDs7ndM6deT6x8v59Q/exec"
+    
+    if not req.barcodes:
+        return {"success": True, "count": 0}
+        
+    try:
+        r = requests.post(
+            USE_BARCODE_SCRIPT_URL,
+            json={"action": "update_eparcel_status", "barcodes": req.barcodes, "status": req.status or "yes"},
+            timeout=10,
+            allow_redirects=False
+        )
+        return {
+            "success": r.status_code in (200, 301, 302, 303, 307),
+            "count": len(req.barcodes),
+            "status_code": r.status_code
+        }
+    except Exception as e:
+        print(f"Update e-Parcel status failed: {e}")
+        return {"success": False, "error": str(e)}
 
 @app.post("/api/reports/received")
 def get_received_report(req: ReceivedReportRequest):
