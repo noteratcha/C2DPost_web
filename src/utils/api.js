@@ -319,3 +319,32 @@ export async function exportDepositReportPdf({ records, summary = {}, date = '',
   downloadBlob(blob, filename);
 }
 
+/**
+ * Log fetched barcodes to UseBarcode Google Sheet
+ *
+ * @param {Array<Object>} items - list of { barcode, details, username, timestamp }
+ * @param {string} username - current user name
+ */
+export async function logBarcodesToUseBarcode(items, username) {
+  if (!items || items.length === 0) return { success: true, logged_count: 0 };
+  try {
+    const response = await fetch(`${API_BASE}/log-barcodes`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        username: username || 'Unknown',
+        items: items
+      })
+    });
+    if (!response.ok) {
+      console.warn(`logBarcodesToUseBarcode HTTP ${response.status}`);
+      return { success: false, status: response.status };
+    }
+    return await response.json();
+  } catch (error) {
+    console.warn('Failed to log barcodes to UseBarcode:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+

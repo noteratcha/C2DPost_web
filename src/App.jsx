@@ -8,7 +8,7 @@ import AdminManagementView from './components/AdminManagementView';
 import DepositReportModal from './components/DepositReportModal';
 import TrackingTimelineModal from './components/TrackingTimelineModal';
 import { parseCsv } from './utils/parseCsv';
-import { convertPdfs, exportAllFiles, exportPdf, reconcileRecords } from './utils/api';
+import { convertPdfs, exportAllFiles, exportPdf, reconcileRecords, logBarcodesToUseBarcode } from './utils/api';
 import { fetchBarcodesFromExtension } from './utils/extensionBridge';
 import { SPREADSHEET_ID } from './config';
 import './App.css';
@@ -392,6 +392,39 @@ export default function App() {
         });
         return copy;
       });
+
+      // บันทึกประวัติการใช้บาร์โค้ดลง Google Sheet (UseBarcode) ให้ตรงกับระบบ Python Desktop
+      const username = currentPerson?.UserName || user || 'Unknown';
+      const logItems = [];
+      missingIndices.forEach((recordIdx, i) => {
+        if (i < barcodes.length) {
+          const row = records[recordIdx];
+          const receiver = String(row.RECEIVER || row['RECEIVER'] || '').trim();
+          const address = String(row.RECEIVER_ADDRESS || row['RECEIVER ADDRESS'] || '').trim();
+          const amphur = String(row.RECEIVER_AMPHUR || row['RECEIVER AMPHUR'] || '').trim();
+          const prov = String(row.RECEIVER_PROVINCE || row['RECEIVER PROVINCE'] || '').trim();
+          const zip = String(row.RECEIVER_ZIPCODE || row['RECEIVER ZIPCODE'] || '').trim();
+          const details = [receiver, address, amphur, prov, zip].filter(Boolean).join(' ');
+
+          logItems.push({
+            barcode: barcodes[i],
+            details: details,
+            username: username
+          });
+        }
+      });
+
+      if (logItems.length > 0) {
+        logBarcodesToUseBarcode(logItems, username)
+          .then((res) => {
+            if (res && res.success) {
+              console.log(`[UseBarcode] บันทึกประวัติสำเร็จ ${res.logged_count} รายการ`);
+            } else {
+              console.warn('[UseBarcode] บันทึกประวัติไม่สำเร็จ:', res);
+            }
+          })
+          .catch((err) => console.warn('[UseBarcode] Error:', err));
+      }
 
       setStatusText(`ดึงบาร์โค้ดเพิ่มสำเร็จ จำนวน ${barcodes.length} หมายเลข`);
     } catch (err) {

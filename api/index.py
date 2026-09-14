@@ -85,6 +85,10 @@ class ReconcileRequest(BaseModel):
     username: Optional[str] = ""
     password: Optional[str] = ""
 
+class LogBarcodesRequest(BaseModel):
+    username: Optional[str] = "Unknown"
+    items: List[dict]
+
 def _normalize_payload_list(raw):
     """Defensively extract a list from various e-Parcel API response shapes."""
     if isinstance(raw, dict):
@@ -240,6 +244,99 @@ def send_eparcel(req: SendEparcelRequest):
             "status_code": 500,
             "error": str(e)
         }
+
+@app.post("/api/log-barcodes")
+def log_barcodes_endpoint(req: LogBarcodesRequest):
+    """
+    Logs fetched barcodes to Google Sheet (UseBarcode) with identical structure to desktop Python:
+    Columns: Timestamp, UserName, Barcode, Details
+    Also records summary counts and user action logs in background.
+    """
+    import threading
+    import requests
+    import urllib.parse
+    
+    USE_BARCODE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyznLrLf7Qgi0glxzytW8uhpZfnu5Jkh_eUibgJxBe8z9dmBDs7ndM6deT6x8v59Q/exec"
+    COUNT_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyElrFXMUEN4pqhpNWD7lxQ_z1l1pCIOny1Ipk9yOEwuWTnASplduekZxzZWFRGSdHh/exec"
+    USER_LOG_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzNEBcaLUc7UWSXtLuf3VnaTR4pP_4Xfxwaq8zKOQHGolyQL9UT2RAGKaT8jtBCzko/exec"
+
+    from datetime import timezone, timedelta
+    tz_thai = timezone(timedelta(hours=7))
+    now_str = datetime.now(tz_thai).strftime("%Y-%m-%d %H:%M:%S")
+    barcode_logs = []
+    
+    for item in req.items:
+        barcode = str(item.get("barcode") or item.get("BARCODE_NO") or "").strip()
+        if not barcode:
+            continue
+            
+        details = str(item.get("details") or "").strip()
+        if not details:
+            receiver = str(item.get("RECEIVER") or item.get("receiver") or "").strip()
+            addr = str(item.get("RECEIVER_ADDRESS") or item.get("address") or "").strip()
+            amphur = str(item.get("RECEIVER_AMPHUR") or item.get("amphur") or "").strip()
+            prov = str(item.get("RECEIVER_PROVINCE") or item.get("province") or "").strip()
+            zipcode = str(item.get("RECEIVER_ZIPCODE") or item.get("zipcode") or "").strip()
+            details = " ".join([p for p in [receiver, addr, amphur, prov, zipcode] if p])
+            
+        barcode_logs.append({
+            "timestamp": item.get("timestamp") or now_str,
+            "username": item.get("username") or req.username or "Unknown",
+            "barcode": barcode,
+            "details": details
+        })
+
+    if not barcode_logs:
+        return {"success": True, "logged_count": 0, "message": "No valid barcodes to log"}
+
+    # 1. Main detailed log to UseBarcode sheet
+    use_barcode_success = False
+    use_barcode_msg = ""
+    try:
+        r = requests.post(
+            USE_BARCODE_SCRIPT_URL,
+            json={"action": "log_detailed_barcodes", "data": barcode_logs},
+            timeout=15
+        )
+        use_barcode_success = (r.status_code == 200)
+        use_barcode_msg = r.text[:100]
+    except Exception as e:
+        use_barcode_success = False
+        use_barcode_msg = str(e)
+        print(f"Failed to log detailed barcodes to UseBarcode: {e}")
+
+    # 2. Secondary logs (Count & User Action) in background
+    def _send_secondary_logs():
+        try:
+            ems_count = sum(1 for b in barcode_logs if str(b["barcode"]).upper().startswith(('E', 'J')))
+            r_count = sum(1 for b in barcode_logs if str(b["barcode"]).upper().startswith(('R', 'B')))
+            eco_count = sum(1 for b in barcode_logs if str(b["barcode"]).upper().startswith('O'))
+            
+            params = urllib.parse.urlencode({'action': 'log_barcode', 'ems': ems_count, 'r': r_count, 'eco': eco_count})
+            requests.get(f"{COUNT_SCRIPT_URL}?{params}", timeout=5)
+        except Exception as e:
+            print(f"Failed to log barcode count: {e}")
+
+        try:
+            bcode_sample = ", ".join([b["barcode"] for b in barcode_logs])
+            if len(bcode_sample) > 100:
+                bcode_sample = bcode_sample[:97] + "..."
+            user_data = {
+                "timestamp": now_str,
+                "username": req.username or "Unknown",
+                "status": f"Fetch Barcodes ({len(barcode_logs)} items) - C2DPost Web (เลข: {bcode_sample})"
+            }
+            requests.post(USER_LOG_SCRIPT_URL, json=user_data, timeout=5)
+        except Exception as e:
+            print(f"Failed to log user action: {e}")
+
+    threading.Thread(target=_send_secondary_logs, daemon=True).start()
+
+    return {
+        "success": use_barcode_success,
+        "logged_count": len(barcode_logs),
+        "response": use_barcode_msg
+    }
 
 @app.post("/api/reports/received")
 def get_received_report(req: ReceivedReportRequest):
