@@ -297,3 +297,40 @@ node C2DPost_web/capture_screenshot.cjs
    - ป้องกันการตัดคำสัญลักษณ์ด้วย `white-space: nowrap !important` ในปุ่ม Badge และปุ่มคำสั่ง
 4. **นโยบายเลขเวอร์ชัน (Version Policy)**:
    - อัปเดตเลขเวอร์ชันตามรูปแบบ `vYYYY.MMDD.HHMM` ใน `src/config.js`, `package.json`, `AboutModal.jsx`, `LoginModal.jsx` และ `api/core/convert_dpost.py` ทุกครั้งก่อน Deploy
+
+---
+
+## 16. การตรวจรับฝากผ่านปุ่ม "รายงานรับฝาก" และระบบ Auto-Sync สู่ตารางหลัก
+
+1. **จุดศูนย์กลางการตรวจรับฝาก**:
+   - การตรวจรับฝากพัสดุใน C2DPost Web ได้รับการรวมศูนย์ไว้ที่ **ปุ่ม "รายงานรับฝาก"** บน ActionToolbar และ Navbar ซึ่งแสดงเด่นด้วยสไตล์ White Glassmorphism
+2. **ขั้นตอนการทำงานและ Auto-Sync**:
+   - คลิกปุ่ม "รายงานรับฝาก" เพื่อเปิด `DepositReportModal` พร้อมดึงข้อมูลจาก API `POST /api/reports/received` ตามวันที่เลือก
+   - ปุ่ม **"ซิงก์ผลรับฝากกับตารางหลัก"** (`handleSyncFromDepositReport`) จะจับคู่หมายเลข Barcode ในรายงานรับฝากกับรายการในตารางหลักทันที
+   - แถวที่รับฝากแล้วจะขึ้นไฮไลต์สีเขียวอ่อน `.reconciled-row` และอัปเดตสถานะการรับฝากแบบเรียลไทม์ พร้อมแจ้งเตือนสรุปจำนวนชิ้นที่ซิงก์สำเร็จ
+   - รองรับการส่งออกเป็นไฟล์ Excel (`.xlsx`) และ PDF (`.pdf`) หัวราชการพร้อมลงนาม
+
+---
+
+## 17. สถาปัตยกรรม Google Apps Script Web App และการบันทึกคอลัมน์ E ("ส่งข้อมูล e-Parcel")
+
+1. **Script Project ID vs Deployment Web App URL**:
+   - Script ID (เช่น `16TAW2fgTXNcu2iwzSqlqNpDngK01WF8w1MGf66z2hIa6sJee63zfMJjp`) เป็นเพียงโค้ดต้นฉบับ
+   - การเรียกใช้งานจริงต้องใช้ Deployment URL (`/exec`):
+     `https://script.google.com/macros/s/AKfycbyyuEJ3pLdXUidsyYoHv84uspMDf8G93U8Mw1ZYCB9ELpFAPjmpwUxsuarxnklnnQ/exec`
+2. **การบันทึกสถานะ "yes" ลงคอลัมน์ E ของ UseBarcode.gsheet**:
+   - ค้นหาแถวในชีต `UseBarcode` (แท็บ `Barcode`) โดยอิงตาม Barcode ในคอลัมน์ C แล้วบันทึกค่า `"yes"` ลงในคอลัมน์ E (คอลัมน์ 5)
+   - ใช้เทคนิค **Dual Dispatch**: ยิงตรงจาก Browser (`mode: 'no-cors'`) ร่วมกับการส่งผ่าน Python API Backend Proxy เพื่อการันตีความสำเร็จ 100%
+
+---
+
+## 18. เทคนิคการออกแบบ White Glassmorphism และกฎการจัดวาง UI/UX
+
+1. **ปุ่ม White Glassmorphism High-Contrast (`.btn-deposit-report-white`)**:
+   - ใน Light Mode ใช้พื้นหลังขาวใส `rgba(255, 255, 255, 0.95)` ผสาน `backdrop-filter: blur(12px)` ขอบเส้นสีเขียวมรกต `border: 1.5px solid #059669` ตัวอักษรสีเขียวเข้ม `#065f46` และเงาละมุน `box-shadow: 0 2px 8px rgba(0,0,0,0.08)`
+   - โดดเด่น สะอาดตา ไม่กลืนกับปุ่มคำสั่งสีอื่นใน Toolbar
+2. **กฎป้องกันคำตัดบรรทัดเด็ดขาด (`white-space: nowrap !important;`)**:
+   - กำหนดใน Badge สถานะ ปุ่มคำสั่ง และแท็บกรองทุกจุด ป้องกันคำภาษาไทยหรือสัญลักษณ์แตกบรรทัด
+3. **การเน้นแถวรับฝากสำเร็จ (`.reconciled-row`)**:
+   - แสดงสีเขียวมรกตโปร่งแสง พร้อมแถบสีด้านซ้าย `border-left: 3px solid #10b981` ชัดเจนทั้งใน Light Mode และ Dark Mode
+
