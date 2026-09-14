@@ -10,8 +10,8 @@ export default function Navbar({
   theme = 'light', 
   onToggleTheme,
   isAdmin = false,
-  adminActiveView = 'workspace',
-  onToggleAdminView,
+  activePage = 'workspace',
+  onNavigate,
   adminServices = null,
   onOpenDepositReport = null
 }) {
@@ -88,12 +88,14 @@ export default function Navbar({
         <div className="navbar-container">
           {/* Left: Modern Brand & Organization Identity */}
           <div className="navbar-left-group">
-            <div className="brand-logo-wrap">
+            <div className="brand-logo-wrap" onClick={() => onNavigate && onNavigate('workspace')} style={{ cursor: onNavigate ? 'pointer' : 'default' }}>
               <img src="/logo_dark.png" alt="C2DPost" className="brand-logo-img" />
             </div>
             <div className="brand-identity-stack">
               <div className="brand-primary-row">
-                <span className="brand-title-accent">C2DPost</span>
+                <span className="brand-title-accent" onClick={() => onNavigate && onNavigate('workspace')} style={{ cursor: onNavigate ? 'pointer' : 'default' }}>
+                  C2DPost
+                </span>
               </div>
               <h1 className="header-office-title" title={user ? orgName : 'โปรแกรมแปลงไฟล์ PDF สู่ระบบฝากส่งไปรษณีย์ DPost'}>
                 {user && (
@@ -107,10 +109,71 @@ export default function Navbar({
             </div>
           </div>
 
+          {/* Center: Dedicated Page Navigation Tabs */}
+          {user && onNavigate && (
+            <nav className="navbar-nav-tabs" aria-label="แถบเมนูนำทาง">
+              <button
+                type="button"
+                className={`nav-tab-btn ${activePage === 'workspace' ? 'active' : ''}`}
+                onClick={() => onNavigate('workspace')}
+                title="หน้าหลัก: แปลงไฟล์ PDF สู่ Excel และดึงหมายเลขบาร์โค้ด"
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                  <polyline points="14 2 14 8 20 8"></polyline>
+                  <line x1="16" y1="13" x2="8" y2="13"></line>
+                  <line x1="16" y1="17" x2="8" y2="17"></line>
+                </svg>
+                <span>แปลงไฟล์ PDF</span>
+              </button>
+
+              <button
+                type="button"
+                className={`nav-tab-btn ${activePage === 'deposit-report' ? 'active' : ''}`}
+                onClick={() => onNavigate('deposit-report')}
+                title="หน้ารายงานผลการรับฝากไปรษณีย์ (e-Parcel)"
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                  <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                  <line x1="12" y1="22.08" x2="12" y2="12"></line>
+                </svg>
+                <span>รายงานรับฝาก</span>
+              </button>
+
+              <button
+                type="button"
+                className={`nav-tab-btn ${activePage === 'tracking' ? 'active' : ''}`}
+                onClick={() => onNavigate('tracking')}
+                title="หน้าค้นหาและตรวจสอบสถานะพัสดุ (Tracking)"
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="11" cy="11" r="8"></circle>
+                  <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+                <span>ตรวจสอบพัสดุ</span>
+              </button>
+
+              {isAdmin && (
+                <button
+                  type="button"
+                  className={`nav-tab-btn nav-tab-admin ${activePage === 'admin' ? 'active' : ''}`}
+                  onClick={() => onNavigate('admin')}
+                  title="ระบบจัดการผู้ใช้งานและ API (Admin)"
+                >
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                  </svg>
+                  <span>จัดการระบบ</span>
+                </button>
+              )}
+            </nav>
+          )}
+
           {/* Right Action Buttons */}
           <div className="navbar-right">
             {/* API Health Badges — shown in Navbar when Admin view is active */}
-            {isAdmin && adminActiveView === 'admin' && adminServices && (
+            {isAdmin && activePage === 'admin' && adminServices && (
               <div className="navbar-api-health">
                 <div
                   className={`navbar-health-item ${adminServices.postone?.online ? 'online' : 'offline'}`}
@@ -153,49 +216,6 @@ export default function Navbar({
                     </span>
                   </div>
                 </div>
-
-                {isAdmin && onToggleAdminView && (
-                  <button 
-                    type="button" 
-                    className={`btn-navbar-admin-toggle ${adminActiveView === 'admin' ? 'active-admin' : ''}`} 
-                    onClick={onToggleAdminView} 
-                    title={adminActiveView === 'admin' ? 'สลับไปหน้าแปลงเอกสาร (PDF to Excel)' : 'สลับไปหน้าระบบจัดการผู้ใช้งาน (Admin)'}
-                  >
-                    {adminActiveView === 'admin' ? (
-                      <>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                          <polyline points="14 2 14 8 20 8"></polyline>
-                        </svg>
-                        <span>หน้าแปลงเอกสาร</span>
-                      </>
-                    ) : (
-                      <>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-                          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
-                        </svg>
-                        <span>จัดการระบบ (Admin)</span>
-                      </>
-                    )}
-                  </button>
-                )}
-
-                {onOpenDepositReport && (
-                  <button 
-                    type="button" 
-                    className="btn-navbar-report" 
-                    onClick={onOpenDepositReport} 
-                    title="เปิดรายงานตรวจสอบการรับฝากไปรษณีย์ (e-Parcel Deposit Report)"
-                  >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                      <polyline points="14 2 14 8 20 8"></polyline>
-                      <line x1="16" y1="13" x2="8" y2="13"></line>
-                      <line x1="16" y1="17" x2="8" y2="17"></line>
-                    </svg>
-                    <span>รายงานรับฝาก</span>
-                  </button>
-                )}
 
                 <button 
                   type="button" 
@@ -455,23 +475,23 @@ export default function Navbar({
                     </a>
                   </div>
 
-                  {/* Section Label: เกี่ยวกับ & การตั้งค่า */}
-                  <div className="menu-section-label">ข้อมูล & การแสดงผล</div>
+                  {/* Section Label: เมนูระบบ */}
+                  <div className="menu-section-label">หน้าเมนูระบบ</div>
 
-                  {/* 3. Report & About Section */}
+                  {/* 3. Page Navigation Links in Menu */}
                   <div className="menu-nav-links">
-                    {onOpenDepositReport && (
+                    {onNavigate && (
                       <button
                         type="button"
-                        className="menu-link-card btn-card"
+                        className={`menu-link-card btn-card ${activePage === 'workspace' ? 'active-menu-item' : ''}`}
                         onClick={() => {
                           setIsNavMenuOpen(false);
-                          onOpenDepositReport();
+                          onNavigate('workspace');
                         }}
-                        title="เปิดรายงานการรับฝากไปรษณีย์"
+                        title="หน้าแปลงเอกสาร PDF และตารางจัดการข้อมูล"
                       >
                         <div className="link-card-left">
-                          <div className="link-avatar-icon icon-report">
+                          <div className="link-avatar-icon icon-workspace" style={{ background: 'rgba(5, 150, 105, 0.15)', color: '#059669' }}>
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
                               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
                               <polyline points="14 2 14 8 20 8"></polyline>
@@ -481,10 +501,108 @@ export default function Navbar({
                           </div>
                           <div className="link-text-meta">
                             <div className="link-title-row">
-                              <span className="link-title">รายงานการรับฝาก</span>
-                              <span className="link-tag-ext report-tag">e-Parcel</span>
+                              <span className="link-title">แปลงไฟล์ PDF</span>
+                              <span className="link-tag-ext">หลัก</span>
                             </div>
-                            <span className="link-subtitle">ตรวจสอบรายการที่ไปรษณีย์รับฝากแล้ว</span>
+                            <span className="link-subtitle">แปลงไฟล์ PDF สู่ Excel และดึงบาร์โค้ด</span>
+                          </div>
+                        </div>
+                        <div className="link-chevron-action">
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="9 18 15 12 9 6"></polyline>
+                          </svg>
+                        </div>
+                      </button>
+                    )}
+
+                    <button
+                      type="button"
+                      className={`menu-link-card btn-card ${activePage === 'deposit-report' ? 'active-menu-item' : ''}`}
+                      onClick={() => {
+                        setIsNavMenuOpen(false);
+                        if (onNavigate) onNavigate('deposit-report');
+                        else if (onOpenDepositReport) onOpenDepositReport();
+                      }}
+                      title="เปิดหน้ารายงานการรับฝากไปรษณีย์"
+                    >
+                      <div className="link-card-left">
+                        <div className="link-avatar-icon icon-report">
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                            <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                            <line x1="12" y1="22.08" x2="12" y2="12"></line>
+                          </svg>
+                        </div>
+                        <div className="link-text-meta">
+                          <div className="link-title-row">
+                            <span className="link-title">รายงานการรับฝาก</span>
+                            <span className="link-tag-ext report-tag">e-Parcel</span>
+                          </div>
+                          <span className="link-subtitle">ตรวจสอบรายการที่ไปรษณีย์รับฝากแล้ว</span>
+                        </div>
+                      </div>
+                      <div className="link-chevron-action">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="9 18 15 12 9 6"></polyline>
+                        </svg>
+                      </div>
+                    </button>
+
+                    {onNavigate && (
+                      <button
+                        type="button"
+                        className={`menu-link-card btn-card ${activePage === 'tracking' ? 'active-menu-item' : ''}`}
+                        onClick={() => {
+                          setIsNavMenuOpen(false);
+                          onNavigate('tracking');
+                        }}
+                        title="หน้าค้นหาและตรวจสอบสถานะพัสดุรายชิ้น"
+                      >
+                        <div className="link-card-left">
+                          <div className="link-avatar-icon icon-tracking" style={{ background: 'rgba(59, 130, 246, 0.15)', color: '#2563eb' }}>
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                              <circle cx="11" cy="11" r="8"></circle>
+                              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                            </svg>
+                          </div>
+                          <div className="link-text-meta">
+                            <div className="link-title-row">
+                              <span className="link-title">ตรวจสอบพัสดุ</span>
+                              <span className="link-tag-ext" style={{ background: 'rgba(59, 130, 246, 0.12)', color: '#2563eb', borderColor: 'rgba(59, 130, 246, 0.25)' }}>Tracking</span>
+                            </div>
+                            <span className="link-subtitle">ดูประวัติและไทม์ไลน์สถานะพัสดุ 13 หลัก</span>
+                          </div>
+                        </div>
+                        <div className="link-chevron-action">
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="9 18 15 12 9 6"></polyline>
+                          </svg>
+                        </div>
+                      </button>
+                    )}
+
+                    {isAdmin && onNavigate && (
+                      <button
+                        type="button"
+                        className={`menu-link-card btn-card ${activePage === 'admin' ? 'active-menu-item' : ''}`}
+                        onClick={() => {
+                          setIsNavMenuOpen(false);
+                          onNavigate('admin');
+                        }}
+                        title="ระบบจัดการผู้ใช้งานและ API (Admin Portal)"
+                      >
+                        <div className="link-card-left">
+                          <div className="link-avatar-icon icon-admin" style={{ background: 'rgba(99, 102, 241, 0.15)', color: '#6366f1' }}>
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                            </svg>
+                          </div>
+                          <div className="link-text-meta">
+                            <div className="link-title-row">
+                              <span className="link-title">จัดการระบบ</span>
+                              <span className="link-tag-ext" style={{ background: 'rgba(99, 102, 241, 0.12)', color: '#6366f1', borderColor: 'rgba(99, 102, 241, 0.25)' }}>Admin</span>
+                            </div>
+                            <span className="link-subtitle">จัดการสิทธิ์ผู้ใช้งานและตรวจสอบสุขภาพ API</span>
                           </div>
                         </div>
                         <div className="link-chevron-action">

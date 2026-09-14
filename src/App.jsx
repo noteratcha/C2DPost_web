@@ -5,6 +5,8 @@ import LoginModal from './components/LoginModal';
 import ActionToolbar from './components/ActionToolbar';
 import PreviewGrid from './components/PreviewGrid';
 import AdminManagementView from './components/AdminManagementView';
+import DepositReportView from './components/DepositReportView';
+import TrackingInquiryView from './components/TrackingInquiryView';
 import DepositReportModal from './components/DepositReportModal';
 import TrackingTimelineModal from './components/TrackingTimelineModal';
 import { parseCsv } from './utils/parseCsv';
@@ -44,11 +46,12 @@ export default function App() {
     if (isDemo) return 'renu_officer';
     return typeof window !== 'undefined' ? localStorage.getItem(STORAGE_USER_KEY) || '' : '';
   });
-  const [adminActiveView, setAdminActiveView] = useState(() => {
+  const [activePage, setActivePage] = useState(() => {
     if (isDemoAdmin) return 'admin';
     const saved = typeof window !== 'undefined' ? localStorage.getItem(STORAGE_USER_KEY) || '' : '';
     return saved.toLowerCase() === 'admin' ? 'admin' : 'workspace';
   });
+  const [selectedTrackingBarcode, setSelectedTrackingBarcode] = useState('');
   const [adminServices, setAdminServices] = useState(null);
   const [people, setPeople] = useState([]);
   const [loadingSheet, setLoadingSheet] = useState(true);
@@ -196,16 +199,16 @@ export default function App() {
     setUser(username);
     const status = (personData?.Status || '').trim().toUpperCase();
     if (username.toLowerCase() === 'admin' || status === 'ADMIN' || status === 'ADMINISTRATOR') {
-      setAdminActiveView('admin');
+      setActivePage('admin');
     } else {
-      setAdminActiveView('workspace');
+      setActivePage('workspace');
     }
   };
 
   const handleLogout = () => {
     localStorage.removeItem(STORAGE_USER_KEY);
     setUser('');
-    setAdminActiveView('workspace');
+    setActivePage('workspace');
     setSelectedFiles([]);
     setFileStatuses({});
     setRecords([]);
@@ -707,18 +710,15 @@ export default function App() {
     }
   };
 
-  // 10. Handle View Tracking Timeline (single barcode)
+  // 10. Handle View Tracking Timeline (single barcode) -> Opens dedicated tracking page
   const handleViewTracking = (row) => {
     const barcode = String(row.BARCODE_NO || '').trim();
     if (!barcode) {
       alert("รายการนี้ยังไม่มีหมายเลขบาร์โค้ด กรุณากด 'ดึงหมายเลข' ก่อนครับ");
       return;
     }
-    setTrackingInfo({
-      barcode,
-      receiver: row.RECEIVER || '',
-      invNo: row.INV_NO || row['REF NO'] || ''
-    });
+    setSelectedTrackingBarcode(barcode);
+    setActivePage('tracking');
   };
 
   // 11. Handle Auto-Reconcile (batch check received status vs post office)
@@ -858,7 +858,7 @@ export default function App() {
         />
       )}
 
-      {/* 2. Main Navigation (Python theme) */}
+      {/* 2. Main Navigation (Python theme with Tab-based Page Routing) */}
       <Navbar 
         user={user} 
         currentPerson={currentPerson} 
@@ -867,10 +867,10 @@ export default function App() {
         theme={theme}
         onToggleTheme={toggleTheme}
         isAdmin={isAdmin}
-        adminActiveView={adminActiveView}
-        onToggleAdminView={() => setAdminActiveView(prev => prev === 'admin' ? 'workspace' : 'admin')}
+        activePage={activePage}
+        onNavigate={setActivePage}
         adminServices={adminServices}
-        onOpenDepositReport={() => setIsDepositReportOpen(true)}
+        onOpenDepositReport={() => setActivePage('deposit-report')}
       />
 
       {/* 3. Dedicated Login Screen (Shown when NOT logged in) */}
@@ -885,57 +885,82 @@ export default function App() {
         </main>
       )}
 
-      {/* 4. Main Workspace (Shown ONLY when logged in) */}
+      {/* 4. Dedicated Page Views (Shown ONLY when logged in) */}
       {extensionUnlocked && user && (
-        isAdmin && adminActiveView === 'admin' ? (
-          <AdminManagementView
-            user={user}
-            people={people}
-            loadingPeople={loadingSheet}
-            onRefreshPeople={loadPeople}
-            onLogout={handleLogout}
-            onSwitchToWorkspace={() => setAdminActiveView('workspace')}
-            onServicesChange={setAdminServices}
-          />
-        ) : (
-          <main className="main-content python-layout-main">
-            <div className="python-container">
-              {/* Card 1: เลือกเอกสาร PDF */}
-              <ActionToolbar
-                records={records}
-                statusText={statusText}
-                progress={progress}
-                isProcessing={isProcessing}
-                isSendingApi={isSendingApi}
-                onFilesSelected={handleFilesSelected}
-                onFetchBarcodes={handleFetchBarcodes}
-                onExportExcel={handleExportExcel}
-                onExportEnvelope={handleExportEnvelope}
-                onSendEparcel={handleSendEparcel}
-                isReconciling={isReconciling}
-                onCheckDeposit={handleCheckDeposit}
-                onOpenDepositReport={() => setIsDepositReportOpen(true)}
-              />
+        <>
+          {/* Page 1: แปลงไฟล์ PDF & ตารางข้อมูล (Workspace) */}
+          {activePage === 'workspace' && (
+            <main className="main-content python-layout-main">
+              <div className="python-container">
+                {/* Card 1: เลือกเอกสาร PDF */}
+                <ActionToolbar
+                  records={records}
+                  statusText={statusText}
+                  progress={progress}
+                  isProcessing={isProcessing}
+                  isSendingApi={isSendingApi}
+                  onFilesSelected={handleFilesSelected}
+                  onFetchBarcodes={handleFetchBarcodes}
+                  onExportExcel={handleExportExcel}
+                  onExportEnvelope={handleExportEnvelope}
+                  onSendEparcel={handleSendEparcel}
+                  isReconciling={isReconciling}
+                  onCheckDeposit={handleCheckDeposit}
+                  onOpenDepositReport={() => setActivePage('deposit-report')}
+                />
 
-              {/* Card 2: ตารางแสดงข้อมูล */}
-              <PreviewGrid 
-                records={records} 
-                selectedFiles={selectedFiles}
-                fileStatuses={fileStatuses}
-                reconcileNotice={reconcileNotice}
-                onDismissReconcileNotice={() => setReconcileNotice(null)}
-                onUpdateRecord={handleUpdateRecord} 
-                onDeleteRecord={handleDeleteRecord} 
-                onClearAll={handleClearAll}
-                onViewPdf={handleViewPdf}
-                onViewTracking={handleViewTracking}
-              />
-            </div>
-          </main>
-        )
+                {/* Card 2: ตารางแสดงข้อมูล */}
+                <PreviewGrid 
+                  records={records} 
+                  selectedFiles={selectedFiles}
+                  fileStatuses={fileStatuses}
+                  reconcileNotice={reconcileNotice}
+                  onDismissReconcileNotice={() => setReconcileNotice(null)}
+                  onUpdateRecord={handleUpdateRecord} 
+                  onDeleteRecord={handleDeleteRecord} 
+                  onClearAll={handleClearAll}
+                  onViewPdf={handleViewPdf}
+                  onViewTracking={handleViewTracking}
+                />
+              </div>
+            </main>
+          )}
+
+          {/* Page 2: รายงานการรับฝาก (Deposit Report) */}
+          {activePage === 'deposit-report' && (
+            <DepositReportView
+              currentPerson={currentPerson}
+              onSyncRecords={handleSyncFromDepositReport}
+              onSwitchToWorkspace={() => setActivePage('workspace')}
+            />
+          )}
+
+          {/* Page 3: ตรวจสอบพัสดุ (Tracking Inquiry) */}
+          {activePage === 'tracking' && (
+            <TrackingInquiryView
+              currentPerson={currentPerson}
+              records={records}
+              initialBarcode={selectedTrackingBarcode}
+              onSwitchToWorkspace={() => setActivePage('workspace')}
+            />
+          )}
+
+          {/* Page 4: จัดการระบบ (Admin Portal) */}
+          {activePage === 'admin' && isAdmin && (
+            <AdminManagementView
+              user={user}
+              people={people}
+              loadingPeople={loadingSheet}
+              onRefreshPeople={loadPeople}
+              onLogout={handleLogout}
+              onSwitchToWorkspace={() => setActivePage('workspace')}
+              onServicesChange={setAdminServices}
+            />
+          )}
+        </>
       )}
 
-      {/* 5. Deposit Report Modal */}
+      {/* 5. Deposit Report Modal (Fallback compatibility) */}
       <DepositReportModal
         isOpen={isDepositReportOpen}
         onClose={() => setIsDepositReportOpen(false)}
@@ -943,7 +968,7 @@ export default function App() {
         onSyncRecords={handleSyncFromDepositReport}
       />
 
-      {/* 6. Tracking Timeline Modal */}
+      {/* 6. Tracking Timeline Modal (Fallback compatibility) */}
       <TrackingTimelineModal
         isOpen={!!trackingInfo}
         barcode={trackingInfo?.barcode || ''}
