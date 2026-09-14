@@ -172,11 +172,6 @@ export default function DepositReportModal({ isOpen, onClose, currentPerson }) {
     ? Math.round((summary.received_count / summary.total_items) * 100)
     : 0;
 
-  // Format weight
-  const displayWeight = summary.total_weight >= 1000
-    ? `${(summary.total_weight / 1000).toFixed(2)} กก.`
-    : `${summary.total_weight.toLocaleString()} กรัม`;
-
   return (
     <div className="deposit-modal-overlay" onClick={onClose}>
       <div className="deposit-modal-container" onClick={(e) => e.stopPropagation()}>
@@ -349,22 +344,6 @@ export default function DepositReportModal({ isOpen, onClose, currentPerson }) {
               <span className="stat-card-label">ยอดรวมค่าบริการ</span>
               <div className="stat-card-value">
                 <strong>฿{summary.total_fee.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</strong>
-              </div>
-            </div>
-          </div>
-
-          <div className="deposit-stat-card">
-            <div className="stat-card-icon icon-purple">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-                <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path>
-                <line x1="3" y1="6" x2="21" y2="6"></line>
-                <path d="M16 10a4 4 0 0 1-8 0"></path>
-              </svg>
-            </div>
-            <div className="stat-card-content">
-              <span className="stat-card-label">น้ำหนักรวม</span>
-              <div className="stat-card-value">
-                <strong>{displayWeight}</strong>
               </div>
             </div>
           </div>

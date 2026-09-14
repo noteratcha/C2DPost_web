@@ -67,7 +67,7 @@
 - [x] **4.2 Auto-Reconcile กับตารางหน้าแรก**
   - สามารถกดตรวจสอบรายการที่เพิ่งแปลงไฟล์ PDF ไปว่า ชิ้นไหนไปรษณีย์รับฝากแล้วบ้างแบบไฮไลต์แถว
 - [x] **4.3 บันทึกประวัติและเลขเวอร์ชัน**
-  - อัปเดตเลขเวอร์ชันของเว็บ (`APP_VERSION`) เป็น `v2026.0914.1157` ตามกฎ `vYYYY.MMDD.HHMM` (Section 15)
+  - อัปเดตเลขเวอร์ชันของเว็บ (`APP_VERSION`) เป็น `v2026.0914.1322` ตามกฎ `vYYYY.MMDD.HHMM` (Section 15)
 - [x] **4.4 Deploy ขึ้น Production** — `vercel --prod --yes` สำเร็จ (aliased → `https://c2dpost-web.vercel.app`)
 - [x] **4.5 โชว์ข้อผิดพลาดของ API จริงใน UI** — เพิ่มแบนเนอร์แจ้งเตือน `api_notice` (Amber Warning) และแบนเนอร์โหมดจำลอง `is_mock` (Sky Info) ทั้งบนหน้าตาราง Reconcile, Tracking Timeline Stepper และ Deposit Report Modal แสดงผลสวยงามทั้ง Light/Dark Mode 100%
 

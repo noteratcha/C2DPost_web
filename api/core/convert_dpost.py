@@ -36,7 +36,7 @@ except Exception as e:
     print(f"Warning: Failed to load Tahoma font: {e}")
     FONT_REGISTERED = False
 
-__version__ = "2026.0914.1157"
+__version__ = "2026.0914.1322"
 
 # Thailand Post API Credentials
 API_KEY = "V9JN25IFH5hdZYc1k8NNRVgnLYXyQLzc"
@@ -1258,7 +1258,11 @@ def generate_deposit_report_pdf(records, summary, meta, output_pdf_path):
 
     elements.append(Paragraph(apply_thai_pua(f"รายงานสรุปการรับฝากเอกสารส่งทางไปรษณีย์ (e-Parcel Deposit Report)"), style_title))
     elements.append(Spacer(1, 0.2*cm))
-    elements.append(Paragraph(apply_thai_pua(f"<b>หน่วยงาน:</b> {org_name}  |  <b>วันที่นำส่ง:</b> {report_date}  |  <b>ยอดรวม:</b> {total_items} ฉบับ (รับฝากแล้ว {received_count} ฉบับ)  |  <b>น้ำหนักรวม:</b> {total_weight:,.1f} กรัม  |  <b>ยอดค่าบริการ:</b> ฿{total_fee:,.2f}"), style_subtitle))
+    subtitle_text = f"<b>หน่วยงาน:</b> {org_name}  |  <b>วันที่นำส่ง:</b> {report_date}  |  <b>ยอดรวม:</b> {total_items} ฉบับ (รับฝากแล้ว {received_count} ฉบับ)"
+    if total_weight > 0:
+        subtitle_text += f"  |  <b>น้ำหนักรวม:</b> {total_weight:,.1f} กรัม"
+    subtitle_text += f"  |  <b>ยอดค่าบริการ:</b> ฿{total_fee:,.2f}"
+    elements.append(Paragraph(apply_thai_pua(subtitle_text), style_subtitle))
     elements.append(Spacer(1, 0.4*cm))
 
     # Table Header
