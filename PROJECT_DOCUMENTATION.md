@@ -155,7 +155,7 @@ node C2DPost_web/capture_screenshot.cjs
      `https://canva.link/dyl3brb47lyph8r`
    - **ติดต่อเจ้าหน้าที่**: ลิงก์ติดต่อเจ้าหน้าที่ส่วน ทข.ปข.10 ผ่าน LINE Official:
      `https://lin.ee/UzWqlKP`
-   - **เลขเวอร์ชันเว็บ**: แสดง `v2026.0914.1322 (เวอร์ชันล่าสุด)` ด้านล่างการ์ด เชื่อมต่อโฟลเดอร์ Google Drive รวมตัวติดตั้ง:
+   - **เลขเวอร์ชันเว็บ**: แสดง `v2026.0914.1940 (เวอร์ชันล่าสุด)` ด้านล่างการ์ด เชื่อมต่อโฟลเดอร์ Google Drive รวมตัวติดตั้ง:
      `https://drive.google.com/drive/folders/1ksrVAQVwkHDBE7qiqLT2ndyPHPQhz6vZ`
 
 2. **ระบบลงทะเบียนขอสิทธิ์การใช้งาน (Registration Window Flow)**:
@@ -253,3 +253,47 @@ node C2DPost_web/capture_screenshot.cjs
   3. ตรึงความกว้างของคอลัมน์คงที่ `width: 58px; min-width: 58px;`
   4. ตรึงความกว้างของตัวติ๊กถูก `.chk-mark { width: 14px; text-align: center; }` เพื่อให้ก้ามปูซ้ายและขวาอยู่ตำแหน่งเดิมเสมอ ไม่กระตุกเมื่อสลับสถานะเลือก
   5. ดีไซน์สไตล์ Glassmorphism Emerald Tint พร้อมเอฟเฟกต์ Transition และ Hover เมื่อเอาเมาส์ชี้ รองรับทั้ง Light Mode และ Dark Mode อย่างประณีต
+
+---
+
+## 13. ระบบรายงานการรับฝากและตรวจสอบประวัติพัสดุ (Deposit Report & Tracking Stepper)
+
+1. **รายงานการรับฝากไปรษณีย์ (`DepositReportModal.jsx`)**:
+   - เชื่อมต่อ API `POST /api/reports/received` รับ Parameter วันที่ (`DD/MM/YYYY`) เพื่อดึงรายการพัสดุที่ไปรษณีย์ไทยรับฝากเข้าระบบ e-Parcel
+   - แสดงการ์ดสถิติรวม: จำนวนชิ้นทั้งหมด, รับฝากสำเร็จ (ชิ้น และ %), ยอดรวมค่าบริการ
+   - ตารางรายการพร้อมระบบค้นหาและแท็บกรองสถานะ (`ทั้งหมด`, `🟢 รับฝากแล้ว`)
+   - ส่งออกรายงานเป็นไฟล์ **Excel (.xlsx)** พร้อมสูตร SUM ค่าบริการอัตโนมัติ และ **PDF (.pdf)** หัวราชการสำหรับลงนามส่งมอบ
+2. **การดูประวัติสถานะพัสดุรายชิ้น (`TrackingTimelineModal.jsx`)**:
+   - เปิดจากปุ่มไอคอนนาฬิกาในตาราง (`btn-tool-track`)
+   - แสดงไทม์ไลน์สถานะจริง (Stepper) จาก `GET /webservice/getHistoryStatus` เรียงตามลำดับเวลา
+   - มีระบบแสดงแบนเนอร์ข้อสังเกต API (`api_notice`) และแบนเนอร์โหมดจำลอง (`is_mock`) อย่างโปร่งใส
+3. **ระบบตรวจสอบรับฝากอัตโนมัติ (Auto-Reconcile)**:
+   - ปุ่ม "ตรวจสอบรับฝาก" (`btn-check-deposit`) ตรวจสอบรายการในตารางแบบกลุ่ม
+   - ไฮไลต์แถวที่รับฝากแล้วด้วยสีเขียวอ่อน (`.reconciled-row`) เพื่อความชัดเจน
+
+---
+
+## 14. ระบบบันทึกประวัติ UseBarcode และอัปเดตสถานะคอลัมน์ E เป็น "yes"
+
+1. **การบันทึกประวัติ UseBarcode อัตโนมัติ**:
+   - เมื่อกดขอหมายเลขบาร์โค้ดจาก PostOne สำเร็จ ระบบจะส่งข้อมูลไปบันทึกที่ `UseBarcode.gsheet` (แท็บ `Barcode`) โดยบันทึก Timestamp (GMT+7), UserName, Barcode และ รายละเอียดผู้รับ
+   - บันทึกสรุปยอดรวมประเภทบาร์โค้ด (EMS, R, eCo) และประวัติเวลาการใช้งาน (`TimeUse`) ในเบื้องหลังแบบ Asynchronous
+2. **การอัปเดตสถานะคอลัมน์ E ("ส่งข้อมูล e-Parcel")**:
+   - เมื่อผู้ใช้กดส่งข้อมูลเข้าสู่ e-Parcel Web Service สำเร็จ ระบบจะค้นหาหมายเลขบาร์โค้ดในชีต `UseBarcode` และอัปเดตค่าคอลัมน์ E เป็น `"yes"` โดยอัตโนมัติ
+   - เรียกผ่านทั้ง Browser ตรง (`no-cors`) และสำรองผ่าน Backend API Proxy เพื่อความเสถียร 100%
+
+---
+
+## 15. นโยบายการพัฒนาใน C2DPost_web และการอัปเดตทักษะ สกิล และสไตล์อย่างต่อเนื่อง
+
+1. **ขอบเขตการทำงานหลัก (Primary Workspace)**:
+   - การพัฒนาฟีเจอร์ ปรับแต่ง และแก้ไขบั๊กทั้งหมดจะดำเนินการภายในโฟลเดอร์ `C2DPost_web` เป็นหลัก
+2. **การอัปเดตสกิลและคู่มืออย่างต่อเนื่อง (Continuous Skill & Doc Sync)**:
+   - ทุกครั้งที่มีการพัฒนาเทคนิคใหม่ แก้บั๊ก หรือปรับปรุง UI/UX จะต้องอัปเดตทั้ง `.agents/skills/c2dpost-web-workflow/SKILL.md` และ `C2DPost_web/PROJECT_DOCUMENTATION.md` เสมอ
+   - อัปเดตเช็กลิสต์ใน `ROADMAP_REPORT_FEATURE.md` ให้สะท้อนสถานะปัจจุบัน
+3. **การรักษามาตรฐานสไตล์และระบบ 2 ธีม**:
+   - รองรับทั้ง Light Mode (Clean White) และ Dark Mode (Slate Glassmorphism) 100%
+   - ใช้ฟอนต์ Google Fonts `Prompt` (หัวข้อ) และ `Inter` (ตาราง/ตัวเลข)
+   - ป้องกันการตัดคำสัญลักษณ์ด้วย `white-space: nowrap !important` ในปุ่ม Badge และปุ่มคำสั่ง
+4. **นโยบายเลขเวอร์ชัน (Version Policy)**:
+   - อัปเดตเลขเวอร์ชันตามรูปแบบ `vYYYY.MMDD.HHMM` ใน `src/config.js`, `package.json`, `AboutModal.jsx`, `LoginModal.jsx` และ `api/core/convert_dpost.py` ทุกครั้งก่อน Deploy

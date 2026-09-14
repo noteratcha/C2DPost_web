@@ -340,7 +340,7 @@ export async function logBarcodesToUseBarcode(items, username) {
     details: it.details || ''
   }));
 
-  const USE_BARCODE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyznLrLf7Qgi0glxzytW8uhpZfnu5Jkh_eUibgJxBe8z9dmBDs7ndM6deT6x8v59Q/exec';
+  const USE_BARCODE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyyuEJ3pLdXUidsyYoHv84uspMDf8G93U8Mw1ZYCB9ELpFAPjmpwUxsuarxnklnnQ/exec';
   const COUNT_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyElrFXMUEN4pqhpNWD7lxQ_z1l1pCIOny1Ipk9yOEwuWTnASplduekZxzZWFRGSdHh/exec';
   const USER_LOG_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzNEBcaLUc7UWSXtLuf3VnaTR4pP_4Xfxwaq8zKOQHGolyQL9UT2RAGKaT8jtBCzko/exec';
 
@@ -395,7 +395,7 @@ export async function logBarcodesToUseBarcode(items, username) {
 export async function updateEparcelStatusInSheet(barcodes, status = 'yes') {
   if (!barcodes || barcodes.length === 0) return { success: true };
 
-  const USE_BARCODE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyznLrLf7Qgi0glxzytW8uhpZfnu5Jkh_eUibgJxBe8z9dmBDs7ndM6deT6x8v59Q/exec';
+  const USE_BARCODE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyyuEJ3pLdXUidsyYoHv84uspMDf8G93U8Mw1ZYCB9ELpFAPjmpwUxsuarxnklnnQ/exec';
 
   const payload = {
     action: 'update_eparcel_status',

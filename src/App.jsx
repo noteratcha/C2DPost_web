@@ -809,6 +809,44 @@ export default function App() {
     }
   };
 
+  // Sync deposit status from Deposit Report Modal into main table records
+  const handleSyncFromDepositReport = useCallback((depositItems = []) => {
+    if (!depositItems || depositItems.length === 0) return;
+    
+    // Create map of received items
+    const receivedMap = new Map();
+    depositItems.forEach(item => {
+      const bcode = String(item.barcode || '').trim().toUpperCase();
+      const isReceived = item.status === '1' || String(item.status_description || '').includes('รับฝาก');
+      if (bcode && isReceived) {
+        receivedMap.set(bcode, item);
+      }
+    });
+
+    if (receivedMap.size === 0) return;
+
+    let matchedCount = 0;
+    setRecords(prev => prev.map(row => {
+      const bcode = String(row.BARCODE_NO || '').trim().toUpperCase();
+      const match = receivedMap.get(bcode);
+      if (match) {
+        matchedCount++;
+        return {
+          ...row,
+          DEPOSIT_STATUS: '✓ รับฝากแล้ว',
+          DEPOSIT_RECEIVED: true,
+          DEPOSIT_DATE: match.received_date || match.datetime || '',
+          DEPOSIT_POSTOFFICE: match.received_postoffice || match.postcode_name || ''
+        };
+      }
+      return row;
+    }));
+
+    if (matchedCount > 0) {
+      setStatusText(`ซิงก์ผลรับฝากจากรายงานสำเร็จ: พบรับฝากแล้ว ${matchedCount} รายการ (ไฮไลต์แถวสีเขียว)`);
+    }
+  }, []);
+
   return (
     <div className="app-layout">
       {/* 1. Chrome Extension Gatekeeper */}
@@ -876,6 +914,7 @@ export default function App() {
                 onSendEparcel={handleSendEparcel}
                 isReconciling={isReconciling}
                 onCheckDeposit={handleCheckDeposit}
+                onOpenDepositReport={() => setIsDepositReportOpen(true)}
               />
 
               {/* Card 2: ตารางแสดงข้อมูล */}
@@ -901,6 +940,7 @@ export default function App() {
         isOpen={isDepositReportOpen}
         onClose={() => setIsDepositReportOpen(false)}
         currentPerson={currentPerson}
+        onSyncRecords={handleSyncFromDepositReport}
       />
 
       {/* 6. Tracking Timeline Modal */}

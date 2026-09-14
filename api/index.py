@@ -260,7 +260,7 @@ def log_barcodes_endpoint(req: LogBarcodesRequest):
     import requests
     import urllib.parse
     
-    USE_BARCODE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyznLrLf7Qgi0glxzytW8uhpZfnu5Jkh_eUibgJxBe8z9dmBDs7ndM6deT6x8v59Q/exec"
+    USE_BARCODE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyyuEJ3pLdXUidsyYoHv84uspMDf8G93U8Mw1ZYCB9ELpFAPjmpwUxsuarxnklnnQ/exec"
     COUNT_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyElrFXMUEN4pqhpNWD7lxQ_z1l1pCIOny1Ipk9yOEwuWTnASplduekZxzZWFRGSdHh/exec"
     USER_LOG_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzNEBcaLUc7UWSXtLuf3VnaTR4pP_4Xfxwaq8zKOQHGolyQL9UT2RAGKaT8jtBCzko/exec"
 
@@ -352,7 +352,7 @@ def update_eparcel_status_endpoint(req: UpdateEparcelStatusRequest):
     Updates Column E 'ส่งข้อมูล e-Parcel' to 'yes' for matching barcodes in UseBarcode Google Sheet.
     """
     import requests
-    USE_BARCODE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyznLrLf7Qgi0glxzytW8uhpZfnu5Jkh_eUibgJxBe8z9dmBDs7ndM6deT6x8v59Q/exec"
+    USE_BARCODE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyyuEJ3pLdXUidsyYoHv84uspMDf8G93U8Mw1ZYCB9ELpFAPjmpwUxsuarxnklnnQ/exec"
     
     if not req.barcodes:
         return {"success": True, "count": 0}

@@ -13,7 +13,8 @@ export default function ActionToolbar({
   onExportExcel,
   onExportEnvelope,
   onSendEparcel,
-  onCheckDeposit
+  onCheckDeposit,
+  onOpenDepositReport
 }) {
   const fileInputRef = useRef(null);
 
@@ -179,16 +180,16 @@ export default function ActionToolbar({
             </button>
           </div>
 
-          {/* ตรวจสอบรับฝาก (Auto-Reconcile) */}
+          {/* รายงานรับฝาก (Deposit Report & Reconcile) */}
           <div 
             className="btn-tooltip-wrapper"
-            data-tooltip="ตรวจสอบว่ารายการใดไปรษณีย์รับฝากเข้าระบบแล้วบ้าง (ไฮไลต์แถวสีเขียว)"
+            data-tooltip="เปิดรายงานการรับฝากไปรษณีย์ (Deposit Report) และตรวจสอบสถานะรับฝาก"
           >
             <button
               type="button"
               className="btn-card-action btn-check-deposit"
-              disabled={!canCheckDeposit}
-              onClick={onCheckDeposit}
+              disabled={isProcessing}
+              onClick={onOpenDepositReport || onCheckDeposit}
             >
               {isReconciling ? (
                 <>
@@ -196,7 +197,15 @@ export default function ActionToolbar({
                   <span>กำลังตรวจสอบ...</span>
                 </>
               ) : (
-                'ตรวจสอบรับฝาก'
+                <>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" style={{ marginRight: '6px', verticalAlign: 'middle' }}>
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                  </svg>
+                  <span>รายงานรับฝาก</span>
+                </>
               )}
             </button>
           </div>

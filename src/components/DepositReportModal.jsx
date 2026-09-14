@@ -18,7 +18,7 @@ function toApiDateFormat(isoDateStr) {
   return `${parts[2]}/${parts[1]}/${parts[0]}`;
 }
 
-export default function DepositReportModal({ isOpen, onClose, currentPerson }) {
+export default function DepositReportModal({ isOpen, onClose, currentPerson, onSyncRecords }) {
   // Today's date in YYYY-MM-DD
   const todayIso = useMemo(() => toInputDateFormat(new Date()), []);
   const [selectedDate, setSelectedDate] = useState(todayIso);
@@ -53,6 +53,9 @@ export default function DepositReportModal({ isOpen, onClose, currentPerson }) {
 
       if (result.success) {
         setReportData(result);
+        if (onSyncRecords && Array.isArray(result.records)) {
+          onSyncRecords(result.records);
+        }
       } else {
         setError(result.message || 'ไม่สามารถดึงข้อมูลรายงานได้');
       }
@@ -61,7 +64,7 @@ export default function DepositReportModal({ isOpen, onClose, currentPerson }) {
     } finally {
       setLoading(false);
     }
-  }, [selectedDate, currentPerson]);
+  }, [selectedDate, currentPerson, onSyncRecords]);
 
   // Initial load when modal opens
   useEffect(() => {
