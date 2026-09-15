@@ -122,21 +122,6 @@ export default function TrackingInquiryView({ currentPerson, records = [], initi
               </p>
             </div>
           </div>
-
-          {onSwitchToWorkspace && (
-            <button
-              type="button"
-              className="btn-back-to-workspace"
-              onClick={onSwitchToWorkspace}
-              title="กลับไปยังหน้าแปลงไฟล์เอกสาร"
-            >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-                <line x1="19" y1="12" x2="5" y2="12"></line>
-                <polyline points="12 19 5 12 12 5"></polyline>
-              </svg>
-              <span>กลับหน้าแปลงไฟล์</span>
-            </button>
-          )}
         </div>
 
         {/* Search Input Card */}
