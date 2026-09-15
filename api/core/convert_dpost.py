@@ -37,7 +37,7 @@ except Exception as e:
     print(f"Error registering fonts: {e}")
     FONT_REGISTERED = False
 
-__version__ = "2026.0915.1118"
+__version__ = "2026.0915.1145"
 
 # Thailand Post API Credentials
 API_KEY = "V9JN25IFH5hdZYc1k8NNRVgnLYXyQLzc"
@@ -171,6 +171,24 @@ def extract_tel(text):
         return tel_digits
     return ""
 
+def normalize_pdf_text(text):
+    """Normalize decomposed Thai vowels and spacing from PDF text stream."""
+    if not text:
+        return ""
+    # Normalize decomposed Sara Am (U+0E33): consonant + space + า -> consonant + ำ
+    text = re.sub(r'([ก-ฮ])\s+า', r'\1ำ', text)
+    text = text.replace('ส านักงาน', 'สำนักงาน') \
+               .replace('ต าบล', 'ตำบล') \
+               .replace('อ าเภอ', 'อำเภอ') \
+               .replace('ช าระ', 'ชำระ') \
+               .replace('ด าเนินการ', 'ดำเนินการ') \
+               .replace('จ านวน', 'จำนวน') \
+               .replace('ค าขอ', 'คำขอ') \
+               .replace('ล าดับ', 'ลำดับ') \
+               .replace('บัตรประจ าตัว', 'บัตรประจำตัว') \
+               .replace('น าส่ง', 'นำส่ง')
+    return text
+
 def parse_address_components(address_text):
     """
     Parse Tambon, Amphur, Province and Zipcode from address text.
@@ -186,17 +204,17 @@ def parse_address_components(address_text):
     zip_match = re.search(r'(\b[0-9]{5}\b)', address_text)
     zipcode = zip_match.group(1) if zip_match else ""
     
-    # Extract Amphur
-    amphur_match = re.search(r'(?:อำเภอ/เขต|อำเภอ|อ\.)\s*([^\sจ\.]+)', address_text)
+    # Extract Amphur (supports Thai vowels including leading vowels เ, แ, โ, ใ, ไ)
+    amphur_match = re.search(r'(?:อำเภอ/เขต|อำเภอ|อ\.)\s*([\u0e00-\u0e7f]+)', address_text)
     amphur = amphur_match.group(1).strip() if amphur_match else ""
     
     # Extract Province
-    province_match = re.search(r'(?:จังหวัด|จ\.)\s*([^\s\d]+)', address_text)
+    province_match = re.search(r'(?:จังหวัด|จ\.)\s*([\u0e00-\u0e7f]+)', address_text)
     province = province_match.group(1).strip() if province_match else ""
     
     # Fallback for Province: if not found, look for the word immediately preceding the zipcode
     if not province and zipcode:
-        prov_match = re.search(r'([ก-ฮ]{2,})\s+' + zipcode, address_text)
+        prov_match = re.search(r'([\u0e00-\u0e7f]{2,})\s+' + zipcode, address_text)
         if prov_match:
             province = prov_match.group(1).strip()
             
@@ -209,7 +227,7 @@ def parse_receiver_label(text):
     <Address lines>
     <5-digit zipcode>
     """
-    # Normalize lines
+    text = normalize_pdf_text(text)
     lines = [line.strip() for line in text.split('\n') if line.strip()]
     
     receiver_name = ""
@@ -229,10 +247,13 @@ def parse_receiver_label(text):
     receiver_name = re.sub(r'^เรียน\s*', '', lines[start_idx]).strip()
     
     # Collect subsequent lines until a zipcode is found
+    # IMPORTANT: Ignore lines mentioning land title deed/survey numbers (e.g. โฉนดที่ดินเลขที่ 19583)
     zip_pattern = re.compile(r'^[๐-๙0-9]{5}$')
     end_idx = -1
     
     for i in range(start_idx + 1, len(lines)):
+        if any(k in lines[i] for k in ['โฉนด', 'ที่ดิน', 'หน้าสำรวจ', 'ระวาง', 'คำขอ']):
+            continue
         line_clean = clean_thai_digits(lines[i])
         if zip_pattern.match(line_clean):
             zipcode = line_clean
@@ -242,6 +263,8 @@ def parse_receiver_label(text):
     if end_idx == -1:
         # If no strict 5-digit line, check if the last line contains a zipcode
         for i in range(start_idx + 1, len(lines)):
+            if any(k in lines[i] for k in ['โฉนด', 'ที่ดิน', 'หน้าสำรวจ', 'ระวาง', 'คำขอ']):
+                continue
             line_clean = clean_thai_digits(lines[i])
             zip_match = re.search(r'([0-9]{5})', line_clean)
             if zip_match:
@@ -277,17 +300,15 @@ def parse_receiver_label(text):
             continue
             
         # Check for amphur
-        a_match = re.search(r'^(?:อำเภอ/เขต|อำเภอ|อ\.)\s*(.+)$', line_conv)
+        a_match = re.search(r'^(?:อำเภอ/เขต|อำเภอ|อ\.)\s*([\u0e00-\u0e7f]+)', line_conv)
         if a_match:
             amphur = a_match.group(1).strip()
-            # Do NOT append to cleaned_address_lines to cut from receiver_address
             continue
             
         # Check for province
-        p_match = re.search(r'^(?:จังหวัด|จ\.)\s*(.+)$', line_conv)
+        p_match = re.search(r'^(?:จังหวัด|จ\.)\s*([\u0e00-\u0e7f]+)', line_conv)
         if p_match:
             province = p_match.group(1).strip()
-            # Do NOT append to cleaned_address_lines to cut from receiver_address
             continue
             
         cleaned_address_lines.append(line)
@@ -314,12 +335,143 @@ def parse_receiver_label(text):
     if zipcode:
         receiver_address = receiver_address.replace(zipcode, "")
         
-    # Normalize spaces and strip
+    # Clean up spacing around abbreviations
+    receiver_address = re.sub(r'ต\.\s+', 'ต.', receiver_address)
     receiver_address = re.sub(r'\s+', ' ', receiver_address).strip()
             
     return {
         'RECEIVER': receiver_name,
         'RECEIVER ADDRESS': receiver_address,
+        'RECEIVER AMPHUR': amphur,
+        'RECEIVER PROVINCE': province,
+        'RECEIVER ZIPCODE': zipcode
+    }
+
+def parse_envelope_label(text):
+    """
+    Parse envelope pages that do not use the 'เรียน <Name>' structure,
+    e.g. envelopes with 'ผู้รับ' and postage permit block.
+    """
+    text = normalize_pdf_text(text)
+    raw_lines = [l.strip() for l in text.split('\n') if l.strip()]
+    
+    has_postage = any(k in text for k in ['ชำระค่าฝากส่ง', 'ใบอนุญาตเลขที่', 'ปณ.', 'ไปรษณีย์อนุญาต', 'ค่าฝากส่งเป็น'])
+    has_phu_rap = bool(re.search(r'(?:^|\n)\s*ผู้รับ|ที่[^\n]+ผู้รับ', text))
+    clean_t = clean_thai_digits(text)
+    has_zip = bool(re.search(r'\b[0-9]{5}\b', clean_t))
+    is_envelope = has_postage or (has_phu_rap and has_zip)
+    if not is_envelope:
+        return None
+        
+    ref_no = ""
+    ref_match = re.search(r'ที่\s*([ก-ฮa-zA-Z\.]+\s*[๐-๙0-9\.\/]+)', text)
+    if ref_match:
+        ref_raw = clean_thai_digits(ref_match.group(1)).replace(" ", "")
+        ref_no = re.sub(r'ผู้รับ.*$', '', ref_raw)
+        
+    shipper_name = ""
+    shipper_addr = ""
+    for i, line in enumerate(raw_lines):
+        if "สำนักงานที่ดิน" in line:
+            shipper_name = line
+            if i + 1 < len(raw_lines):
+                next_l = raw_lines[i+1]
+                if any(c.isdigit() for c in clean_thai_digits(next_l)) and any(k in next_l for k in ['หมู่', 'ตำบล', 'ต.', 'อำเภอ', 'อ.']):
+                    shipper_addr = next_l
+            break
+
+    receiver_name = ""
+    amphur = ""
+    province = ""
+    zipcode = ""
+    receiver_addr_parts = []
+    
+    ignored_patterns = [
+        r'ชำระค่าฝากส่ง',
+        r'ใบอนุญาตเลขที่',
+        r'ปณ\.',
+        r'ไปรษณีย์',
+        r'สำนักงานที่ดิน',
+        r'ฝ่ายรังวัด',
+        r'ฝ่ายทะเบียน',
+        r'เจ้าพนักงานที่ดิน',
+        r'ช่างรังวัด',
+        r'นักวิชาการที่ดิน',
+        r'พนักงานเจ้าหน้าที่',
+        r'หนังสือมอบเรื่อง',
+        r'SMARTLANDS',
+        r'คำขอของท่าน',
+        r'รับเงินมัดจำ',
+        r'เลขลงทะเบียน:'
+    ]
+    
+    candidate_lines = []
+    for line in raw_lines:
+        if any(re.search(pat, line) for pat in ignored_patterns):
+            continue
+        if shipper_addr and line == shipper_addr:
+            continue
+        if line.startswith("ที่") and "ผู้รับ" not in line:
+            continue
+        candidate_lines.append(line)
+        
+    for line in candidate_lines:
+        if line.startswith("ผู้รับ"):
+            rem = re.sub(r'^ผู้รับ\s*', '', line).strip()
+            if rem and not re.match(r'^[0-9\.\/]+', rem):
+                receiver_name = rem
+                break
+                
+    if not receiver_name:
+        for line in candidate_lines:
+            if re.match(r'^(?:นาย|นางสาว|นาง|นายก|ว่าที่|พันตำรวจ|ร้อยตำรวจ|พลฯ|ผู้ใหญ่บ้าน|กำนัน)\s*[\u0e00-\u0e7f]', line):
+                if not line.startswith("("):
+                    receiver_name = line.strip()
+                    break
+
+    for line in candidate_lines:
+        clean_l = clean_thai_digits(line)
+        if re.match(r'^[0-9]{5}$', clean_l) and not zipcode:
+            zipcode = clean_l
+            continue
+        a_m = re.search(r'(?:อำเภอ/เขต|อำเภอ|อ\.)\s*([\u0e00-\u0e7f]+)', line)
+        if a_m and not amphur:
+            amphur = a_m.group(1).strip()
+            continue
+        p_m = re.search(r'(?:จังหวัด|จ\.)\s*([\u0e00-\u0e7f]+)', line)
+        if p_m and not province:
+            province = p_m.group(1).strip()
+            continue
+        if receiver_name and (receiver_name in line or line in receiver_name):
+            continue
+        if "ผู้รับ" in line and ("ที่" in line or any(c.isdigit() for c in clean_l)):
+            continue
+        if any(k in line for k in ['หมู่', 'ตำบล', 'ต.', 'บ้าน']) or \
+           re.match(r'^[0-9]+(?:\/[0-9]+)?\s+', clean_l) or \
+           'ที่ทำการ' in line:
+            receiver_addr_parts.append(line)
+
+    raw_addr = " ".join(receiver_addr_parts)
+    addr_clean = clean_thai_digits(raw_addr)
+    addr_clean = re.sub(r'ตำบล/แขวง|ตำบล', 'ต.', addr_clean)
+    if amphur:
+        addr_clean = re.sub(r'(?:อำเภอ/เขต|อำเภอ|อ\.)\s*' + re.escape(amphur), '', addr_clean)
+        addr_clean = re.sub(r'\b' + re.escape(amphur) + r'\b', '', addr_clean)
+    if province:
+        addr_clean = re.sub(r'(?:จังหวัด|จ\.)\s*' + re.escape(province), '', addr_clean)
+        addr_clean = re.sub(r'\b' + re.escape(province) + r'\b', '', addr_clean)
+    if zipcode:
+        addr_clean = addr_clean.replace(zipcode, '')
+    addr_clean = re.sub(r'ต\.\s+', 'ต.', addr_clean)
+    addr_clean = re.sub(r'\s+', ' ', addr_clean).strip()
+    
+    if not receiver_name and not addr_clean and not zipcode:
+        return None
+        
+    return {
+        'REF NO': ref_no,
+        'RECEIVER': receiver_name,
+        'RECEIVER ADDRESS': addr_clean,
         'RECEIVER AMPHUR': amphur,
         'RECEIVER PROVINCE': province,
         'RECEIVER ZIPCODE': zipcode
@@ -332,6 +484,7 @@ def parse_shipper_label(text):
     อำเภอเรณูนคร นครพนม ๔๘๑๗๐
     ที่ นพ๐๐๒๐.๐๕/๘๘๙
     """
+    text = normalize_pdf_text(text)
     lines = [line.strip() for line in text.split('\n') if line.strip()]
     
     shipper_name = ""
@@ -357,9 +510,10 @@ def parse_shipper_label(text):
             shipper_name = raw_name
             
         # Attempt to extract ref_no if it was merged into the shipper_name line
-        ref_match = re.search(r'ที่\s*([ก-ฮa-zA-Z]+[๐-๙0-9\.\/]+)', raw_name)
+        ref_match = re.search(r'ที่\s*([ก-ฮa-zA-Z\.]+\s*[๐-๙0-9\.\/]+)', raw_name)
         if ref_match:
-            ref_no = clean_thai_digits(ref_match.group(1).strip())
+            ref_raw = clean_thai_digits(ref_match.group(1)).replace(" ", "")
+            ref_no = re.sub(r'ผู้รับ.*$', '', ref_raw)
             
         # Collect subsequent lines as address parts until we hit reference number or other block
         addr_parts = []
@@ -383,9 +537,21 @@ def parse_shipper_label(text):
         if not ref_no:
             for line in lines[shipper_idx:]:
                 if line.startswith("ที่"):
-                    ref_no = clean_thai_digits(line.replace("ที่", "").strip())
+                    ref_m = re.search(r'ที่\s*([ก-ฮa-zA-Z\.]+\s*[๐-๙0-9\.\/]+)', line)
+                    if ref_m:
+                        ref_raw = clean_thai_digits(ref_m.group(1)).replace(" ", "")
+                        ref_no = re.sub(r'ผู้รับ.*$', '', ref_raw)
+                    else:
+                        ref_no = clean_thai_digits(line.replace("ที่", "").strip())
                     break
                 
+    # If ref_no still empty, search entire text for "ที่ <Prov><Digits>/<Digits>"
+    if not ref_no:
+        ref_m = re.search(r'ที่\s*([ก-ฮa-zA-Z\.]+\s*[๐-๙0-9\.\/]+)', text)
+        if ref_m:
+            ref_raw = clean_thai_digits(ref_m.group(1)).replace(" ", "")
+            ref_no = re.sub(r'ผู้รับ.*$', '', ref_raw)
+
     return {
         'SHIPPER NAME': shipper_name,
         'SHIPPER ADDRESS': shipper_address,
@@ -404,7 +570,7 @@ def process_pdf(pdf_path):
     product_in_box = ""
     
     for page in reader.pages:
-        text = page.extract_text() or ""
+        text = normalize_pdf_text(page.extract_text() or "")
         shipper_info = parse_shipper_label(text)
         if shipper_info:
             name = shipper_info.get('SHIPPER NAME', '')
@@ -440,6 +606,10 @@ def process_pdf(pdf_path):
                 elif "ออกโฉนดที่ดิน" in text:
                     product_in_box = "ออกโฉนดที่ดิน"
             
+    # Clean product in box prefix if present
+    if product_in_box:
+        product_in_box = product_in_box.replace("ขอให้ไปดำเนินการเรื่อง", "").strip()
+
     # 2. Post-process the shipper info based on the rules:
     # Rule 2: "ถ้าข้อมูลที่คอลัมน์ G (SHIPPER ADDRESS) ว่าง ให้ไปเอาข้อมูลวรรคสุดท้ายของ F (SHIPPER NAME) มาใส่ และลบข้อความนั้นออกจากคอลัมน์ F"
     if not best_shipper_address and best_shipper_name:
@@ -460,12 +630,12 @@ def process_pdf(pdf_path):
     # Fallback to parse Amphur and Province from SHIPPER NAME if still missing
     # E.g. "สำนักงานที่ดินจังหวัดนครพนม สาขาเรณูนคร"
     if not shipper_amphur and best_shipper_name:
-        branch_match = re.search(r'สาขา\s*([ก-ฮ]+)', best_shipper_name)
+        branch_match = re.search(r'สาขา\s*([\u0e00-\u0e7f]+)', best_shipper_name)
         if branch_match:
             shipper_amphur = branch_match.group(1).strip()
             
     if not shipper_province and best_shipper_name:
-        prov_match = re.search(r'สำนักงานที่ดินจังหวัด\s*([ก-ฮ]+)', best_shipper_name)
+        prov_match = re.search(r'สำนักงานที่ดินจังหวัด\s*([\u0e00-\u0e7f]+)', best_shipper_name)
         if prov_match:
             shipper_province = prov_match.group(1).strip()
             
@@ -502,43 +672,59 @@ def process_pdf(pdf_path):
     
     # 3. Process each page to associate receiver details with the best shipper info
     for i in range(len(reader.pages)):
-        text = reader.pages[i].extract_text() or ""
+        text = normalize_pdf_text(reader.pages[i].extract_text() or "")
         
-        # Check if page contains receiver address block (mailing label)
+        receiver_info = None
+        ref_no = ""
+        
+        # Check standard receiver block with "เรียน"
         if "เรียน" in text and any(char.isdigit() or char in "๐๑๒๓๔๕๖๗๘๙" for char in text):
-            # Parse receiver details
             receiver_info = parse_receiver_label(text)
             if receiver_info:
-                # Find REF NO (Reference Number) for this specific letter
-                # Scan current page
                 page_shipper = parse_shipper_label(text)
                 ref_no = page_shipper.get('REF NO', '')
-                
-                # Fallback to preceding page if REF NO is empty
                 if not ref_no and i > 0:
-                    prev_text = reader.pages[i - 1].extract_text() or ""
+                    prev_text = normalize_pdf_text(reader.pages[i - 1].extract_text() or "")
                     prev_shipper = parse_shipper_label(prev_text)
                     ref_no = prev_shipper.get('REF NO', '')
-                    
-                # Combine parsed information
-                record = {
-                    **final_shipper_info,
-                    **receiver_info,
-                    'REF NO': ref_no,
-                    'SOURCE_FILE': pdf_path
+
+        # Check envelope label (covers envelopes with "ผู้รับ" or inverted layout)
+        if not receiver_info:
+            env_info = parse_envelope_label(text)
+            if env_info:
+                receiver_info = {
+                    'RECEIVER': env_info['RECEIVER'],
+                    'RECEIVER ADDRESS': env_info['RECEIVER ADDRESS'],
+                    'RECEIVER AMPHUR': env_info['RECEIVER AMPHUR'],
+                    'RECEIVER PROVINCE': env_info['RECEIVER PROVINCE'],
+                    'RECEIVER ZIPCODE': env_info['RECEIVER ZIPCODE']
                 }
-                
-                # Check for duplicates (e.g., letter body vs envelope). 
-                # Overwrite the existing record because the later page (envelope) usually has a cleaner, complete address.
-                is_duplicate = False
-                for r_idx, r in enumerate(records):
-                    if r.get('REF NO') == record.get('REF NO') and r.get('RECEIVER') == record.get('RECEIVER'):
-                        records[r_idx] = record
-                        is_duplicate = True
-                        break
-                        
-                if not is_duplicate:
-                    records.append(record)
+                ref_no = env_info.get('REF NO', '')
+                if not ref_no and i > 0:
+                    prev_text = normalize_pdf_text(reader.pages[i - 1].extract_text() or "")
+                    prev_shipper = parse_shipper_label(prev_text)
+                    ref_no = prev_shipper.get('REF NO', '')
+
+        if receiver_info and receiver_info.get('RECEIVER'):
+            record = {
+                **final_shipper_info,
+                **receiver_info,
+                'REF NO': ref_no,
+                'SOURCE_FILE': pdf_path
+            }
+            
+            # Check for duplicates (e.g., letter body vs envelope). 
+            # Overwrite the existing record because the envelope page has the cleaner, complete address.
+            is_duplicate = False
+            for r_idx, r in enumerate(records):
+                if (r.get('REF NO') and r.get('REF NO') == record.get('REF NO')) or \
+                   (r.get('RECEIVER') == record.get('RECEIVER')):
+                    records[r_idx] = record
+                    is_duplicate = True
+                    break
+                    
+            if not is_duplicate:
+                records.append(record)
                 
     return records
 
