@@ -214,32 +214,83 @@ def classify_delivery_status(status_code, status_desc):
     return "in_transit", "อยู่ระหว่างการนำจ่าย"
 
 def _build_demo_tracking(barcode, clean_date="14/09/2026"):
-    return [
-        {
-            "seq": 1,
-            "status": "001",
-            "status_description": "รับฝากเข้าระบบแล้ว",
-            "datetime": f"{clean_date} 11:24:50",
-            "location": "ปณ.เรณูนคร",
-            "signature": "เจ้าหน้าที่รับฝาก"
-        },
-        {
-            "seq": 2,
-            "status": "002",
-            "status_description": "อยู่ระหว่างนำส่งไปยังปลายทาง",
-            "datetime": f"{clean_date} 13:05:12",
-            "location": "ศูนย์คัดแยกนครพนม",
-            "signature": "ระบบอัตโนมัติ"
-        },
-        {
-            "seq": 3,
-            "status": "003",
-            "status_description": "ถึงที่ทำการไปรษณีย์ปลายทาง",
-            "datetime": f"{clean_date} 15:40:33",
-            "location": "ปณ.เมืองนครพนม",
-            "signature": "ระบบอัตโนมัติ"
-        }
-    ]
+    b_clean = str(barcode or "").strip()
+    last_char = b_clean[-3] if len(b_clean) >= 3 and b_clean[-3].isdigit() else "1"
+    digit = int(last_char) if last_char.isdigit() else 1
+
+    ev1 = {
+        "seq": 1,
+        "status": "1",
+        "status_key": "received",
+        "status_label": "รับฝากแล้ว",
+        "status_description": "รับฝากเข้าระบบแล้ว",
+        "datetime": f"{clean_date} 11:24:50",
+        "location": "ปณ.เรณูนคร",
+        "signature": "เจ้าหน้าที่รับฝาก"
+    }
+
+    ev2 = {
+        "seq": 2,
+        "status": "002",
+        "status_key": "in_transit",
+        "status_label": "อยู่ระหว่างการนำจ่าย",
+        "status_description": "อยู่ระหว่างนำส่งไปยังศูนย์คัดแยก",
+        "datetime": f"{clean_date} 14:35:10",
+        "location": "ศป.นครพนม",
+        "signature": "ระบบคัดแยกอัตโนมัติ"
+    }
+
+    ev3 = {
+        "seq": 3,
+        "status": "003",
+        "status_key": "in_transit",
+        "status_label": "อยู่ระหว่างการนำจ่าย",
+        "status_description": "ถึงที่ทำการไปรษณีย์ปลายทาง (เตรียมการนำจ่าย)",
+        "datetime": f"{clean_date} 15:42:18",
+        "location": "ปณ.เมืองนครพนม",
+        "signature": "เจ้าหน้าที่ส่งต่อ"
+    }
+
+    ev_deliv = {
+        "seq": 4,
+        "status": "501",
+        "status_key": "delivered",
+        "status_label": "นำจ่ายสำเร็จ",
+        "status_description": "นำจ่ายสำเร็จ (ผู้รับได้รับเรียบร้อย)",
+        "datetime": f"{clean_date} 16:20:45",
+        "location": "ปณ.สุไหงโก-ลก",
+        "signature": "สมศรี (ผู้รับ)"
+    }
+
+    ev_ret = {
+        "seq": 4,
+        "status": "502",
+        "status_key": "returned",
+        "status_label": "ส่งคืน",
+        "status_description": "ส่งคืน (ติดต่อผู้รับไม่ได้)",
+        "datetime": f"{clean_date} 16:55:00",
+        "location": "ศป.นครพนม",
+        "signature": "เจ้าหน้าที่ส่งคืน"
+    }
+
+    # Customer 0 (ends in 9): Received only
+    if "979" in b_clean or digit in (0, 5):
+        return [ev1]
+
+    # Customer 1 (ends in 0): In transit
+    if "980" in b_clean or digit in (1, 6):
+        return [ev1, ev2]
+
+    # Customer 2 (ends in 1): In transit (Arrived at dest)
+    if "981" in b_clean or digit in (2, 7):
+        return [ev1, ev2, ev3]
+
+    # Customer 3 (ends in 2): Delivered
+    if "982" in b_clean or digit in (3, 8):
+        return [ev1, ev2, ev3, ev_deliv]
+
+    # Customer 4 (ends in 3): Returned
+    return [ev1, ev2, ev_ret]
 
 @app.get("/api/health")
 def health_check():

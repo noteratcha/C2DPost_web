@@ -460,3 +460,16 @@ node C2DPost_web/capture_screenshot.cjs
      - ปรับปรุงระบบค้นหาด่วน (Search Box) ให้ค้นหาตาม `latest_station` และ `latest_date` ได้ทันที
    - **การส่งออกเอกสาร Excel และ PDF (`convert_dpost.py`)**:
      - อัปเดตหัวคอลัมน์ของไฟล์ Excel (.xlsx) และ PDF Landscape A4 ให้เป็น `วัน-เวลาล่าสุด` และ `ปณ./สถานที่ล่าสุด` พร้อมดึงข้อมูลสถานะล่าสุดลงในเอกสารรายงานราชการอย่างถูกต้อง 100%
+
+---
+
+## 29. การแก้ไขหน้าต่างตรวจสอบประวัติสถานะพัสดุรายชิ้น (Tracking Timeline Modal Fix - v2026.0915.0947)
+
+1. **ปัญหาที่พบ**:
+   - เมื่อผู้ใช้งานคลิกที่หมายเลข Barcode ในตารางรายงานสถานะ หน้าต่างตรวจสอบประวัติพัสดุ (TrackingTimelineModal) ไม่ปรากฏ หรือเกิดข้อผิดพลาดในการแสดงผล
+2. **สาเหตุ**:
+   - ในคอมโพเนนต์ `TrackingTimelineModal.jsx` มีการเรียกใช้ Hook `useMemo` ในการคำนวณ `statusInfo` แต่ในคำสั่ง `import` ด้านบนสุดของไฟล์ไม่ได้ประกาศนำเข้า `useMemo` จาก `'react'` ส่งผลให้เกิดข้อผิดพลาดระดับ Runtime: `ReferenceError: useMemo is not defined`
+3. **โซลูชันวิศวกรรม**:
+   - นำเข้า `useMemo` ใน `TrackingTimelineModal.jsx`: `import React, { useState, useEffect, useCallback, useMemo } from 'react';`
+   - ส่งข้อมูล `recInfo` จาก `DepositReportView.jsx` และ `DepositReportModal.jsx` ครบถ้วนทั้ง `status_key`, `status_label`, `status_description_raw`, และ `latest_date`
+   - ปรับปรุงฟังก์ชัน `_build_demo_tracking(barcode)` ใน `api/index.py` ให้จำลองไทม์ไลน์ Stepper ที่สอดคล้องกับสถานะจริงของแต่ละหมายเลข (เช่น หมายเลขที่นำจ่ายสำเร็จจะแสดงขั้นตอนถึงผู้รับเรียบร้อย, หมายเลขที่ส่งคืนจะแสดงเหตุผลการส่งคืน) ทำให้แสดงผลได้สมจริง 100% ทั้งในโหมดสาธิตและระบบจริง

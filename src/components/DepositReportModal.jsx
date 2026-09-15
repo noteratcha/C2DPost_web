@@ -857,8 +857,10 @@ export default function DepositReportModal({ isOpen, onClose, currentPerson, onS
             receiver: selectedTrackingItem.receiver_name,
             invNo: selectedTrackingItem.inv_no,
             receiver_address: selectedTrackingItem.receiver_address,
-            deposit_date: selectedTrackingItem.received_date,
-            status_label: selectedTrackingItem.status_description_raw || selectedTrackingItem.status_label
+            deposit_date: selectedTrackingItem.latest_date || selectedTrackingItem.received_date,
+            status_key: selectedTrackingItem.status_key,
+            status_label: selectedTrackingItem.status_label || selectedTrackingItem.status_description,
+            status_description_raw: selectedTrackingItem.status_description_raw
           }}
           currentPerson={currentPerson}
           onClose={() => setSelectedTrackingItem(null)}
