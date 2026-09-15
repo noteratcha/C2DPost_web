@@ -473,3 +473,23 @@ node C2DPost_web/capture_screenshot.cjs
    - นำเข้า `useMemo` ใน `TrackingTimelineModal.jsx`: `import React, { useState, useEffect, useCallback, useMemo } from 'react';`
    - ส่งข้อมูล `recInfo` จาก `DepositReportView.jsx` และ `DepositReportModal.jsx` ครบถ้วนทั้ง `status_key`, `status_label`, `status_description_raw`, และ `latest_date`
    - ปรับปรุงฟังก์ชัน `_build_demo_tracking(barcode)` ใน `api/index.py` ให้จำลองไทม์ไลน์ Stepper ที่สอดคล้องกับสถานะจริงของแต่ละหมายเลข (เช่น หมายเลขที่นำจ่ายสำเร็จจะแสดงขั้นตอนถึงผู้รับเรียบร้อย, หมายเลขที่ส่งคืนจะแสดงเหตุผลการส่งคืน) ทำให้แสดงผลได้สมจริง 100% ทั้งในโหมดสาธิตและระบบจริง
+
+---
+
+## 30. ระบบซิงก์และอัปเดตวัน-เวลา และสถานที่สถานะล่าสุดแบบเรียลไทม์ (Live Tracking Auto-Enrichment & Sync Parity - v2026.0915.1025)
+
+1. **ปัญหาที่พบและความเป็นจริงของ API ไปรษณีย์ไทย**:
+   - เมื่อผู้ใช้งานเปิดดูหน้าต่างประวัติสถานะพัสดุ (TrackingTimelineModal) เช่น หมายเลข `BC414110996TH` พบว่าไทม์ไลน์แสดงสถานะ "ถึง ปณ.ปลายทาง เตรียมนำจ่าย" วันที่ `15/09/2026 09:27:45` ณ `เรณูนคร`
+   - แต่ในตารางรายงานสถานะเบื้องหลัง ข้อมูลในคอลัมน์ "วัน-เวลาล่าสุด" และ "ปณ./สถานที่ล่าสุด" ยังคงแสดงเป็นวันที่รับฝากวันแรก `14/09/2026 14:30:40` เหมือนกันทุกแถว
+   - **สาเหตุเชิงสถาปัตยกรรม**: API `getAllOrderReceived` ของไปรษณีย์ไทยเป็นเพียงระบบบันทึกคำสั่งรับฝาก (Order Reception) ซึ่งจะอัปเดตเฉพาะรหัสสถานะ `status` (`003` อยู่ระหว่างการนำจ่าย) แต่ไม่ได้ส่งวัน-เวลาของเช็กพอยต์ล่าสุด (`statusDate`) และสถานที่ล่าสุด (`station`) กลับมาในก้อนข้อมูลรับฝาก ข้อมูลเช็กพอยต์สดเหล่านี้จะถูกส่งผ่าน Track & Trace API `getHistoryStatus?barcode=...` เท่านั้น
+
+2. **โซลูชันวิศวกรรม 3 ระดับ (Three-Tier Real-Time Synchronization)**:
+   - **ระดับที่ 1: Automatic Parallel Enrichment บน Backend (`/api/reports/received`)**:
+     - เมื่อผู้ใช้งานร้องขอรายงานสถานะ หากมีจำนวนพัสดุไม่เกิน 35 รายการ Backend จะทำการดึง `getHistoryStatus` ควบคู่กันแบบ Parallel ทันทีโดยใช้ `ThreadPoolExecutor(max_workers=min(len(records), 10))` พร้อมกำหนด Timeout ป้องกันคอขวด
+     - นำผลลัพธ์เช็กพอยต์ล่าสุด (`latest_datetime`, `latest_location`, `latest_status_key`) มารวมเข้ากับ `latest_date` และ `latest_station` ของแต่ละรายการในตารางโดยตรง ทำให้เมื่อเปิดหน้ารายงานขึ้นมา ตารางจะแสดงวันเวลาและสถานที่ล่าสุดที่แท้จริงทันที
+   - **ระดับที่ 2: Callback เชื่อมโยงไทม์ไลน์กับตาราง (`onTrackingUpdated`)**:
+     - ในคอมโพเนนต์ `TrackingTimelineModal.jsx` เมื่อการดึงข้อมูล `fetchTrackingStatus` สำเร็จ จะเรียกฟังก์ชัน `onTrackingUpdated(barcode, result)` กลับไปยัง Component แม่ (`DepositReportView.jsx` และ `DepositReportModal.jsx`)
+     - คอมโพเนนต์แม่จะทำการอัปเดต Record แถวนั้นใน state `reportData.records` ทันที พร้อมคำนวณการ์ดสรุปยอดสถานะ (Summary Stats) ใหม่ และบันทึกลง `sessionStorage` แบบอัตโนมัติ ทำให้ผู้ใช้เห็นแถวข้อมูลในตารางเปลี่ยนเป็นข้อมูลล่าสุดทันทีที่ปิดหน้าต่าง Modal
+   - **ระดับที่ 3: ปุ่มซิงก์สถานะล่าสุดแบบชุด (Batch Tracking Sync Endpoint)**:
+     - พัฒนา Endpoint ใหม่ `POST /api/reports/batch-tracking` รับรายการบาร์โค้ด และประมวลผลดึงสถานะคู่ขนาน
+     - เพิ่มปุ่ม "ซิงก์สถานะล่าสุด (n รายการ)" พร้อมแอนิเมชัน Spinner บนหน้ารายงานสถานะ เพื่อให้ผู้ใช้สามารถกดอัปเดตเช็กพอยต์พัสดุทั้งหมดในตารางได้ตามต้องการ

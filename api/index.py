@@ -86,6 +86,11 @@ class ReconcileRequest(BaseModel):
     username: Optional[str] = ""
     password: Optional[str] = ""
 
+class BatchTrackingRequest(BaseModel):
+    barcodes: List[str]
+    username: Optional[str] = ""
+    password: Optional[str] = ""
+
 class LogBarcodesRequest(BaseModel):
     username: Optional[str] = "Unknown"
     items: List[dict]
@@ -732,6 +737,49 @@ def get_received_report(req: ReceivedReportRequest):
         }
         normalized_records.append(norm_item)
 
+    # Auto-enrich with real-time checkpoints from getHistoryStatus
+    # when live credentials exist and count <= 35 to prevent function timeout
+    if not is_demo_user and username and password and len(normalized_records) <= 35:
+        def _fetch_realtime_tracking(rec):
+            bcode = rec.get("barcode", "").strip()
+            if not bcode:
+                return rec
+            try:
+                hurl = f"https://r_dservice.thailandpost.com/webservice/getHistoryStatus?barcode={bcode}"
+                hresp = requests.get(
+                    hurl,
+                    headers={"Content-Type": "application/json"},
+                    auth=HTTPBasicAuth(username, password),
+                    timeout=5,
+                    verify=False
+                )
+                if hresp.status_code == 200:
+                    try:
+                        hraw = hresp.json()
+                    except Exception:
+                        hraw = hresp.text
+                    events = _parse_tracking_events(hraw, bcode)
+                    if events:
+                        latest = events[-1]
+                        if latest.get("datetime"):
+                            rec["latest_date"] = latest["datetime"]
+                        if latest.get("location"):
+                            rec["latest_station"] = latest["location"]
+                        if latest.get("status_key"):
+                            rec["status_key"] = latest["status_key"]
+                        if latest.get("status_label"):
+                            rec["status_label"] = latest["status_label"]
+                            rec["status_description"] = latest["status_label"]
+                        if latest.get("status_description"):
+                            rec["status_description_raw"] = latest["status_description"]
+            except Exception:
+                pass
+            return rec
+
+        max_w = min(len(normalized_records), 10)
+        with ThreadPoolExecutor(max_workers=max_w) as executor:
+            normalized_records = list(executor.map(_fetch_realtime_tracking, normalized_records))
+
     date_display = clean_date if clean_date == clean_end_date else f"{clean_date} - {clean_end_date}"
 
     delivered_count = sum(1 for r in normalized_records if r["status_key"] == "delivered")
@@ -831,6 +879,81 @@ def get_tracking(req: TrackingRequest):
         "latest_status_label": latest_status_label,
         "latest_datetime": latest_datetime,
         "latest_location": latest_location
+    }
+
+@app.post("/api/reports/batch-tracking")
+def batch_tracking(req: BatchTrackingRequest):
+    """
+    Fetches real-time latest tracking status in parallel for a list of barcodes via getHistoryStatus.
+    """
+    import requests
+    from requests.auth import HTTPBasicAuth
+    from concurrent.futures import ThreadPoolExecutor
+    import urllib3
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+    barcodes = [str(b).strip() for b in (req.barcodes or []) if str(b).strip()]
+    if not barcodes:
+        return {"success": True, "results": {}}
+
+    username = (req.username or "").strip()
+    password = (req.password or "").strip()
+    is_demo_user = not username or not password or username.lower() == "demo"
+
+    results = {}
+
+    if not is_demo_user and username and password:
+        def _fetch_single(bcode):
+            try:
+                hurl = f"https://r_dservice.thailandpost.com/webservice/getHistoryStatus?barcode={bcode}"
+                hresp = requests.get(
+                    hurl,
+                    headers={"Content-Type": "application/json"},
+                    auth=HTTPBasicAuth(username, password),
+                    timeout=5,
+                    verify=False
+                )
+                if hresp.status_code == 200:
+                    try:
+                        hraw = hresp.json()
+                    except Exception:
+                        hraw = hresp.text
+                    events = _parse_tracking_events(hraw, bcode)
+                    if events:
+                        latest = events[-1]
+                        return bcode, {
+                            "latest_date": latest.get("datetime", ""),
+                            "latest_station": latest.get("location", ""),
+                            "status_key": latest.get("status_key", "in_transit"),
+                            "status_label": latest.get("status_label", "อยู่ระหว่างการนำจ่าย"),
+                            "status_description_raw": latest.get("status_description", "")
+                        }
+            except Exception:
+                pass
+            return bcode, None
+
+        max_w = min(len(barcodes), 10)
+        with ThreadPoolExecutor(max_workers=max_w) as executor:
+            for bcode, data in executor.map(_fetch_single, barcodes):
+                if data:
+                    results[bcode] = data
+    else:
+        # Demo mode simulation
+        for bcode in barcodes:
+            evs = _build_demo_tracking(bcode)
+            latest = evs[-1] if evs else {}
+            results[bcode] = {
+                "latest_date": latest.get("datetime", ""),
+                "latest_station": latest.get("location", ""),
+                "status_key": latest.get("status_key", "in_transit"),
+                "status_label": latest.get("status_label", "อยู่ระหว่างการนำจ่าย"),
+                "status_description_raw": latest.get("status_description", "")
+            }
+
+    return {
+        "success": True,
+        "is_mock": bool(is_demo_user),
+        "results": results
     }
 
 @app.post("/api/reports/reconcile")

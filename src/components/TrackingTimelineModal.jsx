@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { fetchTrackingHistory } from '../utils/api';
 import './TrackingTimelineModal.css';
 
-export default function TrackingTimelineModal({ isOpen, barcode, recInfo, currentPerson, onClose, onOpenTrackingPage }) {
+export default function TrackingTimelineModal({ isOpen, barcode, recInfo, currentPerson, onClose, onOpenTrackingPage, onTrackingUpdated }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [trackData, setTrackData] = useState(null);
@@ -18,6 +18,9 @@ export default function TrackingTimelineModal({ isOpen, barcode, recInfo, curren
       const result = await fetchTrackingHistory({ barcode: bcode, username, password });
       if (result.success) {
         setTrackData(result);
+        if (onTrackingUpdated) {
+          onTrackingUpdated(bcode, result);
+        }
       } else {
         setError(result.message || 'ไม่สามารถดึงประวัติสถานะได้');
       }
@@ -26,7 +29,7 @@ export default function TrackingTimelineModal({ isOpen, barcode, recInfo, curren
     } finally {
       setLoading(false);
     }
-  }, [currentPerson]);
+  }, [currentPerson, onTrackingUpdated]);
 
   useEffect(() => {
     if (isOpen && barcode) {

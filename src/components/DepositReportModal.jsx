@@ -96,6 +96,57 @@ export default function DepositReportModal({ isOpen, onClose, currentPerson, onS
     }
   }, [startDate, endDate, currentPerson, onSyncRecords]);
 
+  // Handle live tracking update from modal when viewed
+  const handleTrackingUpdated = useCallback((bcode, trackResult) => {
+    if (!bcode || !trackResult) return;
+    setReportData((prev) => {
+      if (!prev || !prev.records) return prev;
+      let hasChange = false;
+      const updatedRecords = prev.records.map((r) => {
+        if (r.barcode === bcode) {
+          hasChange = true;
+          const evs = trackResult.events || [];
+          const latestEv = evs.length > 0 ? evs[evs.length - 1] : null;
+          return {
+            ...r,
+            latest_date: trackResult.latest_datetime || latestEv?.datetime || r.latest_date,
+            latest_station: trackResult.latest_location || latestEv?.location || r.latest_station,
+            status_key: trackResult.latest_status_key || latestEv?.status_key || r.status_key,
+            status_label: trackResult.latest_status || latestEv?.status || r.status_label,
+            status_description: trackResult.latest_status || latestEv?.status || r.status_description
+          };
+        }
+        return r;
+      });
+      if (!hasChange) return prev;
+
+      // Recalculate summary counts
+      let receivedCount = 0;
+      let inTransitCount = 0;
+      let deliveredCount = 0;
+      let returnedCount = 0;
+      for (const rec of updatedRecords) {
+        const key = rec.status_key || 'received';
+        if (key === 'delivered') deliveredCount++;
+        else if (key === 'returned') returnedCount++;
+        else if (key === 'in_transit') inTransitCount++;
+        else receivedCount++;
+      }
+
+      return {
+        ...prev,
+        records: updatedRecords,
+        summary: {
+          ...prev.summary,
+          received_items: receivedCount,
+          in_transit_items: inTransitCount,
+          delivered_items: deliveredCount,
+          returned_items: returnedCount
+        }
+      };
+    });
+  }, []);
+
   // Initial load when modal opens
   useEffect(() => {
     if (isOpen) {
@@ -864,6 +915,7 @@ export default function DepositReportModal({ isOpen, onClose, currentPerson, onS
           }}
           currentPerson={currentPerson}
           onClose={() => setSelectedTrackingItem(null)}
+          onTrackingUpdated={handleTrackingUpdated}
         />
       )}
     </div>

@@ -238,6 +238,32 @@ export async function fetchTrackingHistory({ barcode, username = '', password = 
 }
 
 /**
+ * Fetch real-time latest tracking status in batch for multiple barcodes.
+ *
+ * @param {Object} params
+ * @param {Array<string>} params.barcodes - Array of barcodes to track
+ * @param {string} [params.username] - e-Parcel username
+ * @param {string} [params.password] - e-Parcel password
+ * @returns {Promise<{success: boolean, is_mock: boolean, results: Object}>}
+ */
+export async function batchFetchTracking({ barcodes, username = '', password = '' }) {
+  const response = await fetch(`${API_BASE}/reports/batch-tracking`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ barcodes, username, password })
+  });
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    const errorMsg = data.message || data.detail || `เกิดข้อผิดพลาดในการดึงสถานะพัสดุ (HTTP ${response.status})`;
+    throw new Error(errorMsg);
+  }
+
+  return data;
+}
+
+/**
  * Auto-reconcile: batch-check a list of barcodes to see which
  * items have already been received at the post office (รับฝากแล้ว).
  *

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { fetchReceivedReport, exportDepositReportExcel, exportDepositReportPdf } from '../utils/api';
+import { fetchReceivedReport, exportDepositReportExcel, exportDepositReportPdf, batchFetchTracking } from '../utils/api';
 import TrackingTimelineModal from './TrackingTimelineModal';
 import './DepositReportView.css';
 
@@ -119,6 +119,114 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
   const [searchQuery, setSearchQuery] = useState(() => cachedState?.searchQuery || '');
   const [filterTab, setFilterTab] = useState(() => cachedState?.filterTab || 'all');
   const [selectedTrackingItem, setSelectedTrackingItem] = useState(null);
+  const [syncingTracking, setSyncingTracking] = useState(false);
+  const [syncProgress, setSyncProgress] = useState('');
+
+  // Handle live tracking update from modal when viewed
+  const handleTrackingUpdated = useCallback((bcode, trackResult) => {
+    if (!bcode || !trackResult) return;
+    setReportData((prev) => {
+      if (!prev || !prev.records) return prev;
+      let hasChange = false;
+      const updatedRecords = prev.records.map((r) => {
+        if (r.barcode === bcode) {
+          hasChange = true;
+          const evs = trackResult.events || [];
+          const latestEv = evs.length > 0 ? evs[evs.length - 1] : null;
+          return {
+            ...r,
+            latest_date: trackResult.latest_datetime || latestEv?.datetime || r.latest_date,
+            latest_station: trackResult.latest_location || latestEv?.location || r.latest_station,
+            status_key: trackResult.latest_status_key || latestEv?.status_key || r.status_key,
+            status_label: trackResult.latest_status_label || latestEv?.status_label || r.status_label,
+            status_description: trackResult.latest_status_label || latestEv?.status_label || r.status_description,
+            status_description_raw: latestEv?.status_description || trackResult.latest_status_label || r.status_description_raw
+          };
+        }
+        return r;
+      });
+
+      if (!hasChange) return prev;
+
+      const delivered_count = updatedRecords.filter((r) => r.status_key === 'delivered').length;
+      const in_transit_count = updatedRecords.filter((r) => r.status_key === 'in_transit').length;
+      const returned_count = updatedRecords.filter((r) => r.status_key === 'returned').length;
+      const received_count = updatedRecords.filter((r) => r.status_key === 'received').length;
+
+      return {
+        ...prev,
+        summary: {
+          ...prev.summary,
+          delivered_count,
+          in_transit_count,
+          returned_count,
+          received_count
+        },
+        records: updatedRecords
+      };
+    });
+  }, []);
+
+  // Batch sync latest status for all items in the report
+  const handleSyncAllTracking = useCallback(async () => {
+    if (!reportData?.records || reportData.records.length === 0) return;
+    const barcodes = reportData.records.map((r) => r.barcode).filter(Boolean);
+    if (barcodes.length === 0) return;
+
+    setSyncingTracking(true);
+    setSyncProgress(`กำลังซิงก์สถานะ ${barcodes.length} รายการ...`);
+    setError('');
+
+    try {
+      const username = currentPerson?.UserName || '';
+      const password = currentPerson?.Password || '';
+      const result = await batchFetchTracking({ barcodes, username, password });
+      
+      if (result.success && result.results) {
+        const resultMap = result.results;
+        setReportData((prev) => {
+          if (!prev || !prev.records) return prev;
+          const updatedRecords = prev.records.map((r) => {
+            const match = resultMap[r.barcode];
+            if (match) {
+              return {
+                ...r,
+                latest_date: match.latest_date || r.latest_date,
+                latest_station: match.latest_station || r.latest_station,
+                status_key: match.status_key || r.status_key,
+                status_label: match.status_label || r.status_label,
+                status_description: match.status_label || r.status_description,
+                status_description_raw: match.status_description_raw || r.status_description_raw
+              };
+            }
+            return r;
+          });
+
+          const delivered_count = updatedRecords.filter((r) => r.status_key === 'delivered').length;
+          const in_transit_count = updatedRecords.filter((r) => r.status_key === 'in_transit').length;
+          const returned_count = updatedRecords.filter((r) => r.status_key === 'returned').length;
+          const received_count = updatedRecords.filter((r) => r.status_key === 'received').length;
+
+          return {
+            ...prev,
+            summary: {
+              ...prev.summary,
+              delivered_count,
+              in_transit_count,
+              returned_count,
+              received_count
+            },
+            records: updatedRecords
+          };
+        });
+      }
+    } catch (err) {
+      setError(`ไม่สามารถซิงก์สถานะล่าสุดได้: ${err.message || err}`);
+    } finally {
+      setSyncingTracking(false);
+      setSyncProgress('');
+    }
+  }, [reportData, currentPerson]);
 
   // Persist state to sessionStorage whenever key fields change
   useEffect(() => {
@@ -482,7 +590,7 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
               type="button"
               className="btn-fetch-report"
               onClick={() => handleFetchReport(startDate, endDate)}
-              disabled={loading}
+              disabled={loading || syncingTracking}
             >
               {loading ? (
                 <>
@@ -499,6 +607,31 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
                 </>
               )}
             </button>
+            {reportData?.records?.length > 0 && (
+              <button
+                type="button"
+                className="btn-sync-tracking"
+                onClick={handleSyncAllTracking}
+                disabled={loading || syncingTracking}
+                title="ดึงสถานะนำจ่ายและจุดเช็คพอยต์ล่าสุดของทุกหมายเลขจากระบบไปรษณีย์ไทย"
+              >
+                {syncingTracking ? (
+                  <>
+                    <span className="spinner-small"></span>
+                    <span>{syncProgress || 'กำลังซิงก์...'}</span>
+                  </>
+                ) : (
+                  <>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                      <polyline points="23 4 23 10 17 10"></polyline>
+                      <polyline points="1 20 1 14 7 14"></polyline>
+                      <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                    </svg>
+                    <span>ซิงก์สถานะล่าสุด ({reportData.records.length})</span>
+                  </>
+                )}
+              </button>
+            )}
           </div>
         </div>
 
@@ -946,6 +1079,7 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
           }}
           currentPerson={currentPerson}
           onClose={() => setSelectedTrackingItem(null)}
+          onTrackingUpdated={handleTrackingUpdated}
           onOpenTrackingPage={onOpenTrackingPage ? () => {
             const bcode = selectedTrackingItem.barcode;
             setSelectedTrackingItem(null);
