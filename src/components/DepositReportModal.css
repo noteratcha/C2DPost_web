@@ -219,6 +219,8 @@
 .deposit-quick-date-btns {
   display: flex;
   gap: 0.35rem;
+  flex-wrap: wrap;
+  align-items: center;
 }
 
 .btn-quick-date {

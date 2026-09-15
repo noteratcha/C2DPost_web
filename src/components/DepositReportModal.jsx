@@ -37,6 +37,14 @@ export default function DepositReportModal({ isOpen, onClose, currentPerson, onS
     const d = new Date();
     return toInputDateFormat(new Date(d.getFullYear(), d.getMonth(), 1));
   }, []);
+  const lastMonthStartIso = useMemo(() => {
+    const d = new Date();
+    return toInputDateFormat(new Date(d.getFullYear(), d.getMonth() - 1, 1));
+  }, []);
+  const lastMonthEndIso = useMemo(() => {
+    const d = new Date();
+    return toInputDateFormat(new Date(d.getFullYear(), d.getMonth(), 0));
+  }, []);
 
   // Date Range state
   const [startDate, setStartDate] = useState(todayIso);
@@ -184,6 +192,9 @@ export default function DepositReportModal({ isOpen, onClose, currentPerson, onS
     } else if (type === 'thisMonth') {
       s = monthStartIso;
       e = todayIso;
+    } else if (type === 'lastMonth') {
+      s = lastMonthStartIso;
+      e = lastMonthEndIso;
     }
     setStartDate(s);
     setEndDate(e);
@@ -446,6 +457,14 @@ export default function DepositReportModal({ isOpen, onClose, currentPerson, onS
                 disabled={loading}
               >
                 เดือนนี้
+              </button>
+              <button
+                type="button"
+                className={`btn-quick-date ${startDate === lastMonthStartIso && endDate === lastMonthEndIso ? 'active' : ''}`}
+                onClick={() => handleSetQuickDate('lastMonth')}
+                disabled={loading}
+              >
+                เดือนที่แล้ว
               </button>
             </div>
           </div>

@@ -98,6 +98,14 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
     const d = new Date();
     return toInputDateFormat(new Date(d.getFullYear(), d.getMonth(), 1));
   }, []);
+  const lastMonthStartIso = useMemo(() => {
+    const d = new Date();
+    return toInputDateFormat(new Date(d.getFullYear(), d.getMonth() - 1, 1));
+  }, []);
+  const lastMonthEndIso = useMemo(() => {
+    const d = new Date();
+    return toInputDateFormat(new Date(d.getFullYear(), d.getMonth(), 0));
+  }, []);
 
   // Retrieve cached state if available
   const cachedState = useMemo(() => getCachedDepositState(), []);
@@ -296,6 +304,9 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
     } else if (type === 'thisMonth') {
       s = monthStartIso;
       e = todayIso;
+    } else if (type === 'lastMonth') {
+      s = lastMonthStartIso;
+      e = lastMonthEndIso;
     }
     setStartDate(s);
     setEndDate(e);
@@ -553,6 +564,14 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
                 disabled={loading}
               >
                 เดือนนี้
+              </button>
+              <button
+                type="button"
+                className={`btn-quick-date ${startDate === lastMonthStartIso && endDate === lastMonthEndIso ? 'active' : ''}`}
+                onClick={() => handleSetQuickDate('lastMonth')}
+                disabled={loading}
+              >
+                เดือนที่แล้ว
               </button>
             </div>
           </div>
