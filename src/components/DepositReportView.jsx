@@ -724,7 +724,7 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
             <div className="stat-card-content">
               <div className="stat-label">ยอดรวมค่าบริการ</div>
               <div className="stat-value text-gold">
-                ฿{summary.total_fee.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                {summary.total_fee.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </div>
             </div>
           </div>
@@ -905,7 +905,7 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
                           {item.weight ? `${item.weight}g` : '-'}
                         </td>
                         <td style={{ textAlign: 'right' }} className="cell-fee">
-                          {item.fee !== undefined ? `฿${item.fee.toFixed(2)}` : '-'}
+                          {item.fee !== undefined ? `${Number(item.fee).toFixed(2)}` : '-'}
                         </td>
                         <td style={{ textAlign: 'center' }}>
                           <span 

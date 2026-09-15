@@ -622,7 +622,7 @@ export default function DepositReportModal({ isOpen, onClose, currentPerson, onS
             <div className="stat-data">
               <span className="stat-label">ยอดรวมค่าบริการ</span>
               <div className="stat-number-row">
-                <span className="stat-number text-gold">฿{summary.total_fee.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                <span className="stat-number text-gold">{summary.total_fee.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
               </div>
             </div>
           </div>
@@ -791,7 +791,7 @@ export default function DepositReportModal({ isOpen, onClose, currentPerson, onS
                       </td>
                       <td className="td-right">{rec.weight ? `${rec.weight}g` : '-'}</td>
                       <td className="td-right font-medium">
-                        {rec.fee ? `฿${rec.fee.toFixed(2)}` : '-'}
+                        {rec.fee ? `${Number(rec.fee).toFixed(2)}` : '-'}
                       </td>
                       <td className="td-center">
                         <span 

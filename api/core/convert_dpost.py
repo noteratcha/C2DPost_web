@@ -37,7 +37,7 @@ except Exception as e:
     print(f"Error registering fonts: {e}")
     FONT_REGISTERED = False
 
-__version__ = "2026.0915.1044"
+__version__ = "2026.0915.1051"
 
 # Thailand Post API Credentials
 API_KEY = "V9JN25IFH5hdZYc1k8NNRVgnLYXyQLzc"
@@ -1119,7 +1119,7 @@ def generate_deposit_report_excel(records, summary, meta, output_excel_path):
     returned_count = summary.get("returned_count", 0)
 
     ws.merge_cells("A2:J2")
-    ws["A2"] = f"ประจำวันที่: {report_date}  |  รายการทั้งหมด: {total_items} ฉบับ  |  นำจ่ายสำเร็จ: {delivered_count} ฉบับ  |  อยู่ระหว่างการนำจ่าย: {in_transit_count} ฉบับ  |  ส่งคืน: {returned_count} ฉบับ  |  น้ำหนักรวม: {total_weight:,.1f} กรัม  |  ยอดค่าบริการรวม: ฿{total_fee:,.2f}"
+    ws["A2"] = f"ประจำวันที่: {report_date}  |  รายการทั้งหมด: {total_items} ฉบับ  |  นำจ่ายสำเร็จ: {delivered_count} ฉบับ  |  อยู่ระหว่างการนำจ่าย: {in_transit_count} ฉบับ  |  ส่งคืน: {returned_count} ฉบับ  |  น้ำหนักรวม: {total_weight:,.1f} กรัม  |  ยอดค่าบริการรวม: {total_fee:,.2f}"
     ws["A2"].font = SUBTITLE_FONT
     ws["A2"].alignment = Alignment(horizontal="left", vertical="center")
     ws.row_dimensions[2].height = 20
@@ -1128,7 +1128,7 @@ def generate_deposit_report_excel(records, summary, meta, output_excel_path):
     headers = [
         "ลำดับ", "หมายเลข Barcode", "เลขที่คำขอ", "ชื่อผู้รับ",
         "ที่อยู่ปลายทาง", "วัน-เวลาล่าสุด", "ปณ./สถานที่ล่าสุด", "น้ำหนัก (g)",
-        "ค่าบริการ (฿)", "สถานะ"
+        "ค่าบริการ", "สถานะ"
     ]
     header_row = 4
     ws.row_dimensions[header_row].height = 24
@@ -1273,12 +1273,12 @@ def generate_deposit_report_pdf(records, summary, meta, output_pdf_path):
     subtitle_text = f"<b>หน่วยงาน:</b> {org_name}  |  <b>วันที่นำส่ง:</b> {report_date}  |  <b>ยอดรวม:</b> {total_items} ฉบับ (นำจ่ายสำเร็จ {delivered_count} ฉบับ, อยู่ระหว่างการนำจ่าย {in_transit_count} ฉบับ, ส่งคืน {returned_count} ฉบับ)"
     if total_weight > 0:
         subtitle_text += f"  |  <b>น้ำหนักรวม:</b> {total_weight:,.1f} กรัม"
-    subtitle_text += f"  |  <b>ยอดค่าบริการ:</b> ฿{total_fee:,.2f}"
+    subtitle_text += f"  |  <b>ยอดค่าบริการ:</b> {total_fee:,.2f}"
     elements.append(Paragraph(apply_thai_pua(subtitle_text), style_subtitle))
     elements.append(Spacer(1, 0.4*cm))
 
     # Table Header
-    th_headers = ["ลำดับ", "หมายเลข Barcode", "เลขที่คำขอ", "ชื่อผู้รับ", "ที่อยู่ปลายทาง", "วัน-เวลาล่าสุด", "ปณ./สถานที่ล่าสุด", "น้ำหนัก (g)", "ค่าบริการ (฿)"]
+    th_headers = ["ลำดับ", "หมายเลข Barcode", "เลขที่คำขอ", "ชื่อผู้รับ", "ที่อยู่ปลายทาง", "วัน-เวลาล่าสุด", "ปณ./สถานที่ล่าสุด", "น้ำหนัก (g)", "ค่าบริการ"]
     col_widths = [1.0*cm, 3.5*cm, 3.0*cm, 4.0*cm, 6.2*cm, 3.4*cm, 2.5*cm, 1.8*cm, 1.9*cm]
 
     table_data = [[Paragraph(apply_thai_pua(h), style_th) for h in th_headers]]
