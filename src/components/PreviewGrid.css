@@ -7,6 +7,12 @@
   min-height: 400px;
   display: flex;
   flex-direction: column;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card-preview-table.drag-over {
+  border-color: #10b981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2), 0 4px 14px rgba(16, 185, 129, 0.12);
 }
 
 /* Header Bar */
@@ -534,11 +540,36 @@
   justify-content: center;
   padding: 60px 20px;
   text-align: center;
+  cursor: pointer;
+  border: 2px dashed transparent;
+  border-radius: 12px;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  user-select: none;
+  background: transparent;
+}
+
+.empty-table-state:hover {
+  border-color: #10b981;
+  background: rgba(16, 185, 129, 0.03);
+  transform: translateY(-2px);
+}
+
+.empty-table-state.drag-over {
+  border-color: #10b981;
+  background: rgba(16, 185, 129, 0.08);
+  box-shadow: inset 0 0 0 1px #10b981;
+  transform: scale(1.01);
 }
 
 .empty-table-state .empty-icon {
-  font-size: 3rem;
+  font-size: 3.2rem;
   margin-bottom: 12px;
+  transition: transform 0.2s ease;
+}
+
+.empty-table-state:hover .empty-icon,
+.empty-table-state.drag-over .empty-icon {
+  transform: scale(1.15) translateY(-4px);
 }
 
 .empty-table-state h4 {
@@ -546,12 +577,30 @@
   font-size: 1.15rem;
   font-weight: 700;
   color: var(--text-main, #0f172a);
+  transition: color 0.15s ease;
+}
+
+.empty-table-state:hover h4,
+.empty-table-state.drag-over h4 {
+  color: #059669;
 }
 
 .empty-table-state p {
-  margin: 0;
-  font-size: 0.9rem;
+  margin: 0 0 8px 0;
+  font-size: 0.92rem;
   color: var(--text-muted, #64748b);
+  font-weight: 500;
+}
+
+.empty-hint-tag {
+  display: inline-block;
+  font-size: 0.78rem;
+  color: #059669;
+  background: rgba(16, 185, 129, 0.1);
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-weight: 600;
+  border: 1px solid rgba(16, 185, 129, 0.25);
 }
 
 /* Reconcile Notice Banner */

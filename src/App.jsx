@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import Navbar from './components/Navbar';
 import ExtensionGate from './components/ExtensionGate';
 import LoginModal from './components/LoginModal';
@@ -60,6 +60,22 @@ export default function App() {
   const [isReconciling, setIsReconciling] = useState(false);
   const [reconcileNotice, setReconcileNotice] = useState(null);
   const [trackingInfo, setTrackingInfo] = useState(null); // { barcode, receiver, invNo }
+
+  // Global drag prevention to stop browser opening dropped PDFs
+  useEffect(() => {
+    const handleDragOver = (e) => e.preventDefault();
+    const handleDrop = (e) => e.preventDefault();
+    window.addEventListener('dragover', handleDragOver);
+    window.addEventListener('drop', handleDrop);
+    return () => {
+      window.removeEventListener('dragover', handleDragOver);
+      window.removeEventListener('drop', handleDrop);
+    };
+  }, []);
+
+  // Workspace Drag & Drop State
+  const [isWorkspaceDragOver, setIsWorkspaceDragOver] = useState(false);
+  const workspaceDragCounterRef = useRef(0);
 
   // App Main State
   const [selectedFiles, setSelectedFiles] = useState(() => {
@@ -342,6 +358,45 @@ export default function App() {
       setIsProcessing(false);
     }
   };
+
+  // Workspace Drag and Drop Event Handlers
+  const handleWorkspaceDragEnter = useCallback((e) => {
+    e.preventDefault();
+    if (activePage !== 'workspace') return;
+    if (e.dataTransfer && e.dataTransfer.types && Array.from(e.dataTransfer.types).includes('Files')) {
+      workspaceDragCounterRef.current += 1;
+      if (workspaceDragCounterRef.current === 1) {
+        setIsWorkspaceDragOver(true);
+      }
+    }
+  }, [activePage]);
+
+  const handleWorkspaceDragLeave = useCallback((e) => {
+    e.preventDefault();
+    if (activePage !== 'workspace') return;
+    workspaceDragCounterRef.current -= 1;
+    if (workspaceDragCounterRef.current <= 0) {
+      workspaceDragCounterRef.current = 0;
+      setIsWorkspaceDragOver(false);
+    }
+  }, [activePage]);
+
+  const handleWorkspaceDragOver = useCallback((e) => {
+    e.preventDefault();
+    if (e.dataTransfer) {
+      e.dataTransfer.dropEffect = 'copy';
+    }
+  }, []);
+
+  const handleWorkspaceDrop = useCallback((e) => {
+    e.preventDefault();
+    workspaceDragCounterRef.current = 0;
+    setIsWorkspaceDragOver(false);
+    if (activePage !== 'workspace') return;
+    if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      handleFilesSelected(e.dataTransfer.files);
+    }
+  }, [activePage, handleFilesSelected]);
 
   // 2. Handle Fetch Barcodes
   const handleFetchBarcodes = async () => {
@@ -891,7 +946,13 @@ export default function App() {
         <>
           {/* Page 1: แปลงไฟล์ PDF & ตารางข้อมูล (Workspace) */}
           {activePage === 'workspace' && (
-            <main className="main-content python-layout-main">
+            <main 
+              className={`main-content python-layout-main ${isWorkspaceDragOver ? 'workspace-drag-active' : ''}`}
+              onDragEnter={handleWorkspaceDragEnter}
+              onDragOver={handleWorkspaceDragOver}
+              onDragLeave={handleWorkspaceDragLeave}
+              onDrop={handleWorkspaceDrop}
+            >
               <div className="python-container">
                 {/* Card 1: เลือกเอกสาร PDF */}
                 <ActionToolbar
@@ -922,8 +983,32 @@ export default function App() {
                   onClearAll={handleClearAll}
                   onViewPdf={handleViewPdf}
                   onViewTracking={handleViewTracking}
+                  onFilesSelected={handleFilesSelected}
                 />
               </div>
+
+              {/* Workspace Drag & Drop Overlay */}
+              {isWorkspaceDragOver && (
+                <div 
+                  className="workspace-drop-overlay"
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={handleWorkspaceDrop}
+                >
+                  <div className="workspace-drop-card">
+                    <div className="drop-icon-bounce">
+                      <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                        <line x1="12" y1="18" x2="12" y2="12"></line>
+                        <polyline points="9 15 12 12 15 15"></polyline>
+                      </svg>
+                    </div>
+                    <h3>วางไฟล์ PDF ที่นี่เพื่อแปลงไฟล์</h3>
+                    <p>ปล่อยไฟล์เพื่อเริ่มต้นอ่านข้อมูลคำขอ สนง.ที่ดิน หรือไฟล์ไปรษณีย์</p>
+                    <span className="drop-sub-badge">รองรับการเลือกและลากวางหลายไฟล์พร้อมกัน (.pdf)</span>
+                  </div>
+                </div>
+              )}
             </main>
           )}
 

@@ -12,6 +12,13 @@
   border-color: #94a3b8;
 }
 
+.card-file-selection.drag-over {
+  border-color: #10b981;
+  background: rgba(16, 185, 129, 0.05);
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.25), 0 4px 12px rgba(16, 185, 129, 0.15);
+  transform: translateY(-1px);
+}
+
 .card-header-title {
   margin-bottom: 12px;
 }
@@ -159,6 +166,17 @@
   justify-content: center;
   min-height: 40px;
   text-align: center;
+}
+
+.status-box.clickable-status-box {
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.status-box.clickable-status-box:hover {
+  border-color: #10b981;
+  background: rgba(16, 185, 129, 0.06);
+  transform: translateY(-1px);
 }
 
 .lbl-status-text {

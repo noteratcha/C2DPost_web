@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import './ActionToolbar.css';
 
 export default function ActionToolbar({
@@ -17,6 +17,8 @@ export default function ActionToolbar({
   onOpenDepositReport
 }) {
   const fileInputRef = useRef(null);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const dragCounterRef = useRef(0);
 
   const totalRecords = records.length;
   const hasMissingBarcode = records.some(r => !r.BARCODE_NO || String(r.BARCODE_NO).trim() === '');
@@ -46,23 +48,50 @@ export default function ActionToolbar({
     }
   };
 
-  const handleDrop = (e) => {
+  const handleDragEnter = (e) => {
     e.preventDefault();
     if (!canSelectFiles) return;
-    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      onFilesSelected(e.dataTransfer.files);
+    if (e.dataTransfer && e.dataTransfer.types && Array.from(e.dataTransfer.types).includes('Files')) {
+      dragCounterRef.current += 1;
+      if (dragCounterRef.current === 1) {
+        setIsDragOver(true);
+      }
+    }
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    dragCounterRef.current -= 1;
+    if (dragCounterRef.current <= 0) {
+      dragCounterRef.current = 0;
+      setIsDragOver(false);
     }
   };
 
   const handleDragOver = (e) => {
     e.preventDefault();
+    if (e.dataTransfer) {
+      e.dataTransfer.dropEffect = 'copy';
+    }
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    dragCounterRef.current = 0;
+    setIsDragOver(false);
+    if (!canSelectFiles) return;
+    if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      onFilesSelected(e.dataTransfer.files);
+    }
   };
 
   return (
     <section 
-      className="card-file-selection"
-      onDrop={handleDrop}
+      className={`card-file-selection ${isDragOver ? 'drag-over' : ''}`}
+      onDragEnter={handleDragEnter}
       onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
     >
       <div className="card-header-title">
         <h3>เลือกเอกสาร PDF</h3>
@@ -102,7 +131,15 @@ export default function ActionToolbar({
 
         {/* 2. Center Status Box */}
         <div className="center-status-box-wrap">
-          <div className="status-box">
+          <div 
+            className={`status-box ${canSelectFiles && records.length === 0 ? 'clickable-status-box' : ''}`}
+            onClick={() => {
+              if (canSelectFiles && records.length === 0 && fileInputRef.current) {
+                fileInputRef.current.click();
+              }
+            }}
+            title={canSelectFiles && records.length === 0 ? 'คลิกหรือลากไฟล์ PDF มาวางเพื่อเลือกไฟล์' : ''}
+          >
             <span className="lbl-status-text">{statusText}</span>
             {progress && (
               <div className="progress-bar-track">

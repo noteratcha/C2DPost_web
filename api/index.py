@@ -670,11 +670,20 @@ def get_received_report(req: ReceivedReportRequest):
     total_weight = 0.0
     total_fee = 0.0
 
+    def _to_float(val):
+        if val is None:
+            return 0.0
+        s = str(val).replace("฿", "").replace("g", "").replace("กก.", "").replace(",", "").strip()
+        try:
+            return float(s)
+        except Exception:
+            return 0.0
+
     for i, item in enumerate(deduped_raw):
-        weight = float(item.get("productWeight") or item.get("weight") or 0.0)
-        ems_price = float(item.get("emsPrice") or item.get("ems_price") or 0.0)
-        svc_price = float(item.get("servicePrice") or item.get("service_price") or 0.0)
-        ins_price = float(item.get("insurancePrice") or item.get("insurance_price") or 0.0)
+        weight = _to_float(item.get("productWeight") or item.get("weight"))
+        ems_price = _to_float(item.get("emsPrice") or item.get("ems_price"))
+        svc_price = _to_float(item.get("servicePrice") or item.get("service_price"))
+        ins_price = _to_float(item.get("insurancePrice") or item.get("insurance_price"))
         fee = ems_price + svc_price + ins_price
         
         total_weight += weight
@@ -738,8 +747,8 @@ def get_received_report(req: ReceivedReportRequest):
         normalized_records.append(norm_item)
 
     # Auto-enrich with real-time checkpoints from getHistoryStatus
-    # when live credentials exist and count <= 35 to prevent function timeout
-    if not is_demo_user and username and password and len(normalized_records) <= 35:
+    # when live credentials exist and count is between 1 and 35
+    if not is_demo_user and username and password and 0 < len(normalized_records) <= 35:
         def _fetch_realtime_tracking(rec):
             bcode = rec.get("barcode", "").strip()
             if not bcode:
@@ -776,7 +785,7 @@ def get_received_report(req: ReceivedReportRequest):
                 pass
             return rec
 
-        max_w = min(len(normalized_records), 10)
+        max_w = max(1, min(len(normalized_records), 10))
         with ThreadPoolExecutor(max_workers=max_w) as executor:
             normalized_records = list(executor.map(_fetch_realtime_tracking, normalized_records))
 

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import FileListModal from './FileListModal';
 import './PreviewGrid.css';
 
@@ -12,10 +12,62 @@ export default function PreviewGrid({
   onDeleteRecord,
   onClearAll,
   onViewPdf,
-  onViewTracking
+  onViewTracking,
+  onFilesSelected
 }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [showFileListModal, setShowFileListModal] = useState(false);
+  const [isGridDragOver, setIsGridDragOver] = useState(false);
+  const gridDragCounterRef = useRef(0);
+  const emptyFileInputRef = useRef(null);
+
+  const handleEmptyStateClick = () => {
+    if (emptyFileInputRef.current) {
+      emptyFileInputRef.current.click();
+    }
+  };
+
+  const handleEmptyFileInputChange = (e) => {
+    if (e.target.files && e.target.files.length > 0 && onFilesSelected) {
+      onFilesSelected(e.target.files);
+      e.target.value = '';
+    }
+  };
+
+  const handleGridDragEnter = (e) => {
+    e.preventDefault();
+    if (e.dataTransfer && e.dataTransfer.types && Array.from(e.dataTransfer.types).includes('Files')) {
+      gridDragCounterRef.current += 1;
+      if (gridDragCounterRef.current === 1) {
+        setIsGridDragOver(true);
+      }
+    }
+  };
+
+  const handleGridDragLeave = (e) => {
+    e.preventDefault();
+    gridDragCounterRef.current -= 1;
+    if (gridDragCounterRef.current <= 0) {
+      gridDragCounterRef.current = 0;
+      setIsGridDragOver(false);
+    }
+  };
+
+  const handleGridDragOver = (e) => {
+    e.preventDefault();
+    if (e.dataTransfer) {
+      e.dataTransfer.dropEffect = 'copy';
+    }
+  };
+
+  const handleGridDrop = (e) => {
+    e.preventDefault();
+    gridDragCounterRef.current = 0;
+    setIsGridDragOver(false);
+    if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0 && onFilesSelected) {
+      onFilesSelected(e.dataTransfer.files);
+    }
+  };
 
   // Count failed files if any
   const failedFileCount = useMemo(() => {
@@ -104,7 +156,13 @@ export default function PreviewGrid({
   };
 
   return (
-    <section className="card-preview-table">
+    <section 
+      className={`card-preview-table ${isGridDragOver ? 'drag-over' : ''}`}
+      onDragEnter={handleGridDragEnter}
+      onDragOver={handleGridDragOver}
+      onDragLeave={handleGridDragLeave}
+      onDrop={handleGridDrop}
+    >
       {/* Header Bar */}
       <div className="preview-header-bar">
         <h3 className="preview-title">ตารางแสดงข้อมูล</h3>
@@ -215,10 +273,25 @@ export default function PreviewGrid({
       {/* Table Frame */}
       <div className="table-wrapper">
         {records.length === 0 ? (
-          <div className="empty-table-state">
+          <div 
+            className={`empty-table-state ${isGridDragOver ? 'drag-over' : ''}`}
+            onClick={handleEmptyStateClick}
+            role="button"
+            tabIndex={0}
+            title="คลิก หรือลากไฟล์ PDF มาวางที่นี่เพื่อเริ่มการประมวลผล"
+          >
+            <input 
+              type="file" 
+              ref={emptyFileInputRef} 
+              style={{ display: 'none' }} 
+              multiple 
+              accept=".pdf" 
+              onChange={handleEmptyFileInputChange} 
+            />
             <div className="empty-icon">📁</div>
             <h4>ยังไม่มีข้อมูลในระบบ</h4>
-            <p>กรุณากดปุ่ม "เพิ่มไฟล์ PDF" หรือลากไฟล์มาวางด้านบนเพื่อเริ่มการประมวลผล</p>
+            <p>คลิก หรือลากไฟล์ PDF มาวางที่นี่เพื่อเริ่มการประมวลผล</p>
+            <span className="empty-hint-tag">รองรับการเลือกและลากวางหลายไฟล์พร้อมกัน (.pdf)</span>
           </div>
         ) : (
           <table className="python-parity-table">
