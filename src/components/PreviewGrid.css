@@ -440,8 +440,61 @@
   font-weight: 600;
 }
 
+.barcode-table-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 0.15rem 0.35rem;
+  margin: -0.15rem -0.35rem;
+  cursor: pointer;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  text-align: left;
+  font-family: inherit;
+}
+
+.barcode-table-btn:hover {
+  background: rgba(2, 132, 199, 0.08);
+  border-color: rgba(2, 132, 199, 0.25);
+  box-shadow: 0 2px 5px rgba(2, 132, 199, 0.12);
+  transform: translateY(-1px);
+}
+
+.barcode-table-btn:hover .barcode-text.has-bcode {
+  text-decoration: underline;
+  color: #0369a1;
+}
+
+[data-theme='dark'] .barcode-table-btn:hover {
+  background: rgba(56, 189, 248, 0.12);
+  border-color: rgba(56, 189, 248, 0.35);
+}
+
+[data-theme='dark'] .barcode-table-btn:hover .barcode-text.has-bcode {
+  color: #7dd3fc;
+}
+
+.barcode-inline-track-icon {
+  opacity: 0.45;
+  color: #0284c7;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+  flex-shrink: 0;
+}
+
+.barcode-table-btn:hover .barcode-inline-track-icon {
+  opacity: 1;
+  transform: scale(1.18);
+}
+
+[data-theme='dark'] .barcode-inline-track-icon {
+  color: #38bdf8;
+}
+
 .barcode-text.has-bcode {
   color: #0284c7;
+  transition: color 0.15s ease;
 }
 
 .barcode-text.no-bcode {

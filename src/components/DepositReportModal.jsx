@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { fetchReceivedReport, exportDepositReportExcel, exportDepositReportPdf } from '../utils/api';
+import { getDeliveryStatusInfo } from './DepositReportView';
+import TrackingTimelineModal from './TrackingTimelineModal';
 import './DepositReportModal.css';
 
 // Helper: Format Date object to YYYY-MM-DD for <input type="date">
@@ -19,9 +21,32 @@ function toApiDateFormat(isoDateStr) {
 }
 
 export default function DepositReportModal({ isOpen, onClose, currentPerson, onSyncRecords }) {
-  // Today's date in YYYY-MM-DD
+  // Date shortcut calculations
   const todayIso = useMemo(() => toInputDateFormat(new Date()), []);
-  const [selectedDate, setSelectedDate] = useState(todayIso);
+  const yesterdayIso = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    return toInputDateFormat(d);
+  }, []);
+  const last7DaysIso = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 6);
+    return toInputDateFormat(d);
+  }, []);
+  const monthStartIso = useMemo(() => {
+    const d = new Date();
+    return toInputDateFormat(new Date(d.getFullYear(), d.getMonth(), 1));
+  }, []);
+
+  // Date Range state
+  const [startDate, setStartDate] = useState(todayIso);
+  const [endDate, setEndDate] = useState(todayIso);
+
+  // Pagination state (20 records per page)
+  const PAGE_SIZE = 20;
+  const [currentPage, setCurrentPage] = useState(1);
+
+  // Data & UI states
   const [loading, setLoading] = useState(false);
   const [isExportingExcel, setIsExportingExcel] = useState(false);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
@@ -29,16 +54,20 @@ export default function DepositReportModal({ isOpen, onClose, currentPerson, onS
   const [reportData, setReportData] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterTab, setFilterTab] = useState('all'); // 'all' | 'received'
+  const [selectedTrackingItem, setSelectedTrackingItem] = useState(null);
 
-  // Fetch report function
-  const handleFetchReport = useCallback(async (dateToFetch) => {
-    const targetIso = dateToFetch || selectedDate;
-    if (!targetIso) {
-      setError('กรุณาเลือกวันที่ต้องการตรวจสอบ');
+  // Fetch report function (accepts start & end dates)
+  const handleFetchReport = useCallback(async (startToFetch, endToFetch) => {
+    const sIso = startToFetch || startDate;
+    const eIso = endToFetch || endDate || sIso;
+
+    if (!sIso || !eIso) {
+      setError('กรุณาเลือกช่วงวันที่ต้องการตรวจสอบ');
       return;
     }
 
-    const apiDate = toApiDateFormat(targetIso);
+    const apiStartDate = toApiDateFormat(sIso);
+    const apiEndDate = toApiDateFormat(eIso);
     setLoading(true);
     setError('');
 
@@ -46,14 +75,15 @@ export default function DepositReportModal({ isOpen, onClose, currentPerson, onS
       const username = currentPerson?.UserName || '';
       const password = currentPerson?.Password || '';
       const result = await fetchReceivedReport({
-        date: apiDate,
+        date: apiStartDate,
+        endDate: apiEndDate,
         username,
         password
       });
 
       if (result.success) {
         setReportData(result);
-        if (onSyncRecords && Array.isArray(result.records)) {
+        if (onSyncRecords && Array.isArray(result.records) && result.records.length > 0) {
           onSyncRecords(result.records);
         }
       } else {
@@ -64,7 +94,7 @@ export default function DepositReportModal({ isOpen, onClose, currentPerson, onS
     } finally {
       setLoading(false);
     }
-  }, [selectedDate, currentPerson, onSyncRecords]);
+  }, [startDate, endDate, currentPerson, onSyncRecords]);
 
   // Initial load when modal opens
   useEffect(() => {
@@ -72,9 +102,9 @@ export default function DepositReportModal({ isOpen, onClose, currentPerson, onS
       setError('');
       setSearchQuery('');
       setFilterTab('all');
-      // If we haven't fetched today's report yet, trigger automatic initial fetch
+      setCurrentPage(1);
       if (!reportData) {
-        handleFetchReport(todayIso);
+        handleFetchReport(todayIso, todayIso);
       }
     }
   }, [isOpen, todayIso, handleFetchReport, reportData]);
@@ -90,24 +120,43 @@ export default function DepositReportModal({ isOpen, onClose, currentPerson, onS
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
-  // Quick date shortcuts
+  // Quick date shortcuts handler
   const handleSetQuickDate = (type) => {
-    const d = new Date();
+    let s = todayIso;
+    let e = todayIso;
     if (type === 'yesterday') {
-      d.setDate(d.getDate() - 1);
+      s = yesterdayIso;
+      e = yesterdayIso;
+    } else if (type === 'last7days') {
+      s = last7DaysIso;
+      e = todayIso;
+    } else if (type === 'thisMonth') {
+      s = monthStartIso;
+      e = todayIso;
     }
-    const iso = toInputDateFormat(d);
-    setSelectedDate(iso);
-    handleFetchReport(iso);
+    setStartDate(s);
+    setEndDate(e);
+    handleFetchReport(s, e);
   };
+
+  // Reset pagination to page 1 whenever filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [startDate, endDate, searchQuery, filterTab]);
 
   // Filtered records based on search and tab
   const filteredRecords = useMemo(() => {
     if (!reportData || !reportData.records) return [];
     let list = reportData.records;
 
-    if (filterTab === 'received') {
-      list = list.filter((r) => r.status === '1' || r.status_description.includes('รับฝาก'));
+    if (filterTab === 'delivered') {
+      list = list.filter((r) => getDeliveryStatusInfo(r).key === 'delivered');
+    } else if (filterTab === 'in_transit') {
+      list = list.filter((r) => getDeliveryStatusInfo(r).key === 'in_transit');
+    } else if (filterTab === 'returned') {
+      list = list.filter((r) => getDeliveryStatusInfo(r).key === 'returned');
+    } else if (filterTab === 'received') {
+      list = list.filter((r) => getDeliveryStatusInfo(r).key === 'received');
     }
 
     if (searchQuery.trim()) {
@@ -125,6 +174,47 @@ export default function DepositReportModal({ isOpen, onClose, currentPerson, onS
     return list;
   }, [reportData, filterTab, searchQuery]);
 
+  // Total pages and clamping
+  const totalPages = Math.max(1, Math.ceil(filteredRecords.length / PAGE_SIZE));
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
+  // Paginated records (20 items per page)
+  const paginatedRecords = useMemo(() => {
+    const startIdx = (currentPage - 1) * PAGE_SIZE;
+    return filteredRecords.slice(startIdx, startIdx + PAGE_SIZE);
+  }, [filteredRecords, currentPage, PAGE_SIZE]);
+
+  // Page index numbers for table footer
+  const startItemIndex = filteredRecords.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
+  const endItemIndex = Math.min(currentPage * PAGE_SIZE, filteredRecords.length);
+
+  // Pagination navigation buttons list
+  const pageNumbers = useMemo(() => {
+    if (totalPages <= 7) {
+      return Array.from({ length: totalPages }, (_, i) => i + 1);
+    }
+    if (currentPage <= 4) {
+      return [1, 2, 3, 4, 5, '...', totalPages];
+    }
+    if (currentPage >= totalPages - 3) {
+      return [1, '...', totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+    }
+    return [1, '...', currentPage - 1, currentPage, currentPage + 1, '...', totalPages];
+  }, [totalPages, currentPage]);
+
+  // Date display label
+  const dateDisplay = useMemo(() => {
+    if (reportData?.date_display) return reportData.date_display;
+    const sApi = toApiDateFormat(startDate);
+    const eApi = toApiDateFormat(endDate);
+    return sApi === eApi ? sApi : `${sApi} ถึง ${eApi}`;
+  }, [reportData, startDate, endDate]);
+
   // Export handlers
   const handleExportExcel = async () => {
     if (!filteredRecords || filteredRecords.length === 0) return;
@@ -134,7 +224,7 @@ export default function DepositReportModal({ isOpen, onClose, currentPerson, onS
       await exportDepositReportExcel({
         records: filteredRecords,
         summary: reportData?.summary || {},
-        date: toApiDateFormat(selectedDate),
+        date: dateDisplay,
         organization: currentPerson?.Organization || 'สำนักงานที่ดิน'
       });
     } catch (err) {
@@ -152,7 +242,7 @@ export default function DepositReportModal({ isOpen, onClose, currentPerson, onS
       await exportDepositReportPdf({
         records: filteredRecords,
         summary: reportData?.summary || {},
-        date: toApiDateFormat(selectedDate),
+        date: dateDisplay,
         organization: currentPerson?.Organization || 'สำนักงานที่ดิน'
       });
     } catch (err) {
@@ -171,17 +261,46 @@ export default function DepositReportModal({ isOpen, onClose, currentPerson, onS
     received_count: 0
   };
 
-  const successRate = summary.total_items > 0
-    ? Math.round((summary.received_count / summary.total_items) * 100)
+  const deliveredCount = summary.delivered_count !== undefined
+    ? summary.delivered_count
+    : (reportData?.records?.filter((r) => getDeliveryStatusInfo(r).key === 'delivered').length || 0);
+
+  const inTransitCount = summary.in_transit_count !== undefined
+    ? summary.in_transit_count
+    : (reportData?.records?.filter((r) => getDeliveryStatusInfo(r).key === 'in_transit').length || 0);
+
+  const returnedCount = summary.returned_count !== undefined
+    ? summary.returned_count
+    : (reportData?.records?.filter((r) => getDeliveryStatusInfo(r).key === 'returned').length || 0);
+
+  const receivedCount = summary.received_count !== undefined
+    ? summary.received_count
+    : (reportData?.records?.filter((r) => getDeliveryStatusInfo(r).key === 'received').length || 0);
+
+  const receivedRate = summary.total_items > 0
+    ? Math.round((receivedCount / summary.total_items) * 100)
+    : 0;
+
+  const inTransitRate = summary.total_items > 0
+    ? Math.round((inTransitCount / summary.total_items) * 100)
+    : 0;
+
+  const deliveredRate = summary.total_items > 0
+    ? Math.round((deliveredCount / summary.total_items) * 100)
+    : 0;
+
+  const returnedRate = summary.total_items > 0
+    ? Math.round((returnedCount / summary.total_items) * 100)
     : 0;
 
   return (
     <div className="deposit-modal-overlay" onClick={onClose}>
-      <div className="deposit-modal-container" onClick={(e) => e.stopPropagation()}>
+      <div className="deposit-modal-content" onClick={(e) => e.stopPropagation()}>
+        
         {/* Header */}
         <div className="deposit-modal-header">
-          <div className="deposit-header-info">
-            <div className="deposit-icon-pill">
+          <div className="deposit-header-left">
+            <div className="deposit-icon-badge">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
                 <polyline points="14 2 14 8 20 8"></polyline>
@@ -191,9 +310,10 @@ export default function DepositReportModal({ isOpen, onClose, currentPerson, onS
               </svg>
             </div>
             <div>
-              <h3 className="deposit-modal-title">รายงานการรับฝากไปรษณีย์ (Deposit Report)</h3>
+              <h2 className="deposit-modal-title">รายงานสถานะไปรษณีย์ (e-Parcel Status Report)</h2>
               <p className="deposit-modal-subtitle">
-                ตรวจสอบสถานะรายการจดหมาย/พัสดุที่ไปรษณีย์ไทยสแกนยืนยันรับฝากเข้าระบบ e-Parcel แล้ว
+                ตรวจสอบและติดตามสถานะพัสดุที่ไปรษณีย์ไทยลงรับเข้าระบบเรียลไทม์
+                {currentPerson?.Organization ? ` • ${currentPerson.Organization}` : ''}
               </p>
             </div>
           </div>
@@ -207,24 +327,43 @@ export default function DepositReportModal({ isOpen, onClose, currentPerson, onS
           </button>
         </div>
 
-        {/* Controls Bar: Date Picker & Quick Actions */}
+        {/* Controls Bar: Date Range Picker & Quick Actions */}
         <div className="deposit-control-bar">
-          <div className="deposit-date-group">
-            <label htmlFor="deposit-date-picker" className="deposit-control-label">
-              เลือกวันที่นำส่ง:
-            </label>
-            <input
-              id="deposit-date-picker"
-              type="date"
-              className="deposit-date-input"
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              disabled={loading}
-            />
+          <div className="deposit-date-range-group">
+            <div className="deposit-date-item">
+              <label htmlFor="modal-deposit-start-date" className="deposit-control-label">
+                ตั้งแต่วันที่:
+              </label>
+              <input
+                id="modal-deposit-start-date"
+                type="date"
+                className="deposit-date-input"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                disabled={loading}
+              />
+            </div>
+
+            <span className="deposit-date-sep">ถึง</span>
+
+            <div className="deposit-date-item">
+              <label htmlFor="modal-deposit-end-date" className="deposit-control-label">
+                ถึงวันที่:
+              </label>
+              <input
+                id="modal-deposit-end-date"
+                type="date"
+                className="deposit-date-input"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                disabled={loading}
+              />
+            </div>
+
             <div className="deposit-quick-date-btns">
               <button
                 type="button"
-                className={`btn-quick-date ${selectedDate === todayIso ? 'active' : ''}`}
+                className={`btn-quick-date ${startDate === todayIso && endDate === todayIso ? 'active' : ''}`}
                 onClick={() => handleSetQuickDate('today')}
                 disabled={loading}
               >
@@ -232,11 +371,27 @@ export default function DepositReportModal({ isOpen, onClose, currentPerson, onS
               </button>
               <button
                 type="button"
-                className="btn-quick-date"
+                className={`btn-quick-date ${startDate === yesterdayIso && endDate === yesterdayIso ? 'active' : ''}`}
                 onClick={() => handleSetQuickDate('yesterday')}
                 disabled={loading}
               >
                 เมื่อวาน
+              </button>
+              <button
+                type="button"
+                className={`btn-quick-date ${startDate === last7DaysIso && endDate === todayIso ? 'active' : ''}`}
+                onClick={() => handleSetQuickDate('last7days')}
+                disabled={loading}
+              >
+                7 วันล่าสุด
+              </button>
+              <button
+                type="button"
+                className={`btn-quick-date ${startDate === monthStartIso && endDate === todayIso ? 'active' : ''}`}
+                onClick={() => handleSetQuickDate('thisMonth')}
+                disabled={loading}
+              >
+                เดือนนี้
               </button>
             </div>
           </div>
@@ -245,7 +400,7 @@ export default function DepositReportModal({ isOpen, onClose, currentPerson, onS
             <button
               type="button"
               className="btn-fetch-deposit"
-              onClick={() => handleFetchReport()}
+              onClick={() => handleFetchReport(startDate, endDate)}
               disabled={loading}
             >
               {loading ? (
@@ -259,7 +414,7 @@ export default function DepositReportModal({ isOpen, onClose, currentPerson, onS
                     <circle cx="11" cy="11" r="8"></circle>
                     <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
                   </svg>
-                  <span>ดึงข้อมูลรับฝาก</span>
+                  <span>อัปเดตข้อมูล</span>
                 </>
               )}
             </button>
@@ -286,109 +441,181 @@ export default function DepositReportModal({ isOpen, onClose, currentPerson, onS
               <line x1="12" y1="17" x2="12.01" y2="17"></line>
             </svg>
             <span>
-              <strong>ข้อสังเกตจากระบบ e-Parcel:</strong> {reportData.api_notice} (ระบบอาจแสดงข้อมูลจำลองหรือข้อมูลสำรองเนื่องจากข้อจำกัด IP)
+              <strong>ข้อสังเกตจากระบบ e-Parcel:</strong> {reportData.api_notice}
             </span>
           </div>
         )}
 
-        {reportData?.is_mock && !error && (
-          <div className="deposit-alert info">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="12" cy="12" r="10"></circle>
-              <line x1="12" y1="16" x2="12" y2="12"></line>
-              <line x1="12" y1="8" x2="12.01" y2="8"></line>
-            </svg>
-            <span>
-              <strong>โหมดสาธิต (Demo Mode):</strong> กำลังแสดงชุดข้อมูลจำลองสำหรับวันที่ {reportData.date} ของ สำนักงานที่ดินเรณูนคร
-            </span>
+        {/* Summary Stat Cards (6 Categories) */}
+        <div className="deposit-summary-cards">
+          {/* 1. รับฝากแล้ว */}
+          <div className="deposit-stat-box stat-cyan">
+            <div className="stat-icon-wrap">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                <polyline points="20 12 20 22 4 22 4 12"></polyline>
+                <rect x="2" y="7" width="20" height="5"></rect>
+                <line x1="12" y1="22" x2="12" y2="7"></line>
+                <path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"></path>
+                <path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"></path>
+              </svg>
+            </div>
+            <div className="stat-data">
+              <span className="stat-label">รับฝากแล้ว</span>
+              <div className="stat-number-row">
+                <span className="stat-number text-blue">{receivedCount}</span>
+                <span className="stat-unit">({receivedRate}%)</span>
+              </div>
+            </div>
           </div>
-        )}
 
-        {/* Executive Stat Cards */}
-        <div className="deposit-stat-grid">
-          <div className="deposit-stat-card">
-            <div className="stat-card-icon icon-blue">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+          {/* 2. อยู่ระหว่างการนำจ่าย */}
+          <div className="deposit-stat-box stat-amber">
+            <div className="stat-icon-wrap">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                <rect x="1" y="3" width="15" height="13"></rect>
+                <polygon points="16 8 20 8 23 11 23 16 16 16 8"></polygon>
+                <circle cx="5.5" cy="18.5" r="2.5"></circle>
+                <circle cx="18.5" cy="18.5" r="2.5"></circle>
+              </svg>
+            </div>
+            <div className="stat-data">
+              <span className="stat-label">อยู่ระหว่างการนำจ่าย</span>
+              <div className="stat-number-row">
+                <span className="stat-number text-amber">{inTransitCount}</span>
+                <span className="stat-unit">({inTransitRate}%)</span>
+              </div>
+            </div>
+          </div>
+
+          {/* 3. นำจ่ายสำเร็จ */}
+          <div className="deposit-stat-box stat-green">
+            <div className="stat-icon-wrap">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                <polyline points="22 4 12 14.01 9 11.01"></polyline>
+              </svg>
+            </div>
+            <div className="stat-data">
+              <span className="stat-label">นำจ่ายสำเร็จ</span>
+              <div className="stat-number-row">
+                <span className="stat-number text-emerald">{deliveredCount}</span>
+                <span className="stat-unit">({deliveredRate}%)</span>
+              </div>
+            </div>
+          </div>
+
+          {/* 4. ส่งคืน */}
+          <div className="deposit-stat-box stat-rose">
+            <div className="stat-icon-wrap">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                <polyline points="9 14 4 9 9 4"></polyline>
+                <path d="M20 20v-7a4 4 0 0 0-4-4H4"></path>
+              </svg>
+            </div>
+            <div className="stat-data">
+              <span className="stat-label">ส่งคืน</span>
+              <div className="stat-number-row">
+                <span className="stat-number text-rose">{returnedCount}</span>
+                <span className="stat-unit">({returnedRate}%)</span>
+              </div>
+            </div>
+          </div>
+
+          {/* 5. รายการทั้งหมด */}
+          <div className="deposit-stat-box stat-blue">
+            <div className="stat-icon-wrap">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
                 <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
                 <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
               </svg>
             </div>
-            <div className="stat-card-content">
-              <span className="stat-card-label">รายการทั้งหมด</span>
-              <div className="stat-card-value">
-                <strong>{summary.total_items.toLocaleString()}</strong>
-                <span className="stat-card-unit">ฉบับ</span>
+            <div className="stat-data">
+              <span className="stat-label">รายการทั้งหมด</span>
+              <div className="stat-number-row">
+                <span className="stat-number">{summary.total_items}</span>
+                <span className="stat-unit">ฉบับ</span>
               </div>
             </div>
           </div>
 
-          <div className="deposit-stat-card highlight-success">
-            <div className="stat-card-icon icon-green">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4">
-                <polyline points="20 6 9 17 4 12"></polyline>
+          {/* 6. ยอดรวมค่าบริการ */}
+          <div className="deposit-stat-box stat-gold">
+            <div className="stat-icon-wrap">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                <line x1="12" y1="1" x2="12" y2="23"></line>
+                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
               </svg>
             </div>
-            <div className="stat-card-content">
-              <span className="stat-card-label">รับฝากสำเร็จ</span>
-              <div className="stat-card-value">
-                <strong className="text-emerald">{summary.received_count.toLocaleString()}</strong>
-                <span className="stat-card-unit">({successRate}%)</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="deposit-stat-card">
-            <div className="stat-card-icon icon-amber">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-                <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
-              </svg>
-            </div>
-            <div className="stat-card-content">
-              <span className="stat-card-label">ยอดรวมค่าบริการ</span>
-              <div className="stat-card-value">
-                <strong>฿{summary.total_fee.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</strong>
+            <div className="stat-data">
+              <span className="stat-label">ยอดรวมค่าบริการ</span>
+              <div className="stat-number-row">
+                <span className="stat-number text-gold">฿{summary.total_fee.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Toolbar: Search and Filter Tabs */}
-        <div className="deposit-table-toolbar">
+        {/* Filter Tabs & Search */}
+        <div className="deposit-toolbar">
           <div className="deposit-filter-tabs">
             <button
               type="button"
-              className={`deposit-tab-btn ${filterTab === 'all' ? 'active' : ''}`}
+              className={`filter-tab-btn ${filterTab === 'all' ? 'active' : ''}`}
               onClick={() => setFilterTab('all')}
             >
-              ทั้งหมด ({summary.total_items})
+              ทั้งหมด ({reportData?.records?.length || 0})
             </button>
             <button
               type="button"
-              className={`deposit-tab-btn ${filterTab === 'received' ? 'active' : ''}`}
+              className={`filter-tab-btn ${filterTab === 'received' ? 'active' : ''}`}
               onClick={() => setFilterTab('received')}
             >
-              🟢 รับฝากแล้ว ({summary.received_count})
+              <span className="tab-dot dot-blue"></span>
+              รับฝากแล้ว ({receivedCount})
+            </button>
+            <button
+              type="button"
+              className={`filter-tab-btn ${filterTab === 'in_transit' ? 'active' : ''}`}
+              onClick={() => setFilterTab('in_transit')}
+            >
+              <span className="tab-dot dot-amber"></span>
+              อยู่ระหว่างการนำจ่าย ({inTransitCount})
+            </button>
+            <button
+              type="button"
+              className={`filter-tab-btn ${filterTab === 'delivered' ? 'active' : ''}`}
+              onClick={() => setFilterTab('delivered')}
+            >
+              <span className="tab-dot dot-green"></span>
+              นำจ่ายสำเร็จ ({deliveredCount})
+            </button>
+            <button
+              type="button"
+              className={`filter-tab-btn ${filterTab === 'returned' ? 'active' : ''}`}
+              onClick={() => setFilterTab('returned')}
+            >
+              <span className="tab-dot dot-rose"></span>
+              ส่งคืน ({returnedCount})
             </button>
           </div>
 
-          <div className="deposit-search-wrap">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" className="deposit-search-icon">
+          <div className="deposit-search-box">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <circle cx="11" cy="11" r="8"></circle>
               <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
             </svg>
             <input
               type="text"
-              className="deposit-search-input"
               placeholder="ค้นหาบาร์โค้ด, เลขคำขอ, หรือชื่อผู้รับ..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              className="deposit-search-input"
             />
             {searchQuery && (
               <button
                 type="button"
-                className="deposit-btn-clear-search"
+                className="btn-clear-search"
                 onClick={() => setSearchQuery('')}
-                title="ล้างคำค้นหา"
               >
                 ✕
               </button>
@@ -396,7 +623,7 @@ export default function DepositReportModal({ isOpen, onClose, currentPerson, onS
           </div>
         </div>
 
-        {/* Data Table */}
+        {/* Table Content with 20 items pagination */}
         <div className="deposit-table-container">
           <table className="deposit-data-table">
             <thead>
@@ -432,57 +659,126 @@ export default function DepositReportModal({ isOpen, onClose, currentPerson, onS
                       </svg>
                       <p className="empty-title">ไม่พบรายการรับฝากสำหรับเงื่อนไขนี้</p>
                       <p className="empty-desc">
-                        {reportData?.summary?.total_items === 0
-                          ? `ไม่มีประวัติการรับฝากเข้าระบบในวันที่ ${toApiDateFormat(selectedDate)}`
-                          : 'ไม่พบรายการที่ตรงกับคำค้นหา ลองเปลี่ยนคำค้นหาหรือเปลี่ยนแท็บ'}
+                        {searchQuery
+                          ? `ไม่พบข้อมูลที่ตรงกับคำค้นหา "${searchQuery}"`
+                          : `ไม่มีรายการที่ไปรษณีย์ไทยรับฝากเข้าระบบในช่วงวันที่ ${dateDisplay}`}
                       </p>
                     </div>
                   </td>
                 </tr>
               ) : (
-                filteredRecords.map((rec) => (
-                  <tr key={rec.seq || rec.barcode}>
-                    <td className="td-center text-muted">{rec.seq}</td>
-                    <td>
-                      <span className="barcode-badge-mono">{rec.barcode}</span>
-                    </td>
-                    <td className="inv-badge">{rec.inv_no || '-'}</td>
-                    <td className="receiver-name font-medium">{rec.receiver_name}</td>
-                    <td className="receiver-address text-muted" title={rec.receiver_address}>
-                      {rec.receiver_address} {rec.receiver_amphur} {rec.receiver_province} {rec.receiver_zipcode}
-                    </td>
-                    <td className="received-date text-emerald-dark">
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" className="inline-clock-icon">
-                        <circle cx="12" cy="12" r="10"></circle>
-                        <polyline points="12 6 12 12 16 14"></polyline>
-                      </svg>
-                      <span>{rec.received_date}</span>
-                    </td>
-                    <td>
-                      <span className="po-badge">{rec.received_postoffice || '-'}</span>
-                    </td>
-                    <td className="td-right">{rec.weight ? `${rec.weight}g` : '-'}</td>
-                    <td className="td-right font-medium">
-                      {rec.fee ? `฿${rec.fee.toFixed(2)}` : '-'}
-                    </td>
-                    <td className="td-center">
-                      <span className="deposit-status-pill success">
-                        <span className="status-dot"></span>
-                        <span>{rec.status_description || 'รับฝากแล้ว'}</span>
-                      </span>
-                    </td>
-                  </tr>
-                ))
+                paginatedRecords.map((rec, idx) => {
+                  const statusInfo = getDeliveryStatusInfo(rec);
+                  const globalIdx = (currentPage - 1) * PAGE_SIZE + idx + 1;
+                  const tooltipText = rec.status_description_raw && rec.status_description_raw !== statusInfo.label
+                    ? `${statusInfo.label} (${rec.status_description_raw})`
+                    : statusInfo.label;
+                  return (
+                    <tr key={rec.barcode || globalIdx} className={`row-status-${statusInfo.key}`}>
+                      <td className="td-center text-muted">{globalIdx}</td>
+                      <td>
+                        {rec.barcode ? (
+                          <button
+                            type="button"
+                            className="barcode-btn-mono"
+                            onClick={() => setSelectedTrackingItem(rec)}
+                            title={`คลิกเพื่อดูสถานะการตรวจสอบพัสดุ ${rec.barcode}`}
+                          >
+                            <span className="barcode-badge-mono">{rec.barcode}</span>
+                            <svg className="barcode-track-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                              <circle cx="11" cy="11" r="8"></circle>
+                              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                            </svg>
+                          </button>
+                        ) : (
+                          <span className="barcode-badge-mono">-</span>
+                        )}
+                      </td>
+                      <td className="inv-badge">{rec.inv_no || '-'}</td>
+                      <td className="receiver-name font-medium">{rec.receiver_name}</td>
+                      <td className="receiver-address text-muted" title={rec.receiver_address}>
+                        {rec.receiver_address} {rec.receiver_amphur} {rec.receiver_province} {rec.receiver_zipcode}
+                      </td>
+                      <td className="received-date text-emerald-dark">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" className="inline-clock-icon">
+                          <circle cx="12" cy="12" r="10"></circle>
+                          <polyline points="12 6 12 12 16 14"></polyline>
+                        </svg>
+                        <span>{rec.received_date}</span>
+                      </td>
+                      <td>
+                        <span className="po-badge">{rec.received_postoffice || '-'}</span>
+                      </td>
+                      <td className="td-right">{rec.weight ? `${rec.weight}g` : '-'}</td>
+                      <td className="td-right font-medium">
+                        {rec.fee ? `฿${rec.fee.toFixed(2)}` : '-'}
+                      </td>
+                      <td className="td-center">
+                        <span 
+                          className={`deposit-status-pill ${statusInfo.className}`}
+                          title={tooltipText}
+                        >
+                          <span className={`status-dot dot-${statusInfo.key}`}></span>
+                          <span>{statusInfo.label}</span>
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
         </div>
 
-        {/* Footer Actions */}
+        {/* Footer Actions & Pagination */}
         <div className="deposit-modal-footer">
           <div className="footer-count-info">
-            แสดง <strong>{filteredRecords.length}</strong> จากทั้งหมด <strong>{summary.total_items}</strong> รายการ (วันที่ {toApiDateFormat(selectedDate)})
+            แสดง <strong>{startItemIndex} - {endItemIndex}</strong> จากทั้งหมด <strong>{filteredRecords.length}</strong> รายการ
+            {totalPages > 1 && (
+              <span className="footer-modal-page-info"> (หน้า {currentPage} จาก {totalPages})</span>
+            )}
           </div>
+
+          {totalPages > 1 && (
+            <div className="deposit-pagination-controls">
+              <button
+                type="button"
+                className="btn-pagination prev"
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                title="หน้าก่อนหน้า"
+              >
+                ‹ ก่อนหน้า
+              </button>
+
+              <div className="pagination-page-numbers">
+                {pageNumbers.map((p, idx) =>
+                  p === '...' ? (
+                    <span key={`modal-dots-${idx}`} className="pagination-ellipsis">…</span>
+                  ) : (
+                    <button
+                      key={p}
+                      type="button"
+                      className={`btn-pagination-page ${currentPage === p ? 'active' : ''}`}
+                      onClick={() => setCurrentPage(p)}
+                    >
+                      {p}
+                    </button>
+                  )
+                )}
+              </div>
+
+              <button
+                type="button"
+                className="btn-pagination next"
+                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                title="หน้าถัดไป"
+              >
+                ถัดไป ›
+              </button>
+            </div>
+          )}
 
           <div className="footer-action-buttons">
             <button
@@ -504,9 +800,8 @@ export default function DepositReportModal({ isOpen, onClose, currentPerson, onS
                     <polyline points="14 2 14 8 20 8"></polyline>
                     <line x1="8" y1="13" x2="16" y2="13"></line>
                     <line x1="8" y1="17" x2="16" y2="17"></line>
-                    <polyline points="10 9 9 9 8 9"></polyline>
                   </svg>
-                  <span>📊 ส่งออก Excel</span>
+                  <span>ส่งออก Excel</span>
                 </>
               )}
             </button>
@@ -528,10 +823,10 @@ export default function DepositReportModal({ isOpen, onClose, currentPerson, onS
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
                     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
                     <polyline points="14 2 14 8 20 8"></polyline>
-                    <circle cx="10" cy="13" r="2"></circle>
-                    <path d="m20 17-1.5-1.5"></path>
+                    <line x1="8" y1="13" x2="16" y2="13"></line>
+                    <line x1="8" y1="17" x2="16" y2="17"></line>
                   </svg>
-                  <span>📄 ส่งออก PDF</span>
+                  <span>ส่งออก PDF</span>
                 </>
               )}
             </button>
@@ -542,6 +837,23 @@ export default function DepositReportModal({ isOpen, onClose, currentPerson, onS
           </div>
         </div>
       </div>
+
+      {/* Tracking Timeline Modal for Barcode click */}
+      {selectedTrackingItem && (
+        <TrackingTimelineModal
+          isOpen={!!selectedTrackingItem}
+          barcode={selectedTrackingItem.barcode}
+          recInfo={{
+            receiver: selectedTrackingItem.receiver_name,
+            invNo: selectedTrackingItem.inv_no,
+            receiver_address: selectedTrackingItem.receiver_address,
+            deposit_date: selectedTrackingItem.received_date,
+            status_label: selectedTrackingItem.status_description_raw || selectedTrackingItem.status_label
+          }}
+          currentPerson={currentPerson}
+          onClose={() => setSelectedTrackingItem(null)}
+        />
+      )}
     </div>
   );
 }

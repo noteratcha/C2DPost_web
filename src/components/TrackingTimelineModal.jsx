@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { fetchTrackingHistory } from '../utils/api';
 import './TrackingTimelineModal.css';
 
-export default function TrackingTimelineModal({ isOpen, barcode, recInfo, currentPerson, onClose }) {
+export default function TrackingTimelineModal({ isOpen, barcode, recInfo, currentPerson, onClose, onOpenTrackingPage }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [trackData, setTrackData] = useState(null);
@@ -50,10 +50,69 @@ export default function TrackingTimelineModal({ isOpen, barcode, recInfo, curren
   const events = trackData?.events || [];
   // chronological: oldest first
   const sortedEvents = [...events].sort((a, b) => (a.seq || 0) - (b.seq || 0));
-  const hasReceived = sortedEvents.some(ev => {
-    const text = `${ev.status_description || ''} ${ev.status || ''}`;
-    return text.includes('รับฝาก') || ['1', '001', 'p001'].includes(String(ev.status || '').toLowerCase());
-  });
+  const latestEvent = sortedEvents.length > 0 ? sortedEvents[sortedEvents.length - 1] : null;
+  const latestDatetime = trackData?.latest_datetime || latestEvent?.datetime || '';
+
+  const statusInfo = useMemo(() => {
+    if (!latestEvent) {
+      const rKey = recInfo?.status_key;
+      const rLabel = recInfo?.status_label;
+      if (rKey === 'delivered' || rLabel === 'นำจ่ายสำเร็จ') {
+        return {
+          key: 'delivered',
+          label: 'นำจ่ายสำเร็จ',
+          badgeClass: 'delivered',
+          dotClass: 'dot-green',
+          rawDesc: recInfo?.status_description_raw
+        };
+      }
+      if (rKey === 'returned' || rLabel === 'ส่งคืน') {
+        return {
+          key: 'returned',
+          label: 'ส่งคืน',
+          badgeClass: 'returned',
+          dotClass: 'dot-rose',
+          rawDesc: recInfo?.status_description_raw
+        };
+      }
+      return {
+        key: 'in_transit',
+        label: rLabel || 'รอรับฝาก / อยู่ระหว่างนำส่ง',
+        badgeClass: 'in-transit',
+        dotClass: 'dot-amber',
+        rawDesc: recInfo?.status_description_raw
+      };
+    }
+    const key = latestEvent.status_key || 'in_transit';
+    if (key === 'delivered') {
+      return {
+        key: 'delivered',
+        label: 'นำจ่ายสำเร็จ',
+        badgeClass: 'delivered',
+        dotClass: 'dot-green',
+        rawDesc: latestEvent.status_description
+      };
+    }
+    if (key === 'returned') {
+      return {
+        key: 'returned',
+        label: 'ส่งคืน',
+        badgeClass: 'returned',
+        dotClass: 'dot-rose',
+        rawDesc: latestEvent.status_description
+      };
+    }
+    return {
+      key: 'in_transit',
+      label: 'อยู่ระหว่างการนำจ่าย',
+      badgeClass: 'in-transit',
+      dotClass: 'dot-amber',
+      rawDesc: latestEvent.status_description
+    };
+  }, [latestEvent, recInfo]);
+
+  const receiverName = recInfo?.receiver || recInfo?.receiver_name || recInfo?.RECEIVER || '';
+  const invNo = recInfo?.invNo || recInfo?.inv_no || recInfo?.INV_NO || recInfo?.['REF NO'] || '';
 
   return (
     <div className="track-modal-overlay" onClick={onClose}>
@@ -84,28 +143,28 @@ export default function TrackingTimelineModal({ isOpen, barcode, recInfo, curren
         <div className="track-summary-bar">
           <div className="track-summary-barcode">
             <span className="track-summary-label">หมายเลข Barcode</span>
-            <span className="track-barcode-mono">{barcode || '-'}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+              <span className="track-barcode-mono">{barcode || '-'}</span>
+              {latestDatetime && (
+                <span className="result-latest-badge" style={{ fontSize: '0.78rem', padding: '0.15rem 0.5rem' }}>
+                  อัปเดต: {latestDatetime}
+                </span>
+              )}
+            </div>
           </div>
-          {recInfo && (
+          {(receiverName || invNo) && (
             <div className="track-summary-receiver">
               <span className="track-summary-label">ผู้รับ / เลขที่อ้างอิง</span>
               <span className="track-summary-value">
-                {recInfo.receiver || '-'} {recInfo.invNo ? `(${recInfo.invNo})` : ''}
+                {receiverName || '-'} {invNo ? `(${invNo})` : ''}
               </span>
             </div>
           )}
           <div className="track-summary-status">
-            {hasReceived ? (
-              <span className="track-final-pill success">
-                <span className="track-status-dot"></span>
-                รับฝากเข้าระบบแล้ว
-              </span>
-            ) : (
-              <span className="track-final-pill pending">
-                <span className="track-status-dot"></span>
-                อยู่ระหว่างการจัดส่ง
-              </span>
-            )}
+            <span className={`status-pill ${statusInfo.badgeClass}`} title={statusInfo.rawDesc || statusInfo.label}>
+              <span className={`status-dot ${statusInfo.dotClass}`}></span>
+              {statusInfo.label}
+            </span>
           </div>
         </div>
 
@@ -248,6 +307,24 @@ export default function TrackingTimelineModal({ isOpen, barcode, recInfo, curren
                 </>
               )}
             </button>
+            {onOpenTrackingPage && (
+              <button
+                type="button"
+                className="btn-track-fullpage"
+                onClick={() => {
+                  onClose();
+                  onOpenTrackingPage(barcode);
+                }}
+                title="เปิดในหน้าค้นหาและติดตามสถานะพัสดุแบบเต็มจอ"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                  <polyline points="15 3 21 3 21 9"></polyline>
+                  <line x1="10" y1="14" x2="21" y2="3"></line>
+                </svg>
+                <span>เปิดหน้าตรวจสอบเต็มจอ</span>
+              </button>
+            )}
             <button type="button" className="btn-track-close" onClick={onClose}>
               ปิดหน้าต่าง
             </button>

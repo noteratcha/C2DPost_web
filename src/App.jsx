@@ -932,6 +932,10 @@ export default function App() {
               currentPerson={currentPerson}
               onSyncRecords={handleSyncFromDepositReport}
               onSwitchToWorkspace={() => setActivePage('workspace')}
+              onOpenTrackingPage={(bcode) => {
+                setSelectedTrackingBarcode(bcode);
+                setActivePage('tracking');
+              }}
             />
           )}
 

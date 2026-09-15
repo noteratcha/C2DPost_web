@@ -188,16 +188,17 @@ export async function exportAllFiles(records, files = [], onProgress) {
  * Fetch deposit report from Thailand Post e-Parcel API
  *
  * @param {Object} params
- * @param {string} params.date - Date in DD/MM/YYYY format (e.g. 14/09/2026)
+ * @param {string} params.date - Start date in DD/MM/YYYY format (e.g. 14/09/2026)
+ * @param {string} [params.endDate] - End date in DD/MM/YYYY format
  * @param {string} [params.username] - e-Parcel username
  * @param {string} [params.password] - e-Parcel password
- * @returns {Promise<{success: boolean, date: string, is_mock: boolean, summary: Object, records: Array}>}
+ * @returns {Promise<{success: boolean, date: string, end_date: string, date_display: string, is_mock: boolean, summary: Object, records: Array}>}
  */
-export async function fetchReceivedReport({ date, username = '', password = '' }) {
+export async function fetchReceivedReport({ date, endDate, username = '', password = '' }) {
   const response = await fetch(`${API_BASE}/reports/received`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ date, username, password })
+    body: JSON.stringify({ date, end_date: endDate || date, username, password })
   });
 
   const data = await response.json().catch(() => ({}));

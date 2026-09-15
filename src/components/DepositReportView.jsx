@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { fetchReceivedReport, exportDepositReportExcel, exportDepositReportPdf } from '../utils/api';
+import TrackingTimelineModal from './TrackingTimelineModal';
 import './DepositReportView.css';
 
 // Helper: Format Date object to YYYY-MM-DD for <input type="date">
@@ -18,10 +19,74 @@ function toApiDateFormat(isoDateStr) {
   return `${parts[2]}/${parts[1]}/${parts[0]}`;
 }
 
-export default function DepositReportView({ currentPerson, onSyncRecords, onSwitchToWorkspace }) {
-  // Today's date in YYYY-MM-DD
+/**
+ * Normalizes raw postal status into one of 3 canonical categories:
+ * 1. 'delivered' -> นำจ่ายสำเร็จ
+ * 2. 'returned' -> ส่งคืน
+ * 3. 'in_transit' -> อยู่ระหว่างการนำจ่าย (All other intermediate statuses)
+ */
+export function getDeliveryStatusInfo(item) {
+  if (!item) return { key: 'in_transit', label: 'อยู่ระหว่างการนำจ่าย', className: 'in-transit' };
+
+  if (item.status_key === 'delivered' || item.status_label === 'นำจ่ายสำเร็จ') {
+    return { key: 'delivered', label: 'นำจ่ายสำเร็จ', className: 'delivered' };
+  }
+  if (item.status_key === 'returned' || item.status_label === 'ส่งคืน') {
+    return { key: 'returned', label: 'ส่งคืน', className: 'returned' };
+  }
+  if (item.status_key === 'received' || item.status_label === 'รับฝากแล้ว') {
+    return { key: 'received', label: 'รับฝากแล้ว', className: 'received' };
+  }
+  if (item.status_key === 'in_transit' || item.status_label === 'อยู่ระหว่างการนำจ่าย') {
+    return { key: 'in_transit', label: 'อยู่ระหว่างการนำจ่าย', className: 'in-transit' };
+  }
+
+  const desc = (item.status_description_raw || item.status_description || item.statusDescription || '').trim();
+  const code = String(item.status || item.statusCode || '').trim();
+
+  // 1. นำจ่ายสำเร็จ
+  if (/นำจ่ายสำเร็จ|ผู้รับได้รับเรียบร้อย|จัดส่งสำเร็จ|ส่งมอบเรียบร้อย|ส่งถึงผู้รับแล้ว/i.test(desc) || code === '501' || code.toLowerCase() === 'delivered') {
+    return { key: 'delivered', label: 'นำจ่ายสำเร็จ', className: 'delivered' };
+  }
+  // 2. ส่งคืน
+  if (/ส่งคืน|คืนต้นทาง|ส่งคืนผู้ส่ง|ตีกลับ|ไม่สามารถส่งมอบ|ไม่สามารถนำจ่าย/i.test(desc) || ['502', '503', '401', '402'].includes(code) || code.toLowerCase() === 'returned') {
+    return { key: 'returned', label: 'ส่งคืน', className: 'returned' };
+  }
+  // 3. รับฝากแล้ว (initial deposit checkpoint)
+  if (code === '1' || code === '001' || code.toLowerCase() === 'received' || /รับฝาก/i.test(desc)) {
+    return { key: 'received', label: 'รับฝากแล้ว', className: 'received' };
+  }
+  // 4. สถานะอื่นๆ ทั้งหมด เป็น อยู่ระหว่างการนำจ่าย
+  return { key: 'in_transit', label: 'อยู่ระหว่างการนำจ่าย', className: 'in-transit' };
+}
+
+export default function DepositReportView({ currentPerson, onSyncRecords, onSwitchToWorkspace, onOpenTrackingPage }) {
+  // Date shortcut calculations
   const todayIso = useMemo(() => toInputDateFormat(new Date()), []);
-  const [selectedDate, setSelectedDate] = useState(todayIso);
+  const yesterdayIso = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    return toInputDateFormat(d);
+  }, []);
+  const last7DaysIso = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 6);
+    return toInputDateFormat(d);
+  }, []);
+  const monthStartIso = useMemo(() => {
+    const d = new Date();
+    return toInputDateFormat(new Date(d.getFullYear(), d.getMonth(), 1));
+  }, []);
+
+  // Date Range state
+  const [startDate, setStartDate] = useState(todayIso);
+  const [endDate, setEndDate] = useState(todayIso);
+
+  // Pagination state (20 records per page)
+  const PAGE_SIZE = 20;
+  const [currentPage, setCurrentPage] = useState(1);
+
+  // Data & UI states
   const [loading, setLoading] = useState(false);
   const [isExportingExcel, setIsExportingExcel] = useState(false);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
@@ -29,16 +94,20 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
   const [reportData, setReportData] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterTab, setFilterTab] = useState('all'); // 'all' | 'received'
+  const [selectedTrackingItem, setSelectedTrackingItem] = useState(null);
 
-  // Fetch report function
-  const handleFetchReport = useCallback(async (dateToFetch) => {
-    const targetIso = dateToFetch || selectedDate;
-    if (!targetIso) {
-      setError('กรุณาเลือกวันที่ต้องการตรวจสอบ');
+  // Fetch report function (accepts start & end dates)
+  const handleFetchReport = useCallback(async (startToFetch, endToFetch) => {
+    const sIso = startToFetch || startDate;
+    const eIso = endToFetch || endDate || sIso;
+
+    if (!sIso || !eIso) {
+      setError('กรุณาเลือกช่วงวันที่ต้องการตรวจสอบ');
       return;
     }
 
-    const apiDate = toApiDateFormat(targetIso);
+    const apiStartDate = toApiDateFormat(sIso);
+    const apiEndDate = toApiDateFormat(eIso);
     setLoading(true);
     setError('');
 
@@ -46,14 +115,15 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
       const username = currentPerson?.UserName || '';
       const password = currentPerson?.Password || '';
       const result = await fetchReceivedReport({
-        date: apiDate,
+        date: apiStartDate,
+        endDate: apiEndDate,
         username,
         password
       });
 
       if (result.success) {
         setReportData(result);
-        if (onSyncRecords && result.records && result.records.length > 0) {
+        if (onSyncRecords && Array.isArray(result.records) && result.records.length > 0) {
           onSyncRecords(result.records);
         }
       } else {
@@ -64,31 +134,50 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
     } finally {
       setLoading(false);
     }
-  }, [selectedDate, currentPerson, onSyncRecords]);
+  }, [startDate, endDate, currentPerson, onSyncRecords]);
 
   // Initial load
   useEffect(() => {
-    handleFetchReport(todayIso);
+    handleFetchReport(todayIso, todayIso);
   }, [todayIso, handleFetchReport]);
 
-  // Quick date shortcuts
+  // Quick date shortcuts handler
   const handleSetQuickDate = (type) => {
-    const d = new Date();
+    let s = todayIso;
+    let e = todayIso;
     if (type === 'yesterday') {
-      d.setDate(d.getDate() - 1);
+      s = yesterdayIso;
+      e = yesterdayIso;
+    } else if (type === 'last7days') {
+      s = last7DaysIso;
+      e = todayIso;
+    } else if (type === 'thisMonth') {
+      s = monthStartIso;
+      e = todayIso;
     }
-    const iso = toInputDateFormat(d);
-    setSelectedDate(iso);
-    handleFetchReport(iso);
+    setStartDate(s);
+    setEndDate(e);
+    handleFetchReport(s, e);
   };
+
+  // Reset pagination to page 1 whenever filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [startDate, endDate, searchQuery, filterTab]);
 
   // Filtered records based on search and tab
   const filteredRecords = useMemo(() => {
     if (!reportData || !reportData.records) return [];
     let list = reportData.records;
 
-    if (filterTab === 'received') {
-      list = list.filter((r) => r.status === '1' || r.status === '2' || (r.status_description && r.status_description.includes('รับฝาก')));
+    if (filterTab === 'delivered') {
+      list = list.filter((r) => getDeliveryStatusInfo(r).key === 'delivered');
+    } else if (filterTab === 'in_transit') {
+      list = list.filter((r) => getDeliveryStatusInfo(r).key === 'in_transit');
+    } else if (filterTab === 'returned') {
+      list = list.filter((r) => getDeliveryStatusInfo(r).key === 'returned');
+    } else if (filterTab === 'received') {
+      list = list.filter((r) => getDeliveryStatusInfo(r).key === 'received');
     }
 
     if (searchQuery.trim()) {
@@ -106,7 +195,48 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
     return list;
   }, [reportData, filterTab, searchQuery]);
 
-  // Export handlers
+  // Total pages and clamping
+  const totalPages = Math.max(1, Math.ceil(filteredRecords.length / PAGE_SIZE));
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
+  // Paginated records (20 items per page)
+  const paginatedRecords = useMemo(() => {
+    const startIdx = (currentPage - 1) * PAGE_SIZE;
+    return filteredRecords.slice(startIdx, startIdx + PAGE_SIZE);
+  }, [filteredRecords, currentPage, PAGE_SIZE]);
+
+  // Page index numbers for table footer
+  const startItemIndex = filteredRecords.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
+  const endItemIndex = Math.min(currentPage * PAGE_SIZE, filteredRecords.length);
+
+  // Pagination navigation buttons list
+  const pageNumbers = useMemo(() => {
+    if (totalPages <= 7) {
+      return Array.from({ length: totalPages }, (_, i) => i + 1);
+    }
+    if (currentPage <= 4) {
+      return [1, 2, 3, 4, 5, '...', totalPages];
+    }
+    if (currentPage >= totalPages - 3) {
+      return [1, '...', totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+    }
+    return [1, '...', currentPage - 1, currentPage, currentPage + 1, '...', totalPages];
+  }, [totalPages, currentPage]);
+
+  // Date display label
+  const dateDisplay = useMemo(() => {
+    if (reportData?.date_display) return reportData.date_display;
+    const sApi = toApiDateFormat(startDate);
+    const eApi = toApiDateFormat(endDate);
+    return sApi === eApi ? sApi : `${sApi} ถึง ${eApi}`;
+  }, [reportData, startDate, endDate]);
+
+  // Export handlers (exports all filtered records for the date range)
   const handleExportExcel = async () => {
     if (!filteredRecords || filteredRecords.length === 0) return;
     setIsExportingExcel(true);
@@ -115,7 +245,7 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
       await exportDepositReportExcel({
         records: filteredRecords,
         summary: reportData?.summary || {},
-        date: toApiDateFormat(selectedDate),
+        date: dateDisplay,
         organization: currentPerson?.Organization || 'สำนักงานที่ดิน'
       });
     } catch (err) {
@@ -133,7 +263,7 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
       await exportDepositReportPdf({
         records: filteredRecords,
         summary: reportData?.summary || {},
-        date: toApiDateFormat(selectedDate),
+        date: dateDisplay,
         organization: currentPerson?.Organization || 'สำนักงานที่ดิน'
       });
     } catch (err) {
@@ -150,8 +280,36 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
     received_count: 0
   };
 
-  const successRate = summary.total_items > 0
-    ? Math.round((summary.received_count / summary.total_items) * 100)
+  const deliveredCount = summary.delivered_count !== undefined
+    ? summary.delivered_count
+    : (reportData?.records?.filter((r) => getDeliveryStatusInfo(r).key === 'delivered').length || 0);
+
+  const inTransitCount = summary.in_transit_count !== undefined
+    ? summary.in_transit_count
+    : (reportData?.records?.filter((r) => getDeliveryStatusInfo(r).key === 'in_transit').length || 0);
+
+  const returnedCount = summary.returned_count !== undefined
+    ? summary.returned_count
+    : (reportData?.records?.filter((r) => getDeliveryStatusInfo(r).key === 'returned').length || 0);
+
+  const receivedCount = summary.received_count !== undefined
+    ? summary.received_count
+    : (reportData?.records?.filter((r) => getDeliveryStatusInfo(r).key === 'received').length || 0);
+
+  const receivedRate = summary.total_items > 0
+    ? Math.round((receivedCount / summary.total_items) * 100)
+    : 0;
+
+  const inTransitRate = summary.total_items > 0
+    ? Math.round((inTransitCount / summary.total_items) * 100)
+    : 0;
+
+  const deliveredRate = summary.total_items > 0
+    ? Math.round((deliveredCount / summary.total_items) * 100)
+    : 0;
+
+  const returnedRate = summary.total_items > 0
+    ? Math.round((returnedCount / summary.total_items) * 100)
     : 0;
 
   return (
@@ -171,7 +329,7 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
               </svg>
             </div>
             <div>
-              <h2 className="deposit-page-title">รายงานการรับฝากไปรษณีย์ (e-Parcel Deposit Report)</h2>
+              <h2 className="deposit-page-title">รายงานสถานะไปรษณีย์ (e-Parcel Status Report)</h2>
               <p className="deposit-page-subtitle">
                 ตรวจสอบและติดตามสถานะรายการพัสดุที่ไปรษณีย์ไทยลงรับเข้าระบบ e-Parcel แล้วแบบเรียลไทม์
                 {currentPerson?.Organization ? ` • ${currentPerson.Organization}` : ''}
@@ -195,24 +353,43 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
           )}
         </div>
 
-        {/* Controls Bar: Date Picker & Quick Actions */}
+        {/* Controls Bar: Date Range Picker & Quick Actions */}
         <div className="deposit-control-card">
-          <div className="deposit-date-group">
-            <label htmlFor="deposit-date-picker" className="deposit-control-label">
-              เลือกวันที่นำส่ง:
-            </label>
-            <input
-              id="deposit-date-picker"
-              type="date"
-              className="deposit-date-input"
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              disabled={loading}
-            />
+          <div className="deposit-date-range-group">
+            <div className="deposit-date-item">
+              <label htmlFor="deposit-start-date" className="deposit-control-label">
+                ตั้งแต่วันที่:
+              </label>
+              <input
+                id="deposit-start-date"
+                type="date"
+                className="deposit-date-input"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                disabled={loading}
+              />
+            </div>
+
+            <span className="deposit-date-sep">ถึง</span>
+
+            <div className="deposit-date-item">
+              <label htmlFor="deposit-end-date" className="deposit-control-label">
+                ถึงวันที่:
+              </label>
+              <input
+                id="deposit-end-date"
+                type="date"
+                className="deposit-date-input"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                disabled={loading}
+              />
+            </div>
+
             <div className="deposit-quick-date-btns">
               <button
                 type="button"
-                className={`btn-quick-date ${selectedDate === todayIso ? 'active' : ''}`}
+                className={`btn-quick-date ${startDate === todayIso && endDate === todayIso ? 'active' : ''}`}
                 onClick={() => handleSetQuickDate('today')}
                 disabled={loading}
               >
@@ -220,11 +397,27 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
               </button>
               <button
                 type="button"
-                className="btn-quick-date"
+                className={`btn-quick-date ${startDate === yesterdayIso && endDate === yesterdayIso ? 'active' : ''}`}
                 onClick={() => handleSetQuickDate('yesterday')}
                 disabled={loading}
               >
                 เมื่อวาน
+              </button>
+              <button
+                type="button"
+                className={`btn-quick-date ${startDate === last7DaysIso && endDate === todayIso ? 'active' : ''}`}
+                onClick={() => handleSetQuickDate('last7days')}
+                disabled={loading}
+              >
+                7 วันล่าสุด
+              </button>
+              <button
+                type="button"
+                className={`btn-quick-date ${startDate === monthStartIso && endDate === todayIso ? 'active' : ''}`}
+                onClick={() => handleSetQuickDate('thisMonth')}
+                disabled={loading}
+              >
+                เดือนนี้
               </button>
             </div>
           </div>
@@ -233,7 +426,7 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
             <button
               type="button"
               className="btn-fetch-report"
-              onClick={() => handleFetchReport(selectedDate)}
+              onClick={() => handleFetchReport(startDate, endDate)}
               disabled={loading}
             >
               {loading ? (
@@ -247,7 +440,7 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
                     <circle cx="11" cy="11" r="8"></circle>
                     <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
                   </svg>
-                  <span>ดึงข้อมูลรับฝาก</span>
+                  <span>อัปเดตข้อมูล</span>
                 </>
               )}
             </button>
@@ -277,8 +470,82 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
           </div>
         )}
 
-        {/* Summary Stats Cards */}
+        {/* Summary Stats Cards (6 Categories) */}
         <div className="deposit-stats-grid">
+          {/* 1. รับฝากแล้ว */}
+          <div className="deposit-stat-card">
+            <div className="stat-card-icon icon-received-deposit">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                <polyline points="20 12 20 22 4 22 4 12"></polyline>
+                <rect x="2" y="7" width="20" height="5"></rect>
+                <line x1="12" y1="22" x2="12" y2="7"></line>
+                <path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"></path>
+                <path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"></path>
+              </svg>
+            </div>
+            <div className="stat-card-content">
+              <div className="stat-label">รับฝากแล้ว</div>
+              <div className="stat-value text-blue">
+                {receivedCount}{' '}
+                <span className="stat-unit">({receivedRate}%)</span>
+              </div>
+            </div>
+          </div>
+
+          {/* 2. อยู่ระหว่างการนำจ่าย */}
+          <div className="deposit-stat-card">
+            <div className="stat-card-icon icon-transit">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                <rect x="1" y="3" width="15" height="13"></rect>
+                <polygon points="16 8 20 8 23 11 23 16 16 16 8"></polygon>
+                <circle cx="5.5" cy="18.5" r="2.5"></circle>
+                <circle cx="18.5" cy="18.5" r="2.5"></circle>
+              </svg>
+            </div>
+            <div className="stat-card-content">
+              <div className="stat-label">อยู่ระหว่างการนำจ่าย</div>
+              <div className="stat-value text-amber">
+                {inTransitCount}{' '}
+                <span className="stat-unit">({inTransitRate}%)</span>
+              </div>
+            </div>
+          </div>
+
+          {/* 3. นำจ่ายสำเร็จ */}
+          <div className="deposit-stat-card">
+            <div className="stat-card-icon icon-delivered">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                <polyline points="22 4 12 14.01 9 11.01"></polyline>
+              </svg>
+            </div>
+            <div className="stat-card-content">
+              <div className="stat-label">นำจ่ายสำเร็จ</div>
+              <div className="stat-value text-emerald">
+                {deliveredCount}{' '}
+                <span className="stat-unit">({deliveredRate}%)</span>
+              </div>
+            </div>
+          </div>
+
+          {/* 4. ส่งคืน */}
+          <div className="deposit-stat-card">
+            <div className="stat-card-icon icon-returned">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                <polyline points="9 14 4 9 9 4"></polyline>
+                <path d="M20 20v-7a4 4 0 0 0-4-4H4"></path>
+              </svg>
+            </div>
+            <div className="stat-card-content">
+              <div className="stat-label">ส่งคืน</div>
+              <div className="stat-value text-rose">
+                {returnedCount}{' '}
+                <span className="stat-unit">({returnedRate}%)</span>
+              </div>
+            </div>
+          </div>
+
+          {/* 5. รายการทั้งหมด */}
           <div className="deposit-stat-card">
             <div className="stat-card-icon icon-total">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
@@ -294,21 +561,7 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
             </div>
           </div>
 
-          <div className="deposit-stat-card">
-            <div className="stat-card-icon icon-received">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-                <polyline points="20 6 9 17 4 12"></polyline>
-              </svg>
-            </div>
-            <div className="stat-card-content">
-              <div className="stat-label">รับฝากสำเร็จ</div>
-              <div className="stat-value text-emerald">
-                {summary.received_count}{' '}
-                <span className="stat-unit">({successRate}%)</span>
-              </div>
-            </div>
-          </div>
-
+          {/* 6. ยอดรวมค่าบริการ */}
           <div className="deposit-stat-card">
             <div className="stat-card-icon icon-fee">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
@@ -341,8 +594,32 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
                 className={`btn-filter-tab ${filterTab === 'received' ? 'active' : ''}`}
                 onClick={() => setFilterTab('received')}
               >
+                <span className="dot-blue"></span>
+                รับฝากแล้ว ({receivedCount})
+              </button>
+              <button
+                type="button"
+                className={`btn-filter-tab ${filterTab === 'in_transit' ? 'active' : ''}`}
+                onClick={() => setFilterTab('in_transit')}
+              >
+                <span className="dot-amber"></span>
+                อยู่ระหว่างการนำจ่าย ({inTransitCount})
+              </button>
+              <button
+                type="button"
+                className={`btn-filter-tab ${filterTab === 'delivered' ? 'active' : ''}`}
+                onClick={() => setFilterTab('delivered')}
+              >
                 <span className="dot-green"></span>
-                รับฝากแล้ว ({summary.received_count})
+                นำจ่ายสำเร็จ ({deliveredCount})
+              </button>
+              <button
+                type="button"
+                className={`btn-filter-tab ${filterTab === 'returned' ? 'active' : ''}`}
+                onClick={() => setFilterTab('returned')}
+              >
+                <span className="dot-rose"></span>
+                ส่งคืน ({returnedCount})
               </button>
             </div>
 
@@ -409,19 +686,38 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
                         <p className="empty-desc">
                           {searchQuery
                             ? `ไม่พบข้อมูลที่ตรงกับคำค้นหา "${searchQuery}"`
-                            : `ไม่มีรายการที่ไปรษณีย์ไทยรับฝากเข้าระบบในวันที่ ${toApiDateFormat(selectedDate)}`}
+                            : `ไม่มีรายการที่ไปรษณีย์ไทยรับฝากเข้าระบบในช่วงวันที่ ${dateDisplay}`}
                         </p>
                       </div>
                     </td>
                   </tr>
                 ) : (
-                  filteredRecords.map((item, idx) => {
-                    const isReceived = item.status === '1' || item.status === '2' || (item.status_description && item.status_description.includes('รับฝาก'));
+                  paginatedRecords.map((item, idx) => {
+                    const statusInfo = getDeliveryStatusInfo(item);
+                    const globalIdx = (currentPage - 1) * PAGE_SIZE + idx + 1;
+                    const tooltipText = item.status_description_raw && item.status_description_raw !== statusInfo.label
+                      ? `${statusInfo.label} (${item.status_description_raw})`
+                      : statusInfo.label;
                     return (
-                      <tr key={item.barcode || idx} className={isReceived ? 'row-received' : ''}>
-                        <td style={{ textAlign: 'center' }}>{item.seq || idx + 1}</td>
+                      <tr key={item.barcode || globalIdx} className={`row-status-${statusInfo.key}`}>
+                        <td style={{ textAlign: 'center' }}>{globalIdx}</td>
                         <td>
-                          <span className="table-barcode-pill">{item.barcode}</span>
+                          {item.barcode ? (
+                            <button
+                              type="button"
+                              className="table-barcode-btn"
+                              onClick={() => setSelectedTrackingItem(item)}
+                              title={`คลิกเพื่อดูสถานะการตรวจสอบพัสดุ ${item.barcode}`}
+                            >
+                              <span className="table-barcode-pill">{item.barcode}</span>
+                              <svg className="barcode-track-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                                <circle cx="11" cy="11" r="8"></circle>
+                                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                              </svg>
+                            </button>
+                          ) : (
+                            <span className="table-barcode-pill">-</span>
+                          )}
                         </td>
                         <td>{item.inv_no || '-'}</td>
                         <td className="cell-receiver-name">{item.receiver_name || '-'}</td>
@@ -452,8 +748,11 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
                           {item.fee !== undefined ? `฿${item.fee.toFixed(2)}` : '-'}
                         </td>
                         <td style={{ textAlign: 'center' }}>
-                          <span className={`status-pill ${isReceived ? 'received' : 'pending'}`}>
-                            {isReceived ? 'รับฝากเข้าระบบแล้ว' : (item.status_description || 'รอรับฝาก')}
+                          <span 
+                            className={`status-pill ${statusInfo.className}`}
+                            title={tooltipText}
+                          >
+                            {statusInfo.label}
                           </span>
                         </td>
                       </tr>
@@ -464,11 +763,55 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
             </table>
           </div>
 
-          {/* Footer Bar: Actions & Summary */}
+          {/* Footer Bar: Pagination & Actions */}
           <div className="deposit-table-footer">
             <div className="footer-records-count">
-              แสดง <strong>{filteredRecords.length}</strong> จากทั้งหมด <strong>{summary.total_items}</strong> รายการ (วันที่ {toApiDateFormat(selectedDate)})
+              แสดง <strong>{startItemIndex} - {endItemIndex}</strong> จากทั้งหมด <strong>{filteredRecords.length}</strong> รายการ
+              {totalPages > 1 && (
+                <span className="footer-page-indicator"> (หน้า {currentPage} จาก {totalPages})</span>
+              )}
             </div>
+
+            {totalPages > 1 && (
+              <div className="deposit-pagination-controls">
+                <button
+                  type="button"
+                  className="btn-pagination prev"
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  title="หน้าก่อนหน้า"
+                >
+                  ‹ ก่อนหน้า
+                </button>
+
+                <div className="pagination-page-numbers">
+                  {pageNumbers.map((p, idx) =>
+                    p === '...' ? (
+                      <span key={`ellipsis-${idx}`} className="pagination-ellipsis">…</span>
+                    ) : (
+                      <button
+                        key={p}
+                        type="button"
+                        className={`btn-pagination-page ${currentPage === p ? 'active' : ''}`}
+                        onClick={() => setCurrentPage(p)}
+                      >
+                        {p}
+                      </button>
+                    )
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  className="btn-pagination next"
+                  disabled={currentPage === totalPages}
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  title="หน้าถัดไป"
+                >
+                  ถัดไป ›
+                </button>
+              </div>
+            )}
 
             <div className="deposit-footer-actions">
               <button
@@ -523,6 +866,28 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
         </div>
 
       </div>
+
+      {/* Tracking Timeline Modal for clicked barcode */}
+      {selectedTrackingItem && (
+        <TrackingTimelineModal
+          isOpen={!!selectedTrackingItem}
+          barcode={selectedTrackingItem.barcode}
+          recInfo={{
+            receiver: selectedTrackingItem.receiver_name,
+            invNo: selectedTrackingItem.inv_no,
+            receiver_address: selectedTrackingItem.receiver_address,
+            deposit_date: selectedTrackingItem.received_date,
+            status_label: selectedTrackingItem.status_description_raw || selectedTrackingItem.status_label
+          }}
+          currentPerson={currentPerson}
+          onClose={() => setSelectedTrackingItem(null)}
+          onOpenTrackingPage={onOpenTrackingPage ? () => {
+            const bcode = selectedTrackingItem.barcode;
+            setSelectedTrackingItem(null);
+            onOpenTrackingPage(bcode);
+          } : undefined}
+        />
+      )}
     </main>
   );
 }

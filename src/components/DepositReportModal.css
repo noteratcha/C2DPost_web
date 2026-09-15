@@ -162,11 +162,25 @@
   border-bottom-color: rgba(255, 255, 255, 0.08);
 }
 
-.deposit-date-group {
+.deposit-date-group,
+.deposit-date-range-group {
   display: flex;
   align-items: center;
   gap: 0.65rem;
   flex-wrap: wrap;
+}
+
+.deposit-date-item {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.deposit-date-sep {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #64748b;
+  white-space: nowrap !important;
 }
 
 .deposit-control-label {
@@ -610,9 +624,11 @@
 /* Data Table Container */
 .deposit-table-container {
   flex: 1;
+  overflow-x: auto;
   overflow-y: auto;
-  min-height: 240px;
-  max-height: 420px;
+  min-height: 200px;
+  max-height: 70vh;
+  height: auto;
 }
 
 .deposit-data-table {
@@ -690,11 +706,67 @@
   padding: 0.18rem 0.45rem;
   border-radius: 4px;
   letter-spacing: 0.02em;
+  transition: all 0.15s ease;
 }
 
 [data-theme='dark'] .barcode-badge-mono {
   color: #38bdf8;
   background: rgba(14, 165, 233, 0.15);
+}
+
+.barcode-btn-mono {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 0.15rem 0.35rem;
+  margin: -0.15rem -0.35rem;
+  cursor: pointer;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  text-align: left;
+  font-family: inherit;
+}
+
+.barcode-btn-mono:hover {
+  background: rgba(2, 132, 199, 0.08);
+  border-color: rgba(2, 132, 199, 0.25);
+  box-shadow: 0 2px 5px rgba(2, 132, 199, 0.12);
+  transform: translateY(-1px);
+}
+
+.barcode-btn-mono:hover .barcode-badge-mono {
+  text-decoration: underline;
+  background: rgba(14, 165, 233, 0.2);
+  color: #0284c7;
+}
+
+[data-theme='dark'] .barcode-btn-mono:hover {
+  background: rgba(56, 189, 248, 0.12);
+  border-color: rgba(56, 189, 248, 0.35);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme='dark'] .barcode-btn-mono:hover .barcode-badge-mono {
+  color: #7dd3fc;
+  background: rgba(14, 165, 233, 0.25);
+}
+
+.barcode-btn-mono .barcode-track-icon {
+  opacity: 0.45;
+  color: #0284c7;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+  flex-shrink: 0;
+}
+
+.barcode-btn-mono:hover .barcode-track-icon {
+  opacity: 1;
+  transform: scale(1.18);
+}
+
+[data-theme='dark'] .barcode-btn-mono .barcode-track-icon {
+  color: #38bdf8;
 }
 
 .inv-badge {
@@ -824,6 +896,93 @@
   color: #94a3b8;
 }
 
+.footer-modal-page-info {
+  font-weight: 600;
+  color: #334155;
+}
+
+[data-theme='dark'] .footer-modal-page-info {
+  color: #e2e8f0;
+}
+
+.deposit-modal-footer .deposit-pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.deposit-modal-footer .btn-pagination {
+  padding: 0.35rem 0.65rem;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  font-family: 'Prompt', sans-serif;
+  background: #ffffff;
+  color: #334155;
+  border: 1px solid #cbd5e1;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap !important;
+}
+
+[data-theme='dark'] .deposit-modal-footer .btn-pagination {
+  background: #0f172a;
+  border-color: #334155;
+  color: #e2e8f0;
+}
+
+.deposit-modal-footer .btn-pagination:hover:not(:disabled) {
+  background: rgba(16, 185, 129, 0.1);
+  color: #059669;
+  border-color: #059669;
+}
+
+.deposit-modal-footer .btn-pagination:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.deposit-modal-footer .pagination-page-numbers {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+.deposit-modal-footer .btn-pagination-page {
+  min-width: 28px;
+  height: 28px;
+  padding: 0 0.25rem;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  background: #ffffff;
+  color: #334155;
+  border: 1px solid #cbd5e1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+[data-theme='dark'] .deposit-modal-footer .btn-pagination-page {
+  background: #0f172a;
+  border-color: #334155;
+  color: #e2e8f0;
+}
+
+.deposit-modal-footer .btn-pagination-page.active {
+  background: #059669;
+  color: #ffffff;
+  border-color: #059669;
+}
+
+.deposit-modal-footer .pagination-ellipsis {
+  padding: 0 0.2rem;
+  color: #64748b;
+  font-size: 0.85rem;
+}
+
 .footer-action-buttons {
   display: flex;
   align-items: center;
@@ -931,4 +1090,162 @@
 [data-theme='dark'] .btn-deposit-close-action:hover {
   background: #334155;
   color: #ffffff;
+}
+
+/* 5-Category Summary Cards Grid in Modal */
+.deposit-summary-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 0.75rem;
+  padding: 0.85rem 1.5rem;
+}
+
+.deposit-stat-box {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  background: #f8fafc;
+  border: 1px solid rgba(0, 0, 0, 0.07);
+  border-radius: 12px;
+  padding: 0.75rem 0.95rem;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.deposit-stat-box:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+[data-theme='dark'] .deposit-stat-box {
+  background: #1e293b;
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+.deposit-stat-box.stat-blue .stat-icon-wrap {
+  background: rgba(59, 130, 246, 0.12);
+  color: #2563eb;
+}
+
+.deposit-stat-box.stat-cyan .stat-icon-wrap {
+  background: rgba(6, 182, 212, 0.12);
+  color: #0891b2;
+}
+
+.deposit-stat-box.stat-green .stat-icon-wrap {
+  background: rgba(16, 185, 129, 0.15);
+  color: #059669;
+}
+
+.deposit-stat-box.stat-amber .stat-icon-wrap {
+  background: rgba(245, 158, 11, 0.12);
+  color: #d97706;
+}
+
+.deposit-stat-box.stat-rose .stat-icon-wrap {
+  background: rgba(239, 68, 68, 0.12);
+  color: #e11d48;
+}
+
+.deposit-stat-box.stat-gold .stat-icon-wrap {
+  background: rgba(245, 158, 11, 0.12);
+  color: #d97706;
+}
+
+.text-blue {
+  color: #0891b2 !important;
+}
+
+[data-theme='dark'] .text-blue {
+  color: #22d3ee !important;
+}
+
+.deposit-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap !important;
+}
+
+.deposit-status-pill.delivered,
+.deposit-status-pill.success {
+  background: rgba(16, 185, 129, 0.12);
+  color: #059669;
+  border: 1px solid rgba(16, 185, 129, 0.28);
+}
+
+[data-theme='dark'] .deposit-status-pill.delivered,
+[data-theme='dark'] .deposit-status-pill.success {
+  background: rgba(16, 185, 129, 0.22);
+  color: #34d399;
+}
+
+.deposit-status-pill.received {
+  background: rgba(6, 182, 212, 0.12);
+  color: #0891b2;
+  border: 1px solid rgba(6, 182, 212, 0.28);
+}
+
+[data-theme='dark'] .deposit-status-pill.received {
+  background: rgba(6, 182, 212, 0.22);
+  color: #22d3ee;
+}
+
+.deposit-status-pill.in-transit,
+.deposit-status-pill.pending {
+  background: rgba(245, 158, 11, 0.12);
+  color: #d97706;
+  border: 1px solid rgba(245, 158, 11, 0.28);
+}
+
+[data-theme='dark'] .deposit-status-pill.in-transit,
+[data-theme='dark'] .deposit-status-pill.pending {
+  background: rgba(245, 158, 11, 0.22);
+  color: #fbbf24;
+}
+
+.deposit-status-pill.returned {
+  background: rgba(239, 68, 68, 0.12);
+  color: #e11d48;
+  border: 1px solid rgba(239, 68, 68, 0.28);
+}
+
+[data-theme='dark'] .deposit-status-pill.returned {
+  background: rgba(239, 68, 68, 0.22);
+  color: #fda4af;
+}
+
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.status-dot.dot-delivered {
+  background: #10b981;
+}
+
+.status-dot.dot-received {
+  background: #0891b2;
+}
+
+.status-dot.dot-in_transit {
+  background: #f59e0b;
+}
+
+.status-dot.dot-returned {
+  background: #f43f5e;
+}
+
+.tab-dot.dot-blue {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #0891b2;
+  display: inline-block;
+  flex-shrink: 0;
 }

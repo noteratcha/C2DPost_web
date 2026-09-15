@@ -33,6 +33,11 @@ export default function AboutModal({ isOpen, onClose }) {
               </li>
               <li>
                 <span className="bullet-dot"></span>
+                <strong>ท.ด. 38 ค.</strong>
+                <span className="doc-desc">(เอกสารแจ้งการปักหลักเขตที่ดิน)</span>
+              </li>
+              <li>
+                <span className="bullet-dot"></span>
                 <strong>ท.ด. 81</strong>
                 <span className="doc-desc">(คำขอรังวัดรวมโฉนด)</span>
               </li>

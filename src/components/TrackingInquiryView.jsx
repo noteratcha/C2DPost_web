@@ -60,10 +60,46 @@ export default function TrackingInquiryView({ currentPerson, records = [], initi
 
   const events = trackData?.events || [];
   const sortedEvents = [...events].sort((a, b) => (a.seq || 0) - (b.seq || 0));
-  const hasReceived = sortedEvents.some((ev) => {
-    const text = `${ev.status_description || ''} ${ev.status || ''}`;
-    return text.includes('รับฝาก') || ['1', '001', 'p001', '2'].includes(String(ev.status || '').toLowerCase());
-  });
+  const latestEvent = sortedEvents.length > 0 ? sortedEvents[sortedEvents.length - 1] : null;
+  const latestDatetime = trackData?.latest_datetime || latestEvent?.datetime || '';
+  const latestLocation = trackData?.latest_location || latestEvent?.location || '';
+
+  const statusInfo = useMemo(() => {
+    if (!latestEvent) {
+      return {
+        key: 'in_transit',
+        label: 'รอรับฝาก / อยู่ระหว่างนำส่ง',
+        badgeClass: 'in-transit',
+        dotClass: 'dot-amber'
+      };
+    }
+    const key = latestEvent.status_key || 'in_transit';
+    if (key === 'delivered') {
+      return {
+        key: 'delivered',
+        label: 'นำจ่ายสำเร็จ',
+        badgeClass: 'delivered',
+        dotClass: 'dot-green',
+        rawDesc: latestEvent.status_description
+      };
+    }
+    if (key === 'returned') {
+      return {
+        key: 'returned',
+        label: 'ส่งคืน',
+        badgeClass: 'returned',
+        dotClass: 'dot-rose',
+        rawDesc: latestEvent.status_description
+      };
+    }
+    return {
+      key: 'in_transit',
+      label: 'อยู่ระหว่างการนำจ่าย',
+      badgeClass: 'in-transit',
+      dotClass: 'dot-amber',
+      rawDesc: latestEvent.status_description
+    };
+  }, [latestEvent]);
 
   return (
     <main className="tracking-page-main python-layout-main">
@@ -212,20 +248,33 @@ export default function TrackingInquiryView({ currentPerson, records = [], initi
             <div className="tracking-result-header">
               <div className="result-barcode-group">
                 <span className="result-label">ผลการตรวจสอบหมายเลข</span>
-                <span className="result-barcode-mono">{searchedBarcode}</span>
+                <div className="result-title-details">
+                  <span className="result-barcode-mono">{searchedBarcode}</span>
+                  {latestDatetime && (
+                    <span className="result-latest-badge" title="วันและเวลาที่มีการอัปเดตสถานะล่าสุด">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <polyline points="12 6 12 12 16 14"></polyline>
+                      </svg>
+                      อัปเดต: {latestDatetime}
+                    </span>
+                  )}
+                  {latestLocation && (
+                    <span className="result-location-badge" title="ที่ทำการไปรษณีย์ล่าสุด">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                        <circle cx="12" cy="10" r="3"></circle>
+                      </svg>
+                      {latestLocation}
+                    </span>
+                  )}
+                </div>
               </div>
               <div className="result-status-badge">
-                {hasReceived ? (
-                  <span className="badge-received">
-                    <span className="badge-dot-green"></span>
-                    รับฝากเข้าระบบแล้ว
-                  </span>
-                ) : (
-                  <span className="badge-pending">
-                    <span className="badge-dot-amber"></span>
-                    รอรับฝาก / อยู่ระหว่างนำส่ง
-                  </span>
-                )}
+                <span className={`status-pill ${statusInfo.badgeClass}`} title={statusInfo.rawDesc || statusInfo.label}>
+                  <span className={`status-dot ${statusInfo.dotClass}`}></span>
+                  {statusInfo.label}
+                </span>
               </div>
             </div>
 
@@ -250,7 +299,6 @@ export default function TrackingInquiryView({ currentPerson, records = [], initi
               ) : (
                 <div className="tracking-stepper">
                   {sortedEvents.map((ev, index) => {
-                    const isFirst = index === 0;
                     const isLast = index === sortedEvents.length - 1;
                     const isRec = `${ev.status_description || ''} ${ev.status || ''}`.includes('รับฝาก');
 
@@ -266,36 +314,43 @@ export default function TrackingInquiryView({ currentPerson, records = [], initi
                         <div className="stepper-content">
                           <div className="stepper-status-row">
                             <span className="stepper-status-desc">{ev.status_description}</span>
+                            {ev.status_label && (
+                              <span className={`stepper-badge-status ${ev.status_key || 'in_transit'}`}>
+                                {ev.status_label}
+                              </span>
+                            )}
                             {isRec && <span className="stepper-tag-rec">รับฝากแล้ว</span>}
                             {isLast && <span className="stepper-tag-latest">ล่าสุด</span>}
                           </div>
 
                           <div className="stepper-meta-row">
                             {ev.datetime && (
-                              <span className="stepper-meta-item">
-                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                  <circle cx="12" cy="12" r="10"></circle>
-                                  <polyline points="12 6 12 12 16 14"></polyline>
+                              <span className="stepper-meta-item datetime" title="วันและเวลารับฝาก / ปรับปรุงสถานะ">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                                  <line x1="16" y1="2" x2="16" y2="6"></line>
+                                  <line x1="8" y1="2" x2="8" y2="6"></line>
+                                  <line x1="3" y1="10" x2="21" y2="10"></line>
                                 </svg>
-                                {ev.datetime}
+                                <span className="datetime-text">{ev.datetime}</span>
                               </span>
                             )}
                             {ev.location && (
-                              <span className="stepper-meta-item">
-                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <span className="stepper-meta-item location" title="สถานที่ / ที่ทำการ">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                   <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
                                   <circle cx="12" cy="10" r="3"></circle>
                                 </svg>
-                                {ev.location}
+                                <span>{ev.location}</span>
                               </span>
                             )}
                             {ev.signature && (
-                              <span className="stepper-meta-item">
-                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <span className="stepper-meta-item signature" title="ผู้ลงนาม">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                   <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
                                   <circle cx="12" cy="7" r="4"></circle>
                                 </svg>
-                                ผู้ลงนาม: {ev.signature}
+                                <span>ผู้ลงนาม: {ev.signature}</span>
                               </span>
                             )}
                           </div>

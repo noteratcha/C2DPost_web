@@ -5,6 +5,7 @@ import pandas as pd
 from pypdf import PdfReader, PdfWriter
 import requests
 import io
+from datetime import datetime
 from reportlab.pdfgen import canvas
 from reportlab.graphics.barcode import code128, qr
 from reportlab.graphics.shapes import Drawing
@@ -33,10 +34,10 @@ try:
     pdfmetrics.registerFont(TTFont('Tahoma-Bold', tahomabd_path))
     FONT_REGISTERED = True
 except Exception as e:
-    print(f"Warning: Failed to load Tahoma font: {e}")
+    print(f"Error registering fonts: {e}")
     FONT_REGISTERED = False
 
-__version__ = "2026.0914.2046"
+__version__ = "2026.0915.0923"
 
 # Thailand Post API Credentials
 API_KEY = "V9JN25IFH5hdZYc1k8NNRVgnLYXyQLzc"
@@ -417,9 +418,9 @@ def process_pdf(pdf_path):
         if len(tel) > len(best_shipper_tel):
             best_shipper_tel = tel
             
-        # Extract form type (e.g. (ท.ด. ๓๘) -> ท.ด. 38) if not found yet
+        # Extract form type (e.g. (ท.ด. ๓๘) -> ท.ด. 38, (ท.ด. ๓๘ ค.) -> ท.ด. 38 ค.) if not found yet
         if not product_in_box:
-            form_match = re.search(r'\(\s*(ท\s*\.\s*ด\s*\.\s*[๐-๙0-9]+)\s*\)', text)
+            form_match = re.search(r'\(\s*(ท\s*\.\s*ด\s*\.\s*[๐-๙0-9]+(?:\s*[ก-ฮ]\.?)?)\s*\)', text)
             if form_match:
                 extracted = form_match.group(1).strip()
                 # Convert Thai numbers to Arabic
@@ -432,6 +433,8 @@ def process_pdf(pdf_path):
                 subject_match = re.search(r'(?<!รับ)เรื่อง\s+([^\n]+)', text)
                 if "หนังสือมอบเรื่องการระวังชี้แนวเขตและลงชื่อรับรองเขตที่ดิน" in text or "เรื่อง การระวังชี้แนวเขตและลงชื่อรับรองเขตที่ดิน" in text:
                     product_in_box = "-"
+                elif "แจ้งการปักหลักเขตที่ดิน" in text or "ท.ด. 38 ค" in text or "ท.ด. ๓๘ ค" in text:
+                    product_in_box = "ท.ด. 38 ค."
                 elif subject_match:
                     product_in_box = subject_match.group(1).strip()
                 elif "ออกโฉนดที่ดิน" in text:
@@ -1111,8 +1114,12 @@ def generate_deposit_report_excel(records, summary, meta, output_excel_path):
     ws["A1"].alignment = Alignment(horizontal="left", vertical="center")
     ws.row_dimensions[1].height = 28
 
+    delivered_count = summary.get("delivered_count", 0)
+    in_transit_count = summary.get("in_transit_count", len(records))
+    returned_count = summary.get("returned_count", 0)
+
     ws.merge_cells("A2:J2")
-    ws["A2"] = f"ประจำวันที่: {report_date}  |  รายการทั้งหมด: {total_items} ฉบับ  |  รับฝากสำเร็จ: {received_count} ฉบับ  |  น้ำหนักรวม: {total_weight:,.1f} กรัม  |  ยอดค่าบริการรวม: ฿{total_fee:,.2f}"
+    ws["A2"] = f"ประจำวันที่: {report_date}  |  รายการทั้งหมด: {total_items} ฉบับ  |  นำจ่ายสำเร็จ: {delivered_count} ฉบับ  |  อยู่ระหว่างการนำจ่าย: {in_transit_count} ฉบับ  |  ส่งคืน: {returned_count} ฉบับ  |  น้ำหนักรวม: {total_weight:,.1f} กรัม  |  ยอดค่าบริการรวม: ฿{total_fee:,.2f}"
     ws["A2"].font = SUBTITLE_FONT
     ws["A2"].alignment = Alignment(horizontal="left", vertical="center")
     ws.row_dimensions[2].height = 20
@@ -1255,10 +1262,13 @@ def generate_deposit_report_pdf(records, summary, meta, output_pdf_path):
     total_weight = summary.get("total_weight", 0.0)
     total_fee = summary.get("total_fee", 0.0)
     received_count = summary.get("received_count", len(records))
+    delivered_count = summary.get("delivered_count", 0)
+    in_transit_count = summary.get("in_transit_count", len(records))
+    returned_count = summary.get("returned_count", 0)
 
     elements.append(Paragraph(apply_thai_pua(f"รายงานสรุปการรับฝากเอกสารส่งทางไปรษณีย์ (e-Parcel Deposit Report)"), style_title))
     elements.append(Spacer(1, 0.2*cm))
-    subtitle_text = f"<b>หน่วยงาน:</b> {org_name}  |  <b>วันที่นำส่ง:</b> {report_date}  |  <b>ยอดรวม:</b> {total_items} ฉบับ (รับฝากแล้ว {received_count} ฉบับ)"
+    subtitle_text = f"<b>หน่วยงาน:</b> {org_name}  |  <b>วันที่นำส่ง:</b> {report_date}  |  <b>ยอดรวม:</b> {total_items} ฉบับ (นำจ่ายสำเร็จ {delivered_count} ฉบับ, อยู่ระหว่างการนำจ่าย {in_transit_count} ฉบับ, ส่งคืน {returned_count} ฉบับ)"
     if total_weight > 0:
         subtitle_text += f"  |  <b>น้ำหนักรวม:</b> {total_weight:,.1f} กรัม"
     subtitle_text += f"  |  <b>ยอดค่าบริการ:</b> ฿{total_fee:,.2f}"
@@ -1366,7 +1376,6 @@ def main():
     df = records_to_dataframe(all_records)
         
     # Output file path with current datetime suffix (YYYYMMDDHHMM)
-    from datetime import datetime
     suffix = datetime.now().strftime("%Y%m%d%H%M")
     output_filename = f"dpost_import_{suffix}.xlsx"
     
