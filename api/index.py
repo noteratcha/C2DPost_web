@@ -548,11 +548,26 @@ def get_received_report(req: ReceivedReportRequest):
         if is_demo_user:
             demo_items = []
             base_customers = [
-                {"name": "นางชัญญา ศรีสงคราม", "addr": "28 หมู่ที่ 7 ต.ท่าลาด", "amphur": "เรณูนคร", "prov": "นครพนม", "zip": "48170", "wt": 10.0, "price": 21.0},
-                {"name": "น.ส.ละอองทอง ศรีชะวงษ์", "addr": "4 หมู่ที่ 1 ต.พระซอง", "amphur": "นาแก", "prov": "นครพนม", "zip": "48130", "wt": 10.0, "price": 21.0},
-                {"name": "นายขรรถสิทธิ์ นาสงคา", "addr": "108 หมู่ที่ 7 ต.ท่าลาด", "amphur": "เรณูนคร", "prov": "นครพนม", "zip": "48170", "wt": 10.0, "price": 21.0},
-                {"name": "นางสำราญ การปลูก", "addr": "147/52 หมู่ที่ 5 ต.ปาเสมัส", "amphur": "สุไหงโก-ลก", "prov": "นราธิวาส", "zip": "96120", "wt": 10.0, "price": 21.0},
-                {"name": "นายไชยญา พ่อป้องขวา", "addr": "47 หมู่ที่ 6 ต.ท่าลาด", "amphur": "เรณูนคร", "prov": "นครพนม", "zip": "48170", "wt": 10.0, "price": 21.0}
+                {
+                    "name": "นางชัญญา ศรีสงคราม", "addr": "28 หมู่ที่ 7 ต.ท่าลาด", "amphur": "เรณูนคร", "prov": "นครพนม", "zip": "48170", "wt": 10.0, "price": 21.0,
+                    "status": "1", "status_desc": "รับฝากเข้าระบบแล้ว", "time_offset": "11:24:50", "station": "ปณ.เรณูนคร", "sig": "เจ้าหน้าที่รับฝาก"
+                },
+                {
+                    "name": "น.ส.ละอองทอง ศรีชะวงษ์", "addr": "4 หมู่ที่ 1 ต.พระซอง", "amphur": "นาแก", "prov": "นครพนม", "zip": "48130", "wt": 10.0, "price": 21.0,
+                    "status": "002", "status_desc": "อยู่ระหว่างการนำจ่าย", "time_offset": "14:35:10", "station": "ศป.นครพนม", "sig": "ระบบคัดแยกอัตโนมัติ"
+                },
+                {
+                    "name": "นายขรรถสิทธิ์ นาสงคา", "addr": "108 หมู่ที่ 7 ต.ท่าลาด", "amphur": "เรณูนคร", "prov": "นครพนม", "zip": "48170", "wt": 10.0, "price": 21.0,
+                    "status": "003", "status_desc": "อยู่ระหว่างการนำจ่าย", "time_offset": "15:42:18", "station": "ปณ.เมืองนครพนม", "sig": "เจ้าหน้าที่ส่งต่อ"
+                },
+                {
+                    "name": "นางสำราญ การปลูก", "addr": "147/52 หมู่ที่ 5 ต.ปาเสมัส", "amphur": "สุไหงโก-ลก", "prov": "นราธิวาส", "zip": "96120", "wt": 10.0, "price": 21.0,
+                    "status": "501", "status_desc": "นำจ่ายสำเร็จ (ผู้รับได้รับเรียบร้อย)", "time_offset": "16:20:45", "station": "ปณ.สุไหงโก-ลก", "sig": "สมศรี (ผู้รับ)"
+                },
+                {
+                    "name": "นายไชยญา พ่อป้องขวา", "addr": "47 หมู่ที่ 6 ต.ท่าลาด", "amphur": "เรณูนคร", "prov": "นครพนม", "zip": "48170", "wt": 10.0, "price": 21.0,
+                    "status": "502", "status_desc": "ส่งคืน (ติดต่อผู้รับไม่ได้)", "time_offset": "16:55:00", "station": "ศป.นครพนม", "sig": "เจ้าหน้าที่ส่งคืน"
+                }
             ]
             for day_idx, d_str in enumerate(target_dates):
                 for c_idx, cust in enumerate(base_customers):
@@ -570,12 +585,14 @@ def get_received_report(req: ReceivedReportRequest):
                         "emsPrice": cust["price"],
                         "servicePrice": 0.0,
                         "insurancePrice": 0.0,
-                        "status": "1",
-                        "statusDescription": "รับฝากเข้าระบบแล้ว",
-                        "createdDate": f"{d_str} 14:30:40",
-                        "receivedDate": f"{d_str} 14:30:40",
+                        "status": cust["status"],
+                        "statusDescription": cust["status_desc"],
+                        "createdDate": f"{d_str} 11:24:50",
+                        "receivedDate": f"{d_str} 11:24:50",
+                        "statusDate": f"{d_str} {cust['time_offset']}",
                         "postcodeName": "เรณูนคร",
-                        "signature": "เจ้าหน้าที่รับฝาก"
+                        "station": cust["station"],
+                        "signature": cust["sig"]
                     })
             raw_data = demo_items
         else:
@@ -611,6 +628,34 @@ def get_received_report(req: ReceivedReportRequest):
         raw_code = str(item.get("status") or item.get("statusCode") or "1").strip()
         status_key, status_label = classify_delivery_status(raw_code, raw_desc)
 
+        # Extract latest checkpoint timestamp and location
+        latest_date = str(
+            item.get("statusDate")
+            or item.get("status_date")
+            or item.get("dateTime")
+            or item.get("datetime")
+            or item.get("eventDate")
+            or item.get("receivedDate")
+            or item.get("received_date")
+            or item.get("createdDate")
+            or item.get("created_date")
+            or ""
+        ).strip()
+        status_time = str(item.get("statusTime") or item.get("status_time") or item.get("time") or "").strip()
+        if status_time and status_time not in latest_date:
+            latest_date = f"{latest_date} {status_time}".strip()
+
+        latest_station = str(
+            item.get("station")
+            or item.get("stationName")
+            or item.get("location")
+            or item.get("officeName")
+            or item.get("postcodeName")
+            or item.get("postCodeName")
+            or item.get("received_postoffice")
+            or "ที่ทำการไปรษณีย์"
+        ).strip()
+
         norm_item = {
             "seq": i + 1,
             "barcode": (item.get("barcode") or "").strip(),
@@ -628,6 +673,8 @@ def get_received_report(req: ReceivedReportRequest):
             "created_date": (item.get("createdDate") or item.get("created_date") or "").strip(),
             "received_date": (item.get("receivedDate") or item.get("received_date") or "").strip(),
             "received_postoffice": (item.get("postcodeName") or item.get("received_postoffice") or "ที่ทำการไปรษณีย์").strip(),
+            "latest_date": latest_date or (item.get("receivedDate") or item.get("received_date") or "").strip(),
+            "latest_station": latest_station,
             "weight": round(weight, 2),
             "fee": round(fee, 2),
             "signature": (item.get("signature") or "").strip()

@@ -167,7 +167,10 @@ export default function DepositReportModal({ isOpen, onClose, currentPerson, onS
           (r.inv_no && r.inv_no.toLowerCase().includes(q)) ||
           (r.receiver_name && r.receiver_name.toLowerCase().includes(q)) ||
           (r.receiver_address && r.receiver_address.toLowerCase().includes(q)) ||
-          (r.received_postoffice && r.received_postoffice.toLowerCase().includes(q))
+          (r.latest_station && r.latest_station.toLowerCase().includes(q)) ||
+          (r.received_postoffice && r.received_postoffice.toLowerCase().includes(q)) ||
+          (r.latest_date && r.latest_date.includes(q)) ||
+          (r.received_date && r.received_date.includes(q))
       );
     }
 
@@ -633,8 +636,8 @@ export default function DepositReportModal({ isOpen, onClose, currentPerson, onS
                 <th style={{ width: '130px' }}>เลขที่คำขอ</th>
                 <th style={{ width: '160px' }}>ชื่อผู้รับ</th>
                 <th style={{ minWidth: '180px' }}>ที่อยู่ปลายทาง</th>
-                <th style={{ width: '150px' }}>วัน-เวลารับฝาก</th>
-                <th style={{ width: '120px' }}>ปณ.รับฝาก</th>
+                <th style={{ width: '150px' }} title="วันและเวลาของสถานะล่าสุด">วัน-เวลาล่าสุด</th>
+                <th style={{ width: '130px' }} title="ที่ทำการไปรษณีย์หรือสถานที่ของสถานะล่าสุด">ปณ./สถานที่ล่าสุด</th>
                 <th className="th-right" style={{ width: '85px' }}>น้ำหนัก</th>
                 <th className="th-right" style={{ width: '85px' }}>ค่าบริการ</th>
                 <th className="th-center" style={{ width: '125px' }}>สถานะ</th>
@@ -704,10 +707,17 @@ export default function DepositReportModal({ isOpen, onClose, currentPerson, onS
                           <circle cx="12" cy="12" r="10"></circle>
                           <polyline points="12 6 12 12 16 14"></polyline>
                         </svg>
-                        <span>{rec.received_date}</span>
+                        <span title={`สถานะล่าสุด: ${rec.latest_date || rec.received_date}${rec.received_date ? ` (รับฝากเมื่อ: ${rec.received_date})` : ''}`}>
+                          {rec.latest_date || rec.received_date}
+                        </span>
                       </td>
                       <td>
-                        <span className="po-badge">{rec.received_postoffice || '-'}</span>
+                        <span 
+                          className="po-badge"
+                          title={`สถานที่ล่าสุด: ${rec.latest_station || rec.received_postoffice || '-'}${rec.received_postoffice ? ` (ปณ.รับฝาก: ${rec.received_postoffice})` : ''}`}
+                        >
+                          {rec.latest_station || rec.received_postoffice || '-'}
+                        </span>
                       </td>
                       <td className="td-right">{rec.weight ? `${rec.weight}g` : '-'}</td>
                       <td className="td-right font-medium">

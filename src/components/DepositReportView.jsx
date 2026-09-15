@@ -1,7 +1,28 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { fetchReceivedReport, exportDepositReportExcel, exportDepositReportPdf } from '../utils/api';
 import TrackingTimelineModal from './TrackingTimelineModal';
 import './DepositReportView.css';
+
+const DEPOSIT_REPORT_CACHE_KEY = 'c2dpost_deposit_report_cache';
+
+function getCachedDepositState() {
+  try {
+    const raw = sessionStorage.getItem(DEPOSIT_REPORT_CACHE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch (err) {
+    console.warn('Error reading deposit report cache:', err);
+    return null;
+  }
+}
+
+function setCachedDepositState(data) {
+  try {
+    sessionStorage.setItem(DEPOSIT_REPORT_CACHE_KEY, JSON.stringify(data));
+  } catch (err) {
+    console.warn('Error writing deposit report cache:', err);
+  }
+}
 
 // Helper: Format Date object to YYYY-MM-DD for <input type="date">
 function toInputDateFormat(dateObj) {
@@ -78,23 +99,39 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
     return toInputDateFormat(new Date(d.getFullYear(), d.getMonth(), 1));
   }, []);
 
-  // Date Range state
-  const [startDate, setStartDate] = useState(todayIso);
-  const [endDate, setEndDate] = useState(todayIso);
+  // Retrieve cached state if available
+  const cachedState = useMemo(() => getCachedDepositState(), []);
+
+  // Date Range state (restored from cache if available)
+  const [startDate, setStartDate] = useState(() => cachedState?.startDate || todayIso);
+  const [endDate, setEndDate] = useState(() => cachedState?.endDate || todayIso);
 
   // Pagination state (20 records per page)
   const PAGE_SIZE = 20;
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = useState(() => cachedState?.currentPage || 1);
 
   // Data & UI states
   const [loading, setLoading] = useState(false);
   const [isExportingExcel, setIsExportingExcel] = useState(false);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [error, setError] = useState('');
-  const [reportData, setReportData] = useState(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filterTab, setFilterTab] = useState('all'); // 'all' | 'received'
+  const [reportData, setReportData] = useState(() => cachedState?.reportData || null);
+  const [searchQuery, setSearchQuery] = useState(() => cachedState?.searchQuery || '');
+  const [filterTab, setFilterTab] = useState(() => cachedState?.filterTab || 'all');
   const [selectedTrackingItem, setSelectedTrackingItem] = useState(null);
+
+  // Persist state to sessionStorage whenever key fields change
+  useEffect(() => {
+    setCachedDepositState({
+      startDate,
+      endDate,
+      reportData,
+      searchQuery,
+      filterTab,
+      currentPage,
+      updatedAt: Date.now()
+    });
+  }, [startDate, endDate, reportData, searchQuery, filterTab, currentPage]);
 
   // Fetch report function (accepts start & end dates)
   const handleFetchReport = useCallback(async (startToFetch, endToFetch) => {
@@ -136,10 +173,20 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
     }
   }, [startDate, endDate, currentPerson, onSyncRecords]);
 
-  // Initial load
+  // Initial load: Only fetch if we DO NOT have cached data already!
+  const hasInitializedRef = useRef(false);
   useEffect(() => {
+    if (hasInitializedRef.current) return;
+    hasInitializedRef.current = true;
+
+    // If we already restored valid reportData from cache, DO NOT re-fetch today's empty report!
+    if (cachedState && cachedState.reportData) {
+      return;
+    }
+
+    // First time opening without cache -> fetch today's report
     handleFetchReport(todayIso, todayIso);
-  }, [todayIso, handleFetchReport]);
+  }, [todayIso, handleFetchReport, cachedState]);
 
   // Quick date shortcuts handler
   const handleSetQuickDate = (type) => {
@@ -160,8 +207,13 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
     handleFetchReport(s, e);
   };
 
-  // Reset pagination to page 1 whenever filters change
+  // Reset pagination to page 1 whenever filters change (skip initial mount to preserve restored page)
+  const isInitialMount = useRef(true);
   useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
     setCurrentPage(1);
   }, [startDate, endDate, searchQuery, filterTab]);
 
@@ -188,7 +240,10 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
           (r.inv_no && r.inv_no.toLowerCase().includes(q)) ||
           (r.receiver_name && r.receiver_name.toLowerCase().includes(q)) ||
           (r.receiver_address && r.receiver_address.toLowerCase().includes(q)) ||
-          (r.received_postoffice && r.received_postoffice.toLowerCase().includes(q))
+          (r.latest_station && r.latest_station.toLowerCase().includes(q)) ||
+          (r.received_postoffice && r.received_postoffice.toLowerCase().includes(q)) ||
+          (r.latest_date && r.latest_date.includes(q)) ||
+          (r.received_date && r.received_date.includes(q))
       );
     }
 
@@ -656,8 +711,8 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
                   <th style={{ width: '130px' }}>เลขที่คำขอ</th>
                   <th style={{ width: '160px' }}>ชื่อผู้รับ</th>
                   <th>ที่อยู่ปลายทาง</th>
-                  <th style={{ width: '140px', textAlign: 'center' }}>วัน-เวลารับฝาก</th>
-                  <th style={{ width: '110px', textAlign: 'center' }}>ปณ.รับฝาก</th>
+                  <th style={{ width: '140px', textAlign: 'center' }} title="วันและเวลาของสถานะล่าสุด">วัน-เวลาล่าสุด</th>
+                  <th style={{ width: '120px', textAlign: 'center' }} title="ที่ทำการไปรษณีย์หรือสถานที่ของสถานะล่าสุด">ปณ./สถานที่ล่าสุด</th>
                   <th style={{ width: '80px', textAlign: 'right' }}>น้ำหนัก</th>
                   <th style={{ width: '90px', textAlign: 'right' }}>ค่าบริการ</th>
                   <th style={{ width: '100px', textAlign: 'center' }}>สถานะ</th>
@@ -728,19 +783,27 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
                           {item.receiver_zipcode || ''}
                         </td>
                         <td style={{ textAlign: 'center' }} className="cell-timestamp">
-                          {item.received_date ? (
-                            <div className="timestamp-badge">
+                          {item.latest_date || item.received_date ? (
+                            <div 
+                              className="timestamp-badge"
+                              title={`สถานะล่าสุด: ${item.latest_date || item.received_date}${item.received_date ? `\n(รับฝากเมื่อ: ${item.received_date})` : ''}`}
+                            >
                               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                 <circle cx="12" cy="12" r="10"></circle>
                                 <polyline points="12 6 12 12 16 14"></polyline>
                               </svg>
-                              <span>{item.received_date}</span>
+                              <span>{item.latest_date || item.received_date}</span>
                             </div>
                           ) : (
                             <span className="text-muted">-</span>
                           )}
                         </td>
-                        <td style={{ textAlign: 'center' }}>{item.received_postoffice || '-'}</td>
+                        <td 
+                          style={{ textAlign: 'center' }}
+                          title={`สถานที่ล่าสุด: ${item.latest_station || item.received_postoffice || '-'}${item.received_postoffice ? `\n(ปณ.รับฝาก: ${item.received_postoffice})` : ''}`}
+                        >
+                          {item.latest_station || item.received_postoffice || '-'}
+                        </td>
                         <td style={{ textAlign: 'right' }}>
                           {item.weight ? `${item.weight}g` : '-'}
                         </td>

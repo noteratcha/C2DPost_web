@@ -37,7 +37,7 @@ except Exception as e:
     print(f"Error registering fonts: {e}")
     FONT_REGISTERED = False
 
-__version__ = "2026.0915.0923"
+__version__ = "2026.0915.0938"
 
 # Thailand Post API Credentials
 API_KEY = "V9JN25IFH5hdZYc1k8NNRVgnLYXyQLzc"
@@ -1127,7 +1127,7 @@ def generate_deposit_report_excel(records, summary, meta, output_excel_path):
     # Headers
     headers = [
         "ลำดับ", "หมายเลข Barcode", "เลขที่คำขอ", "ชื่อผู้รับ",
-        "ที่อยู่ปลายทาง", "วัน-เวลารับฝาก", "ปณ.รับฝาก", "น้ำหนัก (g)",
+        "ที่อยู่ปลายทาง", "วัน-เวลาล่าสุด", "ปณ./สถานที่ล่าสุด", "น้ำหนัก (g)",
         "ค่าบริการ (฿)", "สถานะ"
     ]
     header_row = 4
@@ -1148,6 +1148,8 @@ def generate_deposit_report_excel(records, summary, meta, output_excel_path):
         full_addr = f"{r.get('receiver_address', '')} {r.get('receiver_amphur', '')} {r.get('receiver_province', '')} {r.get('receiver_zipcode', '')}".strip()
         weight = float(r.get("weight") or 0.0)
         fee = float(r.get("fee") or 0.0)
+        latest_d = r.get("latest_date") or r.get("received_date") or ""
+        latest_s = r.get("latest_station") or r.get("received_postoffice") or ""
 
         row_values = [
             i + 1,
@@ -1155,8 +1157,8 @@ def generate_deposit_report_excel(records, summary, meta, output_excel_path):
             r.get("inv_no", ""),
             r.get("receiver_name", ""),
             full_addr,
-            r.get("received_date", ""),
-            r.get("received_postoffice", ""),
+            latest_d,
+            latest_s,
             weight,
             fee,
             r.get("status_description", "รับฝากเข้าระบบแล้ว")
@@ -1276,7 +1278,7 @@ def generate_deposit_report_pdf(records, summary, meta, output_pdf_path):
     elements.append(Spacer(1, 0.4*cm))
 
     # Table Header
-    th_headers = ["ลำดับ", "หมายเลข Barcode", "เลขที่คำขอ", "ชื่อผู้รับ", "ที่อยู่ปลายทาง", "วัน-เวลารับฝาก", "ปณ.รับฝาก", "น้ำหนัก (g)", "ค่าบริการ (฿)"]
+    th_headers = ["ลำดับ", "หมายเลข Barcode", "เลขที่คำขอ", "ชื่อผู้รับ", "ที่อยู่ปลายทาง", "วัน-เวลาล่าสุด", "ปณ./สถานที่ล่าสุด", "น้ำหนัก (g)", "ค่าบริการ (฿)"]
     col_widths = [1.0*cm, 3.5*cm, 3.0*cm, 4.0*cm, 6.2*cm, 3.4*cm, 2.5*cm, 1.8*cm, 1.9*cm]
 
     table_data = [[Paragraph(apply_thai_pua(h), style_th) for h in th_headers]]
@@ -1285,6 +1287,8 @@ def generate_deposit_report_pdf(records, summary, meta, output_pdf_path):
         full_addr = f"{r.get('receiver_address', '')} {r.get('receiver_amphur', '')} {r.get('receiver_province', '')} {r.get('receiver_zipcode', '')}".strip()
         weight = float(r.get("weight") or 0.0)
         fee = float(r.get("fee") or 0.0)
+        latest_d = r.get("latest_date") or r.get("received_date") or "-"
+        latest_s = r.get("latest_station") or r.get("received_postoffice") or "-"
         
         row = [
             Paragraph(str(i + 1), style_td_c),
@@ -1292,8 +1296,8 @@ def generate_deposit_report_pdf(records, summary, meta, output_pdf_path):
             Paragraph(r.get("inv_no", "-"), style_td_c),
             Paragraph(apply_thai_pua(r.get("receiver_name", "")), style_td_l),
             Paragraph(apply_thai_pua(full_addr), style_td_l),
-            Paragraph(r.get("received_date", "-"), style_td_c),
-            Paragraph(apply_thai_pua(r.get("received_postoffice", "-")), style_td_c),
+            Paragraph(latest_d, style_td_c),
+            Paragraph(apply_thai_pua(latest_s), style_td_c),
             Paragraph(f"{weight:,.1f}", style_td_r),
             Paragraph(f"{fee:,.2f}", style_td_r)
         ]

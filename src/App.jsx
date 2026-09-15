@@ -207,6 +207,7 @@ export default function App() {
 
   const handleLogout = () => {
     localStorage.removeItem(STORAGE_USER_KEY);
+    sessionStorage.removeItem('c2dpost_deposit_report_cache');
     setUser('');
     setActivePage('workspace');
     setSelectedFiles([]);
