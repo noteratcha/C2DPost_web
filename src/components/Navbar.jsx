@@ -160,6 +160,44 @@ export default function Navbar({
                 <span>ตรวจสอบพัสดุ</span>
               </button>
 
+              <div className="nav-tab-divider" role="separator" aria-orientation="vertical"></div>
+
+              <a
+                href="https://dpost.thailandpost.com"
+                target="_blank"
+                rel="noreferrer"
+                className="nav-tab-btn nav-tab-ext"
+                title="DPost (Thailand Post) - เว็บอัปโหลดข้อมูลฝากส่งไปรษณีย์ (เปิดแท็บใหม่)"
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
+                  <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
+                </svg>
+                <span>DPost</span>
+                <svg className="nav-tab-ext-icon" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="7" y1="17" x2="17" y2="7"></line>
+                  <polyline points="7 7 17 7 17 17"></polyline>
+                </svg>
+              </a>
+
+              <a
+                href="https://e-ar.thailandpost.com/"
+                target="_blank"
+                rel="noreferrer"
+                className="nav-tab-btn nav-tab-ext"
+                title="e-AR (Electronic Advice) - ตรวจใบตอบรับอิเล็กทรอนิกส์ (เปิดแท็บใหม่)"
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                  <polyline points="22,6 12,13 2,6"></polyline>
+                </svg>
+                <span>e-AR</span>
+                <svg className="nav-tab-ext-icon" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="7" y1="17" x2="17" y2="7"></line>
+                  <polyline points="7 7 17 7 17 17"></polyline>
+                </svg>
+              </a>
+
               {isAdmin && (
                 <button
                   type="button"
@@ -401,73 +439,7 @@ export default function Navbar({
                     </div>
                   </div>
 
-                  {/* Section Label: บริการ & ลิงก์ด่วน */}
-                  <div className="menu-section-label">บริการและระบบภายนอก</div>
 
-                  {/* 2. External Links (DPost, e-AR) */}
-                  <div className="menu-nav-links">
-                    <a
-                      href="https://dpost.thailandpost.com"
-                      target="_blank"
-                      rel="noreferrer"
-                      className="menu-link-card"
-                      onClick={() => setIsNavMenuOpen(false)}
-                      title="เว็บสำหรับอัปโหลดข้อมูล DPost"
-                    >
-                      <div className="link-card-left">
-                        <div className="link-avatar-icon icon-dpost">
-                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                            <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
-                            <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
-                          </svg>
-                        </div>
-                        <div className="link-text-meta">
-                          <div className="link-title-row">
-                            <span className="link-title">DPost</span>
-                            <span className="link-tag-ext">Thailand Post</span>
-                          </div>
-                          <span className="link-subtitle">เว็บอัปโหลดข้อมูลฝากส่งไปรษณีย์</span>
-                        </div>
-                      </div>
-                      <div className="link-arrow-action">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                          <line x1="7" y1="17" x2="17" y2="7"></line>
-                          <polyline points="7 7 17 7 17 17"></polyline>
-                        </svg>
-                      </div>
-                    </a>
-
-                    <a
-                      href="https://e-ar.thailandpost.com/"
-                      target="_blank"
-                      rel="noreferrer"
-                      className="menu-link-card"
-                      onClick={() => setIsNavMenuOpen(false)}
-                      title="เว็บสำหรับตรวจใบตอบรับทางอิเล็กทรอนิกส์"
-                    >
-                      <div className="link-card-left">
-                        <div className="link-avatar-icon icon-ear">
-                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
-                            <polyline points="22,6 12,13 2,6"></polyline>
-                          </svg>
-                        </div>
-                        <div className="link-text-meta">
-                          <div className="link-title-row">
-                            <span className="link-title">e-AR</span>
-                            <span className="link-tag-ext">Electronic Advice</span>
-                          </div>
-                          <span className="link-subtitle">ตรวจใบตอบรับอิเล็กทรอนิกส์</span>
-                        </div>
-                      </div>
-                      <div className="link-arrow-action">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                          <line x1="7" y1="17" x2="17" y2="7"></line>
-                          <polyline points="7 7 17 7 17 17"></polyline>
-                        </svg>
-                      </div>
-                    </a>
-                  </div>
 
                   {/* Section Label: คู่มือ & ความช่วยเหลือ */}
                   <div className="menu-section-label">คู่มือ & ความช่วยเหลือ</div>
