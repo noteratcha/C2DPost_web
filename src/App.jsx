@@ -10,7 +10,7 @@ import TrackingInquiryView from './components/TrackingInquiryView';
 import DepositReportModal from './components/DepositReportModal';
 import TrackingTimelineModal from './components/TrackingTimelineModal';
 import { parseCsv } from './utils/parseCsv';
-import { convertPdfs, exportAllFiles, exportPdf, reconcileRecords, logBarcodesToUseBarcode, updateEparcelStatusInSheet } from './utils/api';
+import { convertPdfs, exportAllFiles, exportExcel, exportPdf, reconcileRecords, logBarcodesToUseBarcode, updateEparcelStatusInSheet } from './utils/api';
 import { fetchBarcodesFromExtension } from './utils/extensionBridge';
 import { SPREADSHEET_ID } from './config';
 import './App.css';
@@ -666,7 +666,77 @@ export default function App() {
     }
   };
 
-  // 4. Handle Export Excel, Combined PDF, and Delivery Note (matching Python: 3 individual files)
+  // 4. Handle Download Document (Excel, Combined PDF, Delivery Note, Envelopes, or All 4 Files)
+  const handleDownloadDocument = async (docType) => {
+    if (records.length === 0) {
+      alert('ไม่มีข้อมูลสำหรับดาวน์โหลด');
+      return;
+    }
+
+    setIsProcessing(true);
+
+    try {
+      if (docType === 'excel') {
+        setStatusText('กำลังสร้างไฟล์ Excel (สำหรับ DPost)...');
+        await exportExcel(records);
+        setStatusText('ดาวน์โหลดไฟล์ Excel (สำหรับ DPost) สำเร็จ');
+      } else if (docType === 'combined') {
+        setStatusText('กำลังสร้างไฟล์ PDF (เอกสารพร้อมบาร์โค้ด)...');
+        await exportPdf(records, 'combined', selectedFiles);
+        setStatusText('ดาวน์โหลดไฟล์ PDF (เอกสารพร้อมบาร์โค้ด) สำเร็จ');
+      } else if (docType === 'delivery_note') {
+        setStatusText('กำลังสร้างไฟล์ PDF (ใบนำส่ง)...');
+        await exportPdf(records, 'delivery_note');
+        setStatusText('ดาวน์โหลดไฟล์ PDF (ใบนำส่ง) สำเร็จ');
+      } else if (docType === 'envelopes') {
+        const selectedRows = records.filter(r => r.SELECTED === true);
+        const target = selectedRows.length > 0 ? selectedRows : records;
+        setStatusText(`กำลังสร้างไฟล์ PDF จ่าหน้าซอง (${target.length} รายการ)...`);
+        await exportPdf(target, 'envelopes', selectedFiles);
+        setStatusText(`ดาวน์โหลดไฟล์ PDF จ่าหน้าซอง (${target.length} รายการ) สำเร็จ`);
+      } else if (docType === 'all') {
+        setStatusText('กำลังเตรียมดาวน์โหลดเอกสารครบทั้ง 4 ไฟล์...');
+
+        // 1. Excel
+        setStatusText('1/4 กำลังสร้างไฟล์ Excel (สำหรับ DPost)...');
+        await exportExcel(records);
+        await new Promise(r => setTimeout(r, 600));
+
+        // 2. Combined PDF
+        setStatusText('2/4 กำลังสร้างไฟล์ PDF (เอกสารพร้อมบาร์โค้ด)...');
+        await exportPdf(records, 'combined', selectedFiles);
+        await new Promise(r => setTimeout(r, 600));
+
+        // 3. Delivery Note PDF
+        setStatusText('3/4 กำลังสร้างไฟล์ PDF (ใบนำส่ง)...');
+        await exportPdf(records, 'delivery_note');
+        await new Promise(r => setTimeout(r, 600));
+
+        // 4. Envelopes PDF
+        const selectedRows = records.filter(r => r.SELECTED === true);
+        const target = selectedRows.length > 0 ? selectedRows : records;
+        setStatusText(`4/4 กำลังสร้างไฟล์ PDF จ่าหน้าซอง (${target.length} รายการ)...`);
+        await exportPdf(target, 'envelopes', selectedFiles);
+
+        setStatusText('ดาวน์โหลดเอกสารครบทั้ง 4 ไฟล์ สำเร็จเรียบร้อยแล้ว');
+        alert(
+          'ดาวน์โหลดเอกสารครบทั้ง 4 ไฟล์ สำเร็จเรียบร้อยแล้ว!\n\n' +
+          '1. ไฟล์ Excel (สำหรับ DPost)\n' +
+          '2. ไฟล์ PDF (เอกสารพร้อมบาร์โค้ด)\n' +
+          '3. ไฟล์ PDF (ใบนำส่ง)\n' +
+          `4. ไฟล์ PDF (จ่าหน้าซอง จำนวน ${target.length} รายการ)`
+        );
+      }
+    } catch (err) {
+      console.error('Download error:', err);
+      setStatusText('เกิดข้อผิดพลาดในการดาวน์โหลดเอกสาร');
+      alert(`ไม่สามารถดาวน์โหลดเอกสารได้:\n${err.message}`);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // 4.1 Handle Export Excel, Combined PDF, and Delivery Note (legacy fallback)
   const handleExportExcel = async () => {
     if (records.length === 0) {
       alert('ไม่มีข้อมูลสำหรับบันทึก');
@@ -963,6 +1033,7 @@ export default function App() {
                   isSendingApi={isSendingApi}
                   onFilesSelected={handleFilesSelected}
                   onFetchBarcodes={handleFetchBarcodes}
+                  onDownloadDocument={handleDownloadDocument}
                   onExportExcel={handleExportExcel}
                   onExportEnvelope={handleExportEnvelope}
                   onSendEparcel={handleSendEparcel}
