@@ -232,7 +232,10 @@ export default function DepositReportModal({ isOpen, onClose, currentPerson, onS
           (r.latest_station && r.latest_station.toLowerCase().includes(q)) ||
           (r.received_postoffice && r.received_postoffice.toLowerCase().includes(q)) ||
           (r.latest_date && r.latest_date.includes(q)) ||
-          (r.received_date && r.received_date.includes(q))
+          (r.received_date && r.received_date.includes(q)) ||
+          (r.status_description_raw && r.status_description_raw.toLowerCase().includes(q)) ||
+          (r.status_description && r.status_description.toLowerCase().includes(q)) ||
+          (r.status_label && r.status_label.toLowerCase().includes(q))
       );
     }
 
@@ -743,8 +746,11 @@ export default function DepositReportModal({ isOpen, onClose, currentPerson, onS
                 paginatedRecords.map((rec, idx) => {
                   const statusInfo = getDeliveryStatusInfo(rec);
                   const globalIdx = (currentPage - 1) * PAGE_SIZE + idx + 1;
-                  const tooltipText = rec.status_description_raw && rec.status_description_raw !== statusInfo.label
-                    ? `${statusInfo.label} (${rec.status_description_raw})`
+                  const rawDesc = (rec.status_description_raw || rec.status_description || '').trim();
+                  const hasSpecificDetail = rawDesc && rawDesc !== statusInfo.label && !statusInfo.label.includes(rawDesc);
+                  const isException = /บ้านปิด|ออกใบแจ้ง|ไม่ชัดเจน|ไม่มีเลขบ้าน|ไม่ยอมรับ|ไม่มีผู้รับ|ไม่มารับตามกำหนด|รอจ่าย|ย้าย|เสียหาย|ระงับ|คืน/i.test(rawDesc);
+                  const tooltipText = hasSpecificDetail
+                    ? `${statusInfo.label} (${rawDesc})`
                     : statusInfo.label;
                   return (
                     <tr key={rec.barcode || globalIdx} className={`row-status-${statusInfo.key}`}>
@@ -793,14 +799,25 @@ export default function DepositReportModal({ isOpen, onClose, currentPerson, onS
                       <td className="td-right font-medium">
                         {rec.fee ? `${Number(rec.fee).toFixed(2)}` : '-'}
                       </td>
-                      <td className="td-center">
-                        <span 
-                          className={`deposit-status-pill ${statusInfo.className}`}
-                          title={tooltipText}
-                        >
-                          <span className={`status-dot dot-${statusInfo.key}`}></span>
-                          <span>{statusInfo.label}</span>
-                        </span>
+                      <td className="td-center cell-status-wrapper">
+                        <div className="status-cell-container">
+                          <span 
+                            className={`deposit-status-pill ${statusInfo.className}`}
+                            title={tooltipText}
+                          >
+                            <span className={`status-dot dot-${statusInfo.key}`}></span>
+                            <span>{statusInfo.label}</span>
+                          </span>
+                          {hasSpecificDetail && (
+                            <div 
+                              className={`status-subtext ${isException ? 'status-subtext-alert' : 'status-subtext-transit'}`}
+                              title={`สถานะย่อย: ${rawDesc}`}
+                            >
+                              {isException && <span className="status-subtext-icon">⚠️</span>}
+                              <span>{rawDesc}</span>
+                            </div>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );

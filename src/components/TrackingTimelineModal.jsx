@@ -168,6 +168,16 @@ export default function TrackingTimelineModal({ isOpen, barcode, recInfo, curren
               <span className={`status-dot ${statusInfo.dotClass}`}></span>
               {statusInfo.label}
             </span>
+            {statusInfo.rawDesc && statusInfo.rawDesc !== statusInfo.label && !statusInfo.label.includes(statusInfo.rawDesc) && (
+              <div 
+                className={`status-subtext ${/บ้านปิด|ออกใบแจ้ง|ไม่ชัดเจน|ไม่มีเลขบ้าน|ไม่ยอมรับ|ไม่มีผู้รับ|ไม่มารับตามกำหนด|รอจ่าย|ย้าย|เสียหาย|ระงับ|คืน/i.test(statusInfo.rawDesc) ? 'status-subtext-alert' : 'status-subtext-transit'}`}
+                style={{ marginTop: '0.35rem', justifyContent: 'flex-end' }}
+                title={`สถานะละเอียด: ${statusInfo.rawDesc}`}
+              >
+                {/บ้านปิด|ออกใบแจ้ง|ไม่ชัดเจน|ไม่มีเลขบ้าน|ไม่ยอมรับ|ไม่มีผู้รับ|ไม่มารับตามกำหนด|รอจ่าย|ย้าย|เสียหาย|ระงับ|คืน/i.test(statusInfo.rawDesc) && <span className="status-subtext-icon">⚠️</span>}
+                <span>{statusInfo.rawDesc}</span>
+              </div>
+            )}
           </div>
         </div>
 

@@ -349,7 +349,10 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
           (r.latest_station && r.latest_station.toLowerCase().includes(q)) ||
           (r.received_postoffice && r.received_postoffice.toLowerCase().includes(q)) ||
           (r.latest_date && r.latest_date.includes(q)) ||
-          (r.received_date && r.received_date.includes(q))
+          (r.received_date && r.received_date.includes(q)) ||
+          (r.status_description_raw && r.status_description_raw.toLowerCase().includes(q)) ||
+          (r.status_description && r.status_description.toLowerCase().includes(q)) ||
+          (r.status_label && r.status_label.toLowerCase().includes(q))
       );
     }
 
@@ -847,8 +850,11 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
                   paginatedRecords.map((item, idx) => {
                     const statusInfo = getDeliveryStatusInfo(item);
                     const globalIdx = (currentPage - 1) * PAGE_SIZE + idx + 1;
-                    const tooltipText = item.status_description_raw && item.status_description_raw !== statusInfo.label
-                      ? `${statusInfo.label} (${item.status_description_raw})`
+                    const rawDesc = (item.status_description_raw || item.status_description || '').trim();
+                    const hasSpecificDetail = rawDesc && rawDesc !== statusInfo.label && !statusInfo.label.includes(rawDesc);
+                    const isException = /บ้านปิด|ออกใบแจ้ง|ไม่ชัดเจน|ไม่มีเลขบ้าน|ไม่ยอมรับ|ไม่มีผู้รับ|ไม่มารับตามกำหนด|รอจ่าย|ย้าย|เสียหาย|ระงับ|คืน/i.test(rawDesc);
+                    const tooltipText = hasSpecificDetail
+                      ? `${statusInfo.label} (${rawDesc})`
                       : statusInfo.label;
                     return (
                       <tr key={item.barcode || globalIdx} className={`row-status-${statusInfo.key}`}>
@@ -907,13 +913,24 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
                         <td style={{ textAlign: 'right' }} className="cell-fee">
                           {item.fee !== undefined ? `${Number(item.fee).toFixed(2)}` : '-'}
                         </td>
-                        <td style={{ textAlign: 'center' }}>
-                          <span 
-                            className={`status-pill ${statusInfo.className}`}
-                            title={tooltipText}
-                          >
-                            {statusInfo.label}
-                          </span>
+                        <td style={{ textAlign: 'center' }} className="cell-status-wrapper">
+                          <div className="status-cell-container">
+                            <span 
+                              className={`status-pill ${statusInfo.className}`}
+                              title={tooltipText}
+                            >
+                              {statusInfo.label}
+                            </span>
+                            {hasSpecificDetail && (
+                              <div 
+                                className={`status-subtext ${isException ? 'status-subtext-alert' : 'status-subtext-transit'}`}
+                                title={`สถานะย่อย: ${rawDesc}`}
+                              >
+                                {isException && <span className="status-subtext-icon">⚠️</span>}
+                                <span>{rawDesc}</span>
+                              </div>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     );

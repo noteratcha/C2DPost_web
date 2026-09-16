@@ -37,7 +37,7 @@ except Exception as e:
     print(f"Error registering fonts: {e}")
     FONT_REGISTERED = False
 
-__version__ = "2026.0916.2125"
+__version__ = "2026.0916.2215"
 
 # Thailand Post API Credentials
 API_KEY = "V9JN25IFH5hdZYc1k8NNRVgnLYXyQLzc"
@@ -1423,6 +1423,14 @@ def generate_deposit_report_excel(records, summary, meta, output_excel_path):
         latest_d = r.get("latest_date") or r.get("received_date") or ""
         latest_s = r.get("latest_station") or r.get("received_postoffice") or ""
 
+        # Status formatting: If raw description gives more detail than the label, include it in parentheses
+        status_lbl = r.get("status_label") or r.get("status_description") or "รับฝากเข้าระบบแล้ว"
+        raw_desc = (r.get("status_description_raw") or "").strip()
+        if raw_desc and raw_desc != status_lbl and raw_desc not in status_lbl:
+            full_status_display = f"{status_lbl} ({raw_desc})"
+        else:
+            full_status_display = status_lbl
+
         row_values = [
             i + 1,
             r.get("barcode", ""),
@@ -1433,7 +1441,7 @@ def generate_deposit_report_excel(records, summary, meta, output_excel_path):
             latest_s,
             weight,
             fee,
-            r.get("status_description", "รับฝากเข้าระบบแล้ว")
+            full_status_display
         ]
         
         for col_idx, val in enumerate(row_values, start=1):
@@ -1550,8 +1558,8 @@ def generate_deposit_report_pdf(records, summary, meta, output_pdf_path):
     elements.append(Spacer(1, 0.4*cm))
 
     # Table Header
-    th_headers = ["ลำดับ", "หมายเลข Barcode", "เลขที่คำขอ", "ชื่อผู้รับ", "ที่อยู่ปลายทาง", "วัน-เวลาล่าสุด", "ปณ./สถานที่ล่าสุด", "น้ำหนัก (g)", "ค่าบริการ"]
-    col_widths = [1.0*cm, 3.5*cm, 3.0*cm, 4.0*cm, 6.2*cm, 3.4*cm, 2.5*cm, 1.8*cm, 1.9*cm]
+    th_headers = ["ลำดับ", "หมายเลข Barcode", "เลขที่คำขอ", "ชื่อผู้รับ", "ที่อยู่ปลายทาง", "วัน-เวลาล่าสุด", "ปณ./สถานที่ล่าสุด", "น้ำหนัก (g)", "ค่าบริการ", "สถานะ"]
+    col_widths = [0.8*cm, 3.2*cm, 2.5*cm, 3.4*cm, 5.0*cm, 3.0*cm, 2.4*cm, 1.7*cm, 1.8*cm, 3.5*cm]
 
     table_data = [[Paragraph(apply_thai_pua(h), style_th) for h in th_headers]]
 
@@ -1562,6 +1570,15 @@ def generate_deposit_report_pdf(records, summary, meta, output_pdf_path):
         latest_d = r.get("latest_date") or r.get("received_date") or "-"
         latest_s = r.get("latest_station") or r.get("received_postoffice") or "-"
         
+        status_lbl = r.get("status_label") or r.get("status_description") or "รับฝากเข้าระบบแล้ว"
+        raw_desc = (r.get("status_description_raw") or "").strip()
+        if raw_desc and raw_desc != status_lbl and raw_desc not in status_lbl:
+            is_exc = any(k in raw_desc for k in ["บ้านปิด", "ออกใบแจ้ง", "ไม่ชัดเจน", "ไม่มีเลขบ้าน", "ไม่ยอมรับ", "ไม่มีผู้รับ", "ไม่มารับตามกำหนด", "รอจ่าย", "ย้าย", "ส่งคืน", "ระงับ"])
+            color_hex = "#c2410c" if is_exc else "#475569"
+            status_p = Paragraph(apply_thai_pua(f"<b>{status_lbl}</b><br/><font size=6 color='{color_hex}'>{raw_desc}</font>"), style_td_c)
+        else:
+            status_p = Paragraph(apply_thai_pua(f"<b>{status_lbl}</b>"), style_td_c)
+
         row = [
             Paragraph(str(i + 1), style_td_c),
             Paragraph(f"<b>{r.get('barcode', '')}</b>", style_td_c),
@@ -1571,7 +1588,8 @@ def generate_deposit_report_pdf(records, summary, meta, output_pdf_path):
             Paragraph(latest_d, style_td_c),
             Paragraph(apply_thai_pua(latest_s), style_td_c),
             Paragraph(f"{weight:,.1f}", style_td_r),
-            Paragraph(f"{fee:,.2f}", style_td_r)
+            Paragraph(f"{fee:,.2f}", style_td_r),
+            status_p
         ]
         table_data.append(row)
 
@@ -1580,7 +1598,8 @@ def generate_deposit_report_pdf(records, summary, meta, output_pdf_path):
         Paragraph(apply_thai_pua(f"<b>รวมทั้งสิ้น ({len(records)} รายการ)</b>"), style_td_bold_r),
         "", "", "", "", "", "",
         Paragraph(f"<b>{total_weight:,.1f}</b>", style_td_bold_r),
-        Paragraph(f"<b>{total_fee:,.2f}</b>", style_td_bold_r)
+        Paragraph(f"<b>{total_fee:,.2f}</b>", style_td_bold_r),
+        ""
     ]
     table_data.append(summary_row)
 
