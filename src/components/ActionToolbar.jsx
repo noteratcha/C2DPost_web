@@ -244,6 +244,7 @@ export default function ActionToolbar({
                   <button
                     type="button"
                     className="download-item-card"
+                    title="ข้อมูลนำเข้าสำหรับระบบ DPost ไปรษณีย์ไทย"
                     onClick={() => {
                       setIsDownloadMenuOpen(false);
                       if (onDownloadDocument) onDownloadDocument('excel');
@@ -264,7 +265,6 @@ export default function ActionToolbar({
                         <span className="download-item-title">1. ไฟล์ Excel (สำหรับ DPost)</span>
                         <span className="doc-format-badge badge-xlsx">.xlsx</span>
                       </div>
-                      <span className="download-item-desc">ข้อมูลนำเข้าสำหรับระบบ DPost ไปรษณีย์ไทย</span>
                     </div>
                     <div className="download-item-action-icon">
                       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
@@ -279,6 +279,7 @@ export default function ActionToolbar({
                   <button
                     type="button"
                     className="download-item-card"
+                    title="เอกสารต้นฉบับพร้อมประทับตราและหมายเลขบาร์โค้ด"
                     onClick={() => {
                       setIsDownloadMenuOpen(false);
                       if (onDownloadDocument) onDownloadDocument('combined');
@@ -299,7 +300,6 @@ export default function ActionToolbar({
                         <span className="download-item-title">2. ไฟล์ PDF (เอกสารพร้อมบาร์โค้ด)</span>
                         <span className="doc-format-badge badge-pdf">.pdf</span>
                       </div>
-                      <span className="download-item-desc">เอกสารต้นฉบับพร้อมประทับตราและหมายเลขบาร์โค้ด</span>
                     </div>
                     <div className="download-item-action-icon">
                       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
@@ -314,6 +314,7 @@ export default function ActionToolbar({
                   <button
                     type="button"
                     className="download-item-card"
+                    title="ใบนำส่งสิ่งของส่งทางไปรษณีย์สรุปรายการฝากส่ง"
                     onClick={() => {
                       setIsDownloadMenuOpen(false);
                       if (onDownloadDocument) onDownloadDocument('delivery_note');
@@ -334,7 +335,6 @@ export default function ActionToolbar({
                         <span className="download-item-title">3. ไฟล์ PDF (ใบนำส่ง)</span>
                         <span className="doc-format-badge badge-pdf">.pdf</span>
                       </div>
-                      <span className="download-item-desc">ใบนำส่งสิ่งของส่งทางไปรษณีย์สรุปรายการฝากส่ง</span>
                     </div>
                     <div className="download-item-action-icon">
                       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
@@ -349,6 +349,7 @@ export default function ActionToolbar({
                   <button
                     type="button"
                     className="download-item-card"
+                    title={`ใบปะหน้าซองจดหมาย ${selectedCount > 0 ? `(เฉพาะที่เลือก ${selectedCount} รายการ)` : `(ทั้งหมด ${totalRecords} รายการ)`}`}
                     onClick={() => {
                       setIsDownloadMenuOpen(false);
                       if (onDownloadDocument) onDownloadDocument('envelopes');
@@ -367,9 +368,6 @@ export default function ActionToolbar({
                         <span className="download-item-title">4. ไฟล์ PDF (สร้างจ่าหน้าซอง)</span>
                         <span className="doc-format-badge badge-envelope">.pdf</span>
                       </div>
-                      <span className="download-item-desc">
-                        ใบปะหน้าซองจดหมาย {selectedCount > 0 ? `(เฉพาะที่เลือก ${selectedCount} รายการ)` : `(ทั้งหมด ${totalRecords} รายการ)`}
-                      </span>
                     </div>
                     <div className="download-item-action-icon">
                       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">

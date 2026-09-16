@@ -109,3 +109,7 @@
 ## 🔴 งานค้าง/สิ่งที่ต้องทำต่อ (Next Backlog)
 
 - [ ] **4.6 สร้าง Git commit แรก + int remote** — repo ที่ Drive root ยังไม่มี commit/remote (branch `master`) ยังไม่ได้ `git push origin main`
+- [x] **4.36 ปรับขนาดเมนูดาวน์โหลดเป็น Tooltip, แก้ไขสถานะนำจ่ายถึงผู้รับแล้ว, และระบบค้นหาพัสดุหลายบรรทัดแบบย่อ-ขยาย (`v2026.0917.0515`)**
+  - ปรับความกว้าง `.download-docs-dropdown` เป็น `min-width: 320px; width: max-content; max-width: 390px;` และเปลี่ยนคำอธิบายเป็นการ์ด Tooltip (`title="..."`)
+  - อัปเดต `classify_delivery_status` และ `getDeliveryStatusInfo` ให้จัดหมวดหมู่ `"นำจ่ายถึงผู้รับแล้ว"` (code 4/501) เป็น `delivered` ("นำจ่ายสำเร็จ") พร้อมคำนวณยอดรวมถูกต้อง
+  - พัฒนาระบบค้นหาพัสดุ `TrackingInquiryView` รองรับข้อความหลายบรรทัด (Multiline Textarea), ตรวจสอบพร้อมกันแบบขนาน (Parallel Fetch), แสดงการ์ดย่อแสดงเฉพาะสถานะล่าสุด และคลิกเพื่อกางดูไทม์ไลน์

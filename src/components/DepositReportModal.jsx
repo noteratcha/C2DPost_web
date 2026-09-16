@@ -329,21 +329,21 @@ export default function DepositReportModal({ isOpen, onClose, currentPerson, onS
     received_count: 0
   };
 
-  const deliveredCount = summary.delivered_count !== undefined
-    ? summary.delivered_count
-    : (reportData?.records?.filter((r) => getDeliveryStatusInfo(r).key === 'delivered').length || 0);
+  const deliveredCount = reportData?.records
+    ? reportData.records.filter((r) => getDeliveryStatusInfo(r).key === 'delivered').length
+    : (summary.delivered_count || 0);
 
-  const inTransitCount = summary.in_transit_count !== undefined
-    ? summary.in_transit_count
-    : (reportData?.records?.filter((r) => getDeliveryStatusInfo(r).key === 'in_transit').length || 0);
+  const inTransitCount = reportData?.records
+    ? reportData.records.filter((r) => getDeliveryStatusInfo(r).key === 'in_transit').length
+    : (summary.in_transit_count || 0);
 
-  const returnedCount = summary.returned_count !== undefined
-    ? summary.returned_count
-    : (reportData?.records?.filter((r) => getDeliveryStatusInfo(r).key === 'returned').length || 0);
+  const returnedCount = reportData?.records
+    ? reportData.records.filter((r) => getDeliveryStatusInfo(r).key === 'returned').length
+    : (summary.returned_count || 0);
 
-  const receivedCount = summary.received_count !== undefined
-    ? summary.received_count
-    : (reportData?.records?.filter((r) => getDeliveryStatusInfo(r).key === 'received').length || 0);
+  const receivedCount = reportData?.records
+    ? reportData.records.filter((r) => getDeliveryStatusInfo(r).key === 'received').length
+    : (summary.received_count || 0);
 
   const receivedRate = summary.total_items > 0
     ? Math.round((receivedCount / summary.total_items) * 100)

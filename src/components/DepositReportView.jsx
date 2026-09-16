@@ -49,35 +49,38 @@ function toApiDateFormat(isoDateStr) {
 export function getDeliveryStatusInfo(item) {
   if (!item) return { key: 'in_transit', label: 'อยู่ระหว่างการนำจ่าย', className: 'in-transit' };
 
-  if (item.status_key === 'delivered' || item.status_label === 'นำจ่ายสำเร็จ') {
-    return { key: 'delivered', label: 'นำจ่ายสำเร็จ', className: 'delivered' };
-  }
-  if (item.status_key === 'returned' || item.status_label === 'ส่งคืน') {
-    return { key: 'returned', label: 'ส่งคืน', className: 'returned' };
-  }
-  if (item.status_key === 'received' || item.status_label === 'รับฝากแล้ว') {
-    return { key: 'received', label: 'รับฝากแล้ว', className: 'received' };
-  }
-  if (item.status_key === 'in_transit' || item.status_label === 'อยู่ระหว่างการนำจ่าย') {
-    return { key: 'in_transit', label: 'อยู่ระหว่างการนำจ่าย', className: 'in-transit' };
-  }
-
   const desc = (item.status_description_raw || item.status_description || item.statusDescription || '').trim();
   const code = String(item.status || item.statusCode || '').trim();
 
-  // 1. นำจ่ายสำเร็จ
-  if (/นำจ่ายสำเร็จ|ผู้รับได้รับเรียบร้อย|จัดส่งสำเร็จ|ส่งมอบเรียบร้อย|ส่งถึงผู้รับแล้ว/i.test(desc) || code === '501' || code.toLowerCase() === 'delivered') {
+  // 1. Delivered / นำจ่ายสำเร็จ
+  // Checks official Thailand Post e-Parcel statuses: "นำจ่ายถึงผู้รับแล้ว" (code 4), "ถึงผู้รับแล้ว", "นำจ่ายสำเร็จ" (code 501)
+  if (
+    /นำจ่ายถึงผู้รับแล้ว|นําจ่ายถึงผู้รับแล้ว|ถึงผู้รับแล้ว|นำจ่ายสำเร็จ|นําจ่ายสำเร็จ|ผู้รับได้รับ|จัดส่งสำเร็จ|ส่งมอบเรียบร้อย|ส่งถึงผู้รับแล้ว|นำจ่ายเรียบร้อย/i.test(desc) ||
+    code === '4' || code === '501' || code.toLowerCase() === 'delivered' ||
+    item.status_key === 'delivered' || item.status_label === 'นำจ่ายสำเร็จ'
+  ) {
     return { key: 'delivered', label: 'นำจ่ายสำเร็จ', className: 'delivered' };
   }
-  // 2. ส่งคืน
-  if (/ส่งคืน|คืนต้นทาง|ส่งคืนผู้ส่ง|ตีกลับ|ไม่สามารถส่งมอบ|ไม่สามารถนำจ่าย/i.test(desc) || ['502', '503', '401', '402'].includes(code) || code.toLowerCase() === 'returned') {
+
+  // 2. Returned / ส่งคืน
+  if (
+    /ส่งคืน|คืนต้นทาง|ส่งคืนผู้ส่ง|ตีกลับ|ไม่สามารถส่งมอบ|ไม่สามารถนำจ่าย|คืนสู่ผู้ฝาก/i.test(desc) ||
+    ['502', '503', '401', '402'].includes(code) || code.toLowerCase() === 'returned' ||
+    item.status_key === 'returned' || item.status_label === 'ส่งคืน'
+  ) {
     return { key: 'returned', label: 'ส่งคืน', className: 'returned' };
   }
-  // 3. รับฝากแล้ว (initial deposit checkpoint)
-  if (code === '1' || code === '001' || code.toLowerCase() === 'received' || /รับฝาก/i.test(desc)) {
+
+  // 3. Received / รับฝากแล้ว (initial deposit checkpoint)
+  if (
+    code === '1' || code === '001' || code.toLowerCase() === 'received' ||
+    /รับฝากเข้าระบบ|รับฝากแล้ว|^รับฝาก$/i.test(desc) ||
+    item.status_key === 'received' || item.status_label === 'รับฝากแล้ว'
+  ) {
     return { key: 'received', label: 'รับฝากแล้ว', className: 'received' };
   }
-  // 4. สถานะอื่นๆ ทั้งหมด เป็น อยู่ระหว่างการนำจ่าย
+
+  // 4. Default: In transit / อยู่ระหว่างการนำจ่าย
   return { key: 'in_transit', label: 'อยู่ระหว่างการนำจ่าย', className: 'in-transit' };
 }
 
@@ -444,21 +447,21 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
     received_count: 0
   };
 
-  const deliveredCount = summary.delivered_count !== undefined
-    ? summary.delivered_count
-    : (reportData?.records?.filter((r) => getDeliveryStatusInfo(r).key === 'delivered').length || 0);
+  const deliveredCount = reportData?.records
+    ? reportData.records.filter((r) => getDeliveryStatusInfo(r).key === 'delivered').length
+    : (summary.delivered_count || 0);
 
-  const inTransitCount = summary.in_transit_count !== undefined
-    ? summary.in_transit_count
-    : (reportData?.records?.filter((r) => getDeliveryStatusInfo(r).key === 'in_transit').length || 0);
+  const inTransitCount = reportData?.records
+    ? reportData.records.filter((r) => getDeliveryStatusInfo(r).key === 'in_transit').length
+    : (summary.in_transit_count || 0);
 
-  const returnedCount = summary.returned_count !== undefined
-    ? summary.returned_count
-    : (reportData?.records?.filter((r) => getDeliveryStatusInfo(r).key === 'returned').length || 0);
+  const returnedCount = reportData?.records
+    ? reportData.records.filter((r) => getDeliveryStatusInfo(r).key === 'returned').length
+    : (summary.returned_count || 0);
 
-  const receivedCount = summary.received_count !== undefined
-    ? summary.received_count
-    : (reportData?.records?.filter((r) => getDeliveryStatusInfo(r).key === 'received').length || 0);
+  const receivedCount = reportData?.records
+    ? reportData.records.filter((r) => getDeliveryStatusInfo(r).key === 'received').length
+    : (summary.received_count || 0);
 
   const receivedRate = summary.total_items > 0
     ? Math.round((receivedCount / summary.total_items) * 100)

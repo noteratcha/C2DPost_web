@@ -203,16 +203,29 @@ def classify_delivery_status(status_code, status_desc):
     desc = str(status_desc or "").strip()
     code = str(status_code or "").strip()
 
+    # Normalize decomposed Thai vowels (e.g. น + ำ vs อำ)
+    desc_norm = desc.replace("\u0e4d\u0e32", "\u0e33")
+
     # 1. Delivered / นำจ่ายสำเร็จ
-    if any(k in desc for k in ["นำจ่ายสำเร็จ", "ผู้รับได้รับเรียบร้อย", "จัดส่งสำเร็จ", "ส่งมอบเรียบร้อย", "ส่งถึงผู้รับแล้ว"]) or code in ["501", "delivered"]:
+    # Official Thailand Post e-Parcel statuses: "นำจ่ายถึงผู้รับแล้ว" (code 4), "นำจ่ายสำเร็จ" (code 501), "ถึงผู้รับแล้ว"
+    if (
+        any(k in desc_norm for k in [
+            "นำจ่ายถึงผู้รับแล้ว", "ถึงผู้รับแล้ว", "นำจ่ายสำเร็จ", "ผู้รับได้รับเรียบร้อย",
+            "ผู้รับได้รับ", "จัดส่งสำเร็จ", "ส่งมอบเรียบร้อย", "ส่งถึงผู้รับแล้ว", "นำจ่ายเรียบร้อย"
+        ])
+        or code in ["4", "501", "delivered"]
+    ):
         return "delivered", "นำจ่ายสำเร็จ"
 
     # 2. Returned / ส่งคืน
-    if any(k in desc for k in ["ส่งคืน", "คืนต้นทาง", "ส่งคืนผู้ส่ง", "ตีกลับ", "ไม่สามารถส่งมอบ", "ไม่สามารถนำจ่าย"]) or code in ["502", "503", "401", "402", "returned"]:
+    if (
+        any(k in desc_norm for k in ["ส่งคืน", "คืนต้นทาง", "ส่งคืนผู้ส่ง", "ตีกลับ", "ไม่สามารถส่งมอบ", "ไม่สามารถนำจ่าย", "คืนสู่ผู้ฝาก"])
+        or code in ["502", "503", "401", "402", "returned"]
+    ):
         return "returned", "ส่งคืน"
 
     # 3. Received / รับฝากแล้ว (initial deposit checkpoint - status code 1 or 001)
-    if code in ["1", "001", "received"] or any(k in desc for k in ["รับฝากเข้าระบบ", "รับฝากแล้ว", "รับฝาก"]):
+    if code in ["1", "001", "received"] or any(k in desc_norm for k in ["รับฝากเข้าระบบ", "รับฝากแล้ว", "รับฝาก"]):
         return "received", "รับฝากแล้ว"
 
     # 4. All other statuses -> อยู่ระหว่างการนำจ่าย
