@@ -37,7 +37,7 @@ except Exception as e:
     print(f"Error registering fonts: {e}")
     FONT_REGISTERED = False
 
-__version__ = "2026.0916.2105"
+__version__ = "2026.0916.2125"
 
 # Thailand Post API Credentials
 API_KEY = "V9JN25IFH5hdZYc1k8NNRVgnLYXyQLzc"
@@ -897,15 +897,30 @@ def generate_combined_pdf(dataframe, output_pdf_path, envelope_only=False):
                     width = float(page.mediabox.width)
                     height = float(page.mediabox.height)
                 
-                # Find X and Y coordinate of "เรียน"
+                # Find X and Y coordinate of "เรียน" and sender address block
                 y_coord_rian = None
                 x_coord_rian = None
+                sender_y_list = []
+                sender_x_list = []
+                
                 def visitor_body(text_content, cm, tm, font_dict, font_size):
                     nonlocal y_coord_rian, x_coord_rian
+                    t = text_content.strip()
+                    x, y = tm[4], tm[5]
+                    if not t or x < 0 or y < 0:
+                        return
                     # Find the first occurrence of "เรียน"
-                    if "เรียน" in text_content and y_coord_rian is None:
-                        x_coord_rian = tm[4]
-                        y_coord_rian = tm[5]
+                    if "เรียน" in t and y_coord_rian is None and x > 0 and y > 0:
+                        x_coord_rian = x
+                        y_coord_rian = y
+                    # Detect sender block lines (left column x < width * 0.40, upper portion)
+                    if x < width * 0.40 and y > height * 0.35:
+                        if any(k in t for k in ['สำนักงาน', 'ส านักงาน', 'ฝ่าย', 'กลุ่มงาน', 'ที่ดิน', 'ที่ นพ', 'ที่ กค', 'ที่ ']):
+                            sender_y_list.append(y)
+                            sender_x_list.append(x)
+                        elif any(k in t for k in ['หมู่ที่', 'ต าบล', 'ตำบล', 'อำเภอ', 'อ าเภอ', 'จังหวัด', 'นพ', '48170', '๔๘๑๗๐', '116', '๑๑๖']) and len(t) < 80:
+                            sender_y_list.append(y)
+                            sender_x_list.append(x)
                 page.extract_text(visitor_text=visitor_body)
                 
                 packet = io.BytesIO()
@@ -913,6 +928,8 @@ def generate_combined_pdf(dataframe, output_pdf_path, envelope_only=False):
                 
                 # Scale factor to make overlay smaller
                 scale = 0.8
+                sender_bottom = min(sender_y_list) if sender_y_list else None
+                sender_left = min(sender_x_list) if sender_x_list else None
 
                 if y_coord_rian is not None and x_coord_rian is not None:
                     # Position dynamically relative to "เรียน"
@@ -928,8 +945,15 @@ def generate_combined_pdf(dataframe, output_pdf_path, envelope_only=False):
                     # Prevent going off-screen to the left or bottom
                     base_x = max(10, base_x)
                     base_y = max(10, base_y)
+                elif sender_bottom is not None:
+                    # Position under sender's address (ใต้ที่อยู่ผู้ฝากส่ง)
+                    # Box top is at base_y + (210 * scale)
+                    # Gap of 18pt below the sender bottom line
+                    base_y = sender_bottom - 18 - (210 * scale)
+                    base_x = max(18, sender_left if sender_left is not None else 20)
+                    base_y = max(10, base_y)
                 else:
-                    # Fallback to old default if "เรียน" is not found
+                    # Fallback to old default if neither "เรียน" nor sender address is found
                     base_x = width * 0.05
                     base_y = 40
                 
@@ -997,17 +1021,21 @@ def generate_combined_pdf(dataframe, output_pdf_path, envelope_only=False):
                 
             if envelope_only:
                 if has_overlay:
-                    if y_coord_rian is not None:
+                    ref_y = y_coord_rian if y_coord_rian is not None else (sender_bottom - 30 if sender_bottom is not None else None)
+                    if ref_y is not None:
                         dl_width = 220 * mm
                         dl_height = 110 * mm
                         orig_width = float(page.mediabox.width)
+                        orig_height = float(page.mediabox.height)
                         
                         # Center horizontally
                         left = (orig_width - dl_width) / 2.0
                         right = left + dl_width
                         
-                        # Center vertically around 'เรียน'
-                        top = y_coord_rian + (dl_height / 2.0)
+                        # Center vertically around ref_y
+                        top = ref_y + (dl_height / 2.0)
+                        if top > orig_height:
+                            top = orig_height
                         bottom = top - dl_height
                         
                         page.mediabox.left = left
