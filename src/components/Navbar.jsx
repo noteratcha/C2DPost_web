@@ -17,11 +17,13 @@ export default function Navbar({
 }) {
   const [showAboutModal, setShowAboutModal] = useState(false);
   const [isNavMenuOpen, setIsNavMenuOpen] = useState(false);
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isChecking, setIsChecking] = useState(false);
   const [lastCheckTime, setLastCheckTime] = useState('');
   const [apiOldStatus, setApiOldStatus] = useState('loading'); // 'loading' | 'success' | 'danger'
   const [apiNewStatus, setApiNewStatus] = useState('loading'); // 'loading' | 'success' | 'danger'
   const navMenuRef = useRef(null);
+  const userMenuRef = useRef(null);
 
   const checkApis = useCallback(async () => {
     setIsChecking(true);
@@ -54,19 +56,23 @@ export default function Navbar({
     return () => clearInterval(interval);
   }, [checkApis]);
 
-  // Click outside and Escape key to close hamburger menu
+  // Click outside and Escape key to close hamburger and user dropdown menus
   useEffect(() => {
     function handleClickOutside(event) {
       if (navMenuRef.current && !navMenuRef.current.contains(event.target)) {
         setIsNavMenuOpen(false);
       }
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target)) {
+        setIsUserMenuOpen(false);
+      }
     }
     function handleKeyDown(event) {
       if (event.key === 'Escape') {
         setIsNavMenuOpen(false);
+        setIsUserMenuOpen(false);
       }
     }
-    if (isNavMenuOpen) {
+    if (isNavMenuOpen || isUserMenuOpen) {
       document.addEventListener('mousedown', handleClickOutside);
       document.addEventListener('keydown', handleKeyDown);
     }
@@ -74,7 +80,7 @@ export default function Navbar({
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isNavMenuOpen]);
+  }, [isNavMenuOpen, isUserMenuOpen]);
 
   const orgName = currentPerson?.Organization?.trim() || 'สำนักงานที่ดิน';
 
@@ -199,8 +205,14 @@ export default function Navbar({
             )}
 
             {user && (
-              <>
-                <div className="user-profile-badge" title={`ผู้ใช้งาน: ${user}`}>
+              <div className="user-profile-menu-container" ref={userMenuRef}>
+                <button 
+                  type="button"
+                  className={`user-profile-badge ${isUserMenuOpen ? 'active' : ''}`}
+                  onClick={() => setIsUserMenuOpen(prev => !prev)}
+                  title={`ผู้ใช้งาน: ${user} (คลิกเพื่อเปิดเมนู)`}
+                  aria-expanded={isUserMenuOpen}
+                >
                   <div className="user-avatar-badge">
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
@@ -215,22 +227,68 @@ export default function Navbar({
                       {currentPerson?.Status || 'DOL'}
                     </span>
                   </div>
-                </div>
-
-                <button 
-                  type="button" 
-                  className="btn-standalone-logout" 
-                  onClick={onLogout} 
-                  title="ออกจากระบบ (Sign out)"
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-                    <polyline points="16 17 21 12 16 7"/>
-                    <line x1="21" y1="12" x2="9" y2="12"/>
+                  <svg className={`user-badge-chevron ${isUserMenuOpen ? 'open' : ''}`} width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="6 9 12 15 18 9"></polyline>
                   </svg>
-                  <span>ออกจากระบบ</span>
                 </button>
-              </>
+
+                {isUserMenuOpen && (
+                  <div className="user-profile-dropdown">
+                    {/* User Header Summary Card */}
+                    <div className="user-dropdown-header">
+                      <div className="user-dropdown-avatar">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                          <circle cx="12" cy="7" r="4"></circle>
+                        </svg>
+                      </div>
+                      <div className="user-dropdown-details">
+                        <div className="user-dropdown-name" title={currentPerson ? currentPerson.UserName || user : user}>
+                          {currentPerson ? currentPerson.UserName || user : user}
+                        </div>
+                        <div className="user-dropdown-org" title={orgName}>
+                          {orgName}
+                        </div>
+                        <div className="user-dropdown-badges">
+                          <span className="user-dropdown-role-chip">{currentPerson?.Status || 'DOL'}</span>
+                          {currentPerson?.ResponsiblePostoffice && (
+                            <span className="user-dropdown-po-chip" title={currentPerson.ResponsiblePostoffice}>
+                              {currentPerson.ResponsiblePostoffice}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="user-dropdown-divider"></div>
+
+                    {/* Menu Actions */}
+                    <div className="user-dropdown-menu-list">
+                      <button
+                        type="button"
+                        className="user-dropdown-logout-btn"
+                        onClick={() => {
+                          setIsUserMenuOpen(false);
+                          onLogout();
+                        }}
+                        title="ออกจากระบบ"
+                      >
+                        <div className="logout-icon-box">
+                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                            <polyline points="16 17 21 12 16 7"/>
+                            <line x1="21" y1="12" x2="9" y2="12"/>
+                          </svg>
+                        </div>
+                        <div className="logout-text-stack">
+                          <span className="logout-text-main">ออกจากระบบ</span>
+                          <span className="logout-text-sub">ลงชื่อออกจากบัญชี {user}</span>
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
 
             {/* Hamburger Menu (Combining all 5 parts: Status, DPost, e-AR, About, Dark/Light) */}
