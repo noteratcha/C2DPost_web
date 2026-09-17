@@ -203,6 +203,74 @@ export function openEarWithBarcode(barcode) {
 }
 
 /**
+ * Compare two semver strings like "1.3.0" vs "1.2.0"
+ * @returns {number} 1 if a > b, -1 if a < b, 0 if equal
+ */
+export function compareVersions(a, b) {
+  const pa = String(a || '0').split('.').map((n) => parseInt(n, 10) || 0);
+  const pb = String(b || '0').split('.').map((n) => parseInt(n, 10) || 0);
+  const maxLen = Math.max(pa.length, pb.length);
+  for (let i = 0; i < maxLen; i++) {
+    const na = pa[i] || 0;
+    const nb = pb[i] || 0;
+    if (na > nb) return 1;
+    if (na < nb) return -1;
+  }
+  return 0;
+}
+
+/**
+ * Check if the installed extension supports FETCH_EAR_PDF (requires v1.3.0+)
+ * @param {number} timeoutMs
+ * @returns {Promise<{supported: boolean, installed: boolean, version: string}>}
+ */
+export async function checkEarCapability(timeoutMs = 600) {
+  // 1. Check synchronous DOM attributes
+  if (typeof document !== 'undefined' && document.documentElement) {
+    const domVer = document.documentElement.getAttribute('data-c2dpost-version');
+    const isInst = document.documentElement.getAttribute('data-c2dpost-extension-installed') === 'true';
+    if (domVer) {
+      installedVersionCache = domVer;
+      isInstalledCache = true;
+      const isSupp = compareVersions(domVer, '1.3.0') >= 0;
+      return { supported: isSupp, installed: true, version: domVer };
+    }
+  }
+
+  // 2. Ping via postMessage
+  return new Promise((resolve) => {
+    let resolved = false;
+    const handlePong = (event) => {
+      if (event.data && (event.data.type === 'C2DPOST_PONG' || event.data.type === 'C2DPOST_EXTENSION_READY')) {
+        if (!resolved) {
+          resolved = true;
+          window.removeEventListener('message', handlePong);
+          const ver = event.data.version || document.documentElement.getAttribute('data-c2dpost-version') || '1.0.0';
+          installedVersionCache = ver;
+          isInstalledCache = true;
+          const isSupp = compareVersions(ver, '1.3.0') >= 0;
+          resolve({ supported: isSupp, installed: true, version: ver });
+        }
+      }
+    };
+
+    window.addEventListener('message', handlePong);
+    window.postMessage({ type: 'C2DPOST_PING' }, '*');
+
+    setTimeout(() => {
+      if (!resolved) {
+        resolved = true;
+        window.removeEventListener('message', handlePong);
+        const ver = getExtensionVersion();
+        const isInst = isInstalledCache || !!ver;
+        const isSupp = isInst && compareVersions(ver, '1.3.0') >= 0;
+        resolve({ supported: isSupp, installed: isInst, version: ver || '' });
+      }
+    }, timeoutMs);
+  });
+}
+
+/**
  * Request e-AR PDF via Chrome Extension Bridge (bypasses CORS and Geoblocking)
  * @param {string} barcode Barcode string e.g. "BC414111081TH"
  * @returns {Promise<{success: boolean, barcode: string, pdfBase64?: string, error?: string}>}
@@ -222,7 +290,7 @@ export function fetchEarPdfFromExtension(barcode) {
     const timeout = setTimeout(() => {
       window.removeEventListener('message', handleResult);
       resolve({ success: false, error: 'Extension e-AR request timeout' });
-    }, 8000);
+    }, 5000);
 
     const handleResult = (event) => {
       if (event.data && event.data.type === 'C2DPOST_EAR_PDF_RESULT' && event.data.requestId === requestId) {

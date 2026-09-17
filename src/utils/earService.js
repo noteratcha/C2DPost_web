@@ -7,7 +7,7 @@
  */
 
 import { API_BASE } from './api';
-import { fetchEarPdfFromExtension } from './extensionBridge';
+import { fetchEarPdfFromExtension, checkEarCapability } from './extensionBridge';
 
 const earCache = new Map();
 
@@ -135,6 +135,19 @@ export async function downloadBatchEar({ records, format = 'pdf', onProgress }) 
     throw new Error('ไม่พบรายการพัสดุสำหรับดาวน์โหลด e-AR');
   }
 
+  // 0. Pre-flight check: Verify extension v1.3.0 is installed & active
+  const cap = await checkEarCapability(700);
+  if (!cap.supported) {
+    const error = new Error(
+      cap.installed
+        ? `ต้องการส่วนขยาย C2DPost Helper เวอร์ชัน 1.3.0 ขึ้นไป (ปัจจุบันในเบราว์เซอร์เป็น v${cap.version || '1.2.0'}) กรุณารีเฟรชส่วนขยายในแท็บ Extensions`
+        : 'จำเป็นต้องเปิดใช้งานส่วนขยาย C2DPost Helper v1.3.0 เพื่อดาวน์โหลดใบตอบรับ e-AR จากไปรษณีย์ไทย'
+    );
+    error.code = 'EXTENSION_EAR_REQUIRED';
+    error.details = cap;
+    throw error;
+  }
+
   // 1. Filter and clean barcodes
   const validItems = [];
   const seenBarcodes = new Set();
@@ -249,6 +262,9 @@ export async function downloadBatchEar({ records, format = 'pdf', onProgress }) 
 
   // Filter out items that have valid base64
   const validBlobs = clientBlobs.filter((b) => b && b.base64);
+  if (validBlobs.length === 0) {
+    throw new Error('ไม่พบข้อมูลเอกสาร e-AR จากไปรษณีย์ไทยสำหรับรายการที่เลือก (ไปรษณีย์ไทยอาจยังไม่ได้สแกนอัปโหลดภาพใบตอบรับเข้าระบบ หรือเพิ่งนำจ่ายสำเร็จวันนี้)');
+  }
 
   // 3. Call backend /api/reports/batch-ear-pdf
   const barcodesList = validItems.map((v) => v.barcode);

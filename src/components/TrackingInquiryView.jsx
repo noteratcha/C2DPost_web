@@ -312,8 +312,16 @@ export default function TrackingInquiryView({ currentPerson, records = [], initi
       }, 4000);
     } catch (err) {
       console.error('Batch e-AR download error in tracking view:', err);
-      alert(err.message || 'เกิดข้อผิดพลาดในการดาวน์โหลด e-AR');
       setEarProgressText('');
+      if (err.code === 'EXTENSION_EAR_REQUIRED') {
+        alert(
+          err.details?.installed
+            ? `⚠️ ต้องการส่วนขยาย C2DPost Helper v1.3.0 ขึ้นไป (ตรวจพบ v${err.details?.version || '1.2.0'})\n\nกรุณาสลับไปที่แท็บ Extensions แล้วกดปุ่ม 🔄 รีเฟรชส่วนขยาย C2DPost Helper จากนั้นรีเฟรชหน้านี้ (F5)`
+            : '⚠️ กรุณาเปิดใช้งานส่วนขยาย C2DPost Helper v1.3.0 ใน Chrome เพื่อดาวน์โหลดใบตอบรับ e-AR จากไปรษณีย์ไทย'
+        );
+      } else {
+        alert(err.message || 'เกิดข้อผิดพลาดในการดาวน์โหลด e-AR');
+      }
     } finally {
       setIsDownloadingEar(false);
     }
@@ -513,13 +521,13 @@ export default function TrackingInquiryView({ currentPerson, records = [], initi
 
             <div className="results-expand-actions">
               {summary.delivered > 0 && (
-                <div className="ear-download-dropdown-wrap" ref={earDropdownRef}>
+                <div className="ear-download-split-wrap" ref={earDropdownRef}>
                   <button
                     type="button"
-                    className="btn-footer-ear"
-                    onClick={() => setShowEarDropdown((prev) => !prev)}
+                    className="btn-footer-ear-main"
+                    onClick={() => handleBatchDownloadEar('pdf')}
                     disabled={isDownloadingEar}
-                    title={`ดาวน์โหลดใบตอบรับ e-AR สำหรับรายการที่นำจ่ายสำเร็จ (${summary.delivered} รายการ)`}
+                    title={`คลิกดาวน์โหลด PDF รวม e-AR (${summary.delivered} รายการ) ทันที`}
                   >
                     {isDownloadingEar ? (
                       <>
@@ -534,9 +542,17 @@ export default function TrackingInquiryView({ currentPerson, records = [], initi
                           <line x1="12" y1="15" x2="12" y2="3"></line>
                         </svg>
                         <span>โหลด e-AR ({summary.delivered})</span>
-                        <span className="dropdown-caret">▾</span>
                       </>
                     )}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-footer-ear-arrow"
+                    onClick={() => setShowEarDropdown((prev) => !prev)}
+                    disabled={isDownloadingEar}
+                    title="เลือกรูปแบบอื่น (PDF รวม หรือไฟล์ ZIP แยกรายพัสดุ)"
+                  >
+                    ▾
                   </button>
 
                   {showEarDropdown && !isDownloadingEar && (

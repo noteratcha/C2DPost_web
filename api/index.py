@@ -1180,22 +1180,28 @@ async def batch_ear_pdf(req: BatchEarPdfRequest):
             "Origin": "https://e-ar.thailandpost.com",
             "Referer": "https://e-ar.thailandpost.com/ear"
         }
+        fetch_errors = []
         for b in remaining:
             try:
-                r = requests.post(url, json=[b], headers=headers, timeout=8, verify=False)
+                r = requests.post(url, json=[b], headers=headers, timeout=10, verify=False)
                 if r.status_code == 200 and len(r.content) > 500 and "application/pdf" in r.headers.get("Content-Type", ""):
                     pdf_map[b] = {
                         "bytes": r.content,
                         "receiver": "",
                         "inv_no": ""
                     }
+                else:
+                    fetch_errors.append(f"{b}: status {r.status_code}, len {len(r.content)}, ct {r.headers.get('Content-Type')}, text: {r.text[:100]}")
             except Exception as ex:
-                print(f"[batch-ear-pdf] Server-side fetch failed for {b}: {ex}")
+                fetch_errors.append(f"{b}: ex {ex}")
 
     if not pdf_map:
+        err_msg = "ไม่พบข้อมูลใบตอบรับ e-AR จากไปรษณีย์ไทยสำหรับรายการที่เลือก"
+        if fetch_errors:
+            err_msg += f" (Debug: {'; '.join(fetch_errors[:3])})"
         raise HTTPException(
             status_code=404,
-            detail="ไม่พบข้อมูลใบตอบรับ e-AR จากไปรษณีย์ไทยสำหรับรายการที่เลือก (ระบบอาจยังไม่อัปโหลดภาพใบตอบรับ หรือต้องใช้งานผ่านส่วนขยาย C2DPost Helper)"
+            detail=err_msg
         )
 
     # Ordered list of barcodes to include

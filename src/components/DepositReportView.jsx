@@ -138,6 +138,12 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
   const [isDownloadingEar, setIsDownloadingEar] = useState(false);
   const [earProgressText, setEarProgressText] = useState('');
   const [showEarDropdown, setShowEarDropdown] = useState(false);
+  const [earHelpModal, setEarHelpModal] = useState({
+    isOpen: false,
+    reason: 'installed_old',
+    currentVersion: '',
+    message: ''
+  });
   const earDropdownRef = useRef(null);
 
   // Close e-AR dropdown when clicking outside
@@ -573,8 +579,17 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
       }, 4000);
     } catch (err) {
       console.error('Batch e-AR download error:', err);
-      alert(err.message || 'เกิดข้อผิดพลาดในการดาวน์โหลด e-AR');
       setEarProgressText('');
+      if (err.code === 'EXTENSION_EAR_REQUIRED') {
+        setEarHelpModal({
+          isOpen: true,
+          reason: err.details?.installed ? 'installed_old' : 'not_installed',
+          currentVersion: err.details?.version || '',
+          message: err.message
+        });
+      } else {
+        alert(err.message || 'เกิดข้อผิดพลาดในการดาวน์โหลด e-AR');
+      }
     } finally {
       setIsDownloadingEar(false);
     }
@@ -1163,25 +1178,25 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
             )}
 
             <div className="deposit-footer-actions">
-              {/* Batch e-AR Download Dropdown */}
-              <div className="ear-download-dropdown-wrap" ref={earDropdownRef}>
+              {/* Batch e-AR Download Split Button */}
+              <div className="ear-download-split-wrap" ref={earDropdownRef}>
                 <button
                   type="button"
-                  className={`btn-footer-ear ${selectedBarcodes.size > 0 ? 'has-selection' : ''}`}
-                  onClick={() => setShowEarDropdown((prev) => !prev)}
+                  className={`btn-footer-ear-main ${selectedBarcodes.size > 0 ? 'has-selection' : ''}`}
+                  onClick={() => handleBatchDownloadEar('pdf')}
                   disabled={isDownloadingEar || deliveredCount === 0}
                   title={
                     deliveredCount === 0
                       ? 'ไม่มีรายการที่นำจ่ายสำเร็จสำหรับดาวน์โหลด e-AR'
                       : selectedBarcodes.size > 0
-                      ? `ดาวน์โหลด e-AR ที่เลือก (${selectedDeliveredRecords.length} รายการ)`
-                      : `ดาวน์โหลด e-AR นำจ่ายสำเร็จทั้งหมด (${filteredDeliveredRecords.length} รายการ)`
+                      ? `คลิกดาวน์โหลด PDF รวม e-AR ที่เลือก (${selectedDeliveredRecords.length} รายการ) ทันที`
+                      : `คลิกดาวน์โหลด PDF รวม e-AR นำจ่ายสำเร็จ (${filteredDeliveredRecords.length} รายการ) ทันที`
                   }
                 >
                   {isDownloadingEar ? (
                     <>
                       <span className="spinner-small"></span>
-                      <span>กำลังโหลด e-AR...</span>
+                      <span>{earProgressText || 'กำลังโหลด e-AR...'}</span>
                     </>
                   ) : (
                     <>
@@ -1195,9 +1210,17 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
                           ? `โหลด e-AR ที่เลือก (${selectedDeliveredRecords.length})`
                           : `โหลด e-AR (${filteredDeliveredRecords.length})`}
                       </span>
-                      <span className="dropdown-caret">▾</span>
                     </>
                   )}
+                </button>
+                <button
+                  type="button"
+                  className={`btn-footer-ear-arrow ${selectedBarcodes.size > 0 ? 'has-selection' : ''}`}
+                  onClick={() => setShowEarDropdown((prev) => !prev)}
+                  disabled={isDownloadingEar || deliveredCount === 0}
+                  title="เลือกรูปแบบอื่น (PDF รวม หรือไฟล์ ZIP บีบอัด)"
+                >
+                  ▾
                 </button>
 
                 {showEarDropdown && !isDownloadingEar && (
@@ -1321,6 +1344,86 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
             onOpenTrackingPage(bcode);
           } : undefined}
         />
+      )}
+
+      {/* Extension Guidance Modal for e-AR */}
+      {earHelpModal.isOpen && (
+        <div className="ear-help-modal-backdrop" onClick={() => setEarHelpModal({ isOpen: false })}>
+          <div className="ear-help-modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="ear-help-modal-header">
+              <div className="ear-help-icon-title">
+                <span className="ear-help-badge-icon">🧩</span>
+                <h3>
+                  {earHelpModal.reason === 'installed_old'
+                    ? 'กรุณารีเฟรชส่วนขยาย C2DPost Helper เป็น v1.3.0'
+                    : 'จำเป็นต้องเปิดใช้งานส่วนขยาย C2DPost Helper v1.3.0'}
+                </h3>
+              </div>
+              <button
+                type="button"
+                className="ear-help-close-btn"
+                onClick={() => setEarHelpModal({ isOpen: false })}
+                title="ปิดหน้าต่าง"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="ear-help-modal-body">
+              <div className="ear-help-alert-box">
+                <div className="alert-box-header">
+                  <strong>ℹ️ ทำไมต้องใช้ส่วนขยาย v1.3.0?</strong>
+                </div>
+                <p>
+                  ระบบดาวน์โหลดใบตอบรับ e-AR ของไปรษณีย์ไทย 
+                  <strong> จำกัดการเข้าถึงเฉพาะการเชื่อมต่ออินเทอร์เน็ตในประเทศไทย (Thai IP)</strong> 
+                  และมีระบบรักษาความปลอดภัย CORS จึงต้องอาศัยส่วนขยาย C2DPost Helper บนเบราว์เซอร์ของท่านในการดึงไฟล์โดยตรง
+                </p>
+                {earHelpModal.currentVersion && (
+                  <div className="ear-help-ver-tag">
+                    เวอร์ชันใน Chrome ขณะนี้: <strong>v{earHelpModal.currentVersion}</strong> (ต้องอัปเดตเป็น v1.3.0 ขึ้นไป)
+                  </div>
+                )}
+              </div>
+
+              <div className="ear-help-steps">
+                <h4>💡 วิธีอัปเดต / เปิดใช้งานง่ายๆ ใน 1 นาที:</h4>
+                <ol>
+                  <li>
+                    สลับไปที่แท็บ <strong>Extensions (chrome://extensions)</strong> ที่เปิดอยู่ด้านบน
+                  </li>
+                  <li>
+                    กดปุ่ม <strong>🔄 รีเฟรช (Reload)</strong> ที่การ์ดส่วนขยาย <strong>C2DPost Helper</strong>
+                    <br />
+                    <small className="text-muted">
+                      (หรือหากยังไม่มี ให้ดาวน์โหลดไฟล์ Zip ด้านล่าง แตกไฟล์ แล้วกด "Load unpacked" ในหน้า Extensions)
+                    </small>
+                  </li>
+                  <li>
+                    กลับมาที่หน้าต่างนี้ แล้วกด <strong>F5 (รีเฟรชหน้าเว็บ)</strong> จากนั้นกดปุ่ม "โหลด e-AR ที่เลือก" ได้ทันที!
+                  </li>
+                </ol>
+              </div>
+            </div>
+
+            <div className="ear-help-modal-footer">
+              <a
+                href="/C2DPost_Helper_v1.3.0_WebStore.zip"
+                download="C2DPost_Helper_v1.3.0_WebStore.zip"
+                className="btn-download-ext-zip"
+              >
+                📥 ดาวน์โหลดส่วนขยาย C2DPost_Helper_v1.3.0.zip
+              </a>
+              <button
+                type="button"
+                className="btn-close-help-modal"
+                onClick={() => setEarHelpModal({ isOpen: false })}
+              >
+                เข้าใจแล้ว / ปิด
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </main>
   );

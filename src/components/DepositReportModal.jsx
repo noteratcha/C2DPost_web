@@ -420,8 +420,16 @@ export default function DepositReportModal({ isOpen, onClose, currentPerson, onS
       }, 4000);
     } catch (err) {
       console.error('Batch e-AR download error:', err);
-      alert(err.message || 'เกิดข้อผิดพลาดในการดาวน์โหลด e-AR');
       setEarProgressText('');
+      if (err.code === 'EXTENSION_EAR_REQUIRED') {
+        alert(
+          err.details?.installed
+            ? `⚠️ ต้องการส่วนขยาย C2DPost Helper v1.3.0 ขึ้นไป (ตรวจพบ v${err.details?.version || '1.2.0'})\n\nกรุณาสลับไปที่แท็บ Extensions แล้วกดปุ่ม 🔄 รีเฟรชส่วนขยาย C2DPost Helper จากนั้นรีเฟรชหน้านี้ (F5)`
+            : '⚠️ กรุณาเปิดใช้งานส่วนขยาย C2DPost Helper v1.3.0 ใน Chrome เพื่อดาวน์โหลดใบตอบรับ e-AR จากไปรษณีย์ไทย'
+        );
+      } else {
+        alert(err.message || 'เกิดข้อผิดพลาดในการดาวน์โหลด e-AR');
+      }
     } finally {
       setIsDownloadingEar(false);
     }
@@ -958,23 +966,23 @@ export default function DepositReportModal({ isOpen, onClose, currentPerson, onS
           )}
 
           <div className="footer-action-buttons">
-            {/* Batch e-AR Download Dropdown */}
-            <div className="ear-download-dropdown-wrap" ref={earDropdownRef}>
+            {/* Batch e-AR Download Split Button */}
+            <div className="ear-download-split-wrap" ref={earDropdownRef}>
               <button
                 type="button"
-                className="btn-footer-ear"
-                onClick={() => setShowEarDropdown((prev) => !prev)}
+                className="btn-footer-ear-main"
+                onClick={() => handleBatchDownloadEar('pdf')}
                 disabled={loading || isDownloadingEar || deliveredCount === 0}
                 title={
                   deliveredCount === 0
                     ? 'ไม่มีรายการที่นำจ่ายสำเร็จสำหรับดาวน์โหลด e-AR'
-                    : `ดาวน์โหลด e-AR นำจ่ายสำเร็จ (${deliveredCount} รายการ)`
+                    : `คลิกดาวน์โหลด PDF รวม e-AR (${deliveredCount} รายการ) ทันที`
                 }
               >
                 {isDownloadingEar ? (
                   <>
                     <span className="deposit-spinner small"></span>
-                    <span>กำลังโหลด e-AR...</span>
+                    <span>{earProgressText || 'กำลังโหลด e-AR...'}</span>
                   </>
                 ) : (
                   <>
@@ -984,9 +992,17 @@ export default function DepositReportModal({ isOpen, onClose, currentPerson, onS
                       <line x1="12" y1="15" x2="12" y2="3"></line>
                     </svg>
                     <span>โหลด e-AR ({deliveredCount})</span>
-                    <span className="dropdown-caret">▾</span>
                   </>
                 )}
+              </button>
+              <button
+                type="button"
+                className="btn-footer-ear-arrow"
+                onClick={() => setShowEarDropdown((prev) => !prev)}
+                disabled={loading || isDownloadingEar || deliveredCount === 0}
+                title="เลือกรูปแบบอื่น (PDF รวม หรือไฟล์ ZIP แยกรายพัสดุ)"
+              >
+                ▾
               </button>
 
               {showEarDropdown && !isDownloadingEar && (
