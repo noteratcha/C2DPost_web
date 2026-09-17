@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import AboutModal from './AboutModal';
-import CredentialAssistantModal from './CredentialAssistantModal';
 import { syncCredentialsToExtension } from '../utils/extensionBridge';
 import './Navbar.css';
 
@@ -20,7 +19,6 @@ export default function Navbar({
   const [showAboutModal, setShowAboutModal] = useState(false);
   const [isNavMenuOpen, setIsNavMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
-  const [credentialModalTarget, setCredentialModalTarget] = useState(null); // 'dpost' | 'ear' | null
   const [isChecking, setIsChecking] = useState(false);
   const [lastCheckTime, setLastCheckTime] = useState('');
   const [apiOldStatus, setApiOldStatus] = useState('loading'); // 'loading' | 'success' | 'danger'
@@ -39,15 +37,11 @@ export default function Navbar({
     }
   }, [user, currentPerson]);
 
-  const handleOpenExternalService = (service, url, e) => {
-    if (e) e.preventDefault();
+  const handleOpenExternalService = (url) => {
     const uname = currentPerson?.UserName || user || '';
     const pass = currentPerson?.Password || '';
     const org = currentPerson?.Organization || '';
     syncCredentialsToExtension(uname, pass, org);
-
-    window.open(url, '_blank', 'noopener,noreferrer');
-    setCredentialModalTarget(service);
   };
 
   const checkApis = useCallback(async () => {
@@ -190,9 +184,9 @@ export default function Navbar({
               <a
                 href="https://dpost.thailandpost.com"
                 target="_blank"
-                rel="noreferrer"
+                rel="noopener noreferrer"
                 className="nav-tab-btn nav-tab-ext"
-                onClick={(e) => handleOpenExternalService('dpost', 'https://dpost.thailandpost.com', e)}
+                onClick={() => handleOpenExternalService('https://dpost.thailandpost.com')}
                 title="DPost (Thailand Post) - เข้าสู่ระบบพร้อมส่งข้อมูล Username & Password อัตโนมัติ"
               >
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -209,9 +203,9 @@ export default function Navbar({
               <a
                 href="https://e-ar.thailandpost.com/sign-in"
                 target="_blank"
-                rel="noreferrer"
+                rel="noopener noreferrer"
                 className="nav-tab-btn nav-tab-ext"
-                onClick={(e) => handleOpenExternalService('ear', 'https://e-ar.thailandpost.com/sign-in', e)}
+                onClick={() => handleOpenExternalService('https://e-ar.thailandpost.com/sign-in')}
                 title="e-AR (Electronic Advice) - เข้าสู่ระบบพร้อมส่งข้อมูล Username & Password อัตโนมัติ"
               >
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -657,20 +651,6 @@ export default function Navbar({
       <AboutModal 
         isOpen={showAboutModal} 
         onClose={() => setShowAboutModal(false)} 
-      />
-
-      <CredentialAssistantModal
-        isOpen={Boolean(credentialModalTarget)}
-        onClose={() => setCredentialModalTarget(null)}
-        service={credentialModalTarget || 'dpost'}
-        currentPerson={currentPerson}
-        extensionInstalled={extensionInstalled}
-        onReopen={() => {
-          const url = credentialModalTarget === 'dpost' 
-            ? 'https://dpost.thailandpost.com' 
-            : 'https://e-ar.thailandpost.com/sign-in';
-          window.open(url, '_blank', 'noopener,noreferrer');
-        }}
       />
     </>
   );

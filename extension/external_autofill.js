@@ -25,6 +25,7 @@
 
     element.dispatchEvent(new Event('input', { bubbles: true }));
     element.dispatchEvent(new Event('change', { bubbles: true }));
+    element.dispatchEvent(new Event('blur', { bubbles: true }));
   }
 
   // Display unobtrusive, high-visibility confirmation badge on page
@@ -99,7 +100,7 @@
       <div class="c2d-icon">⚡</div>
       <div>
         <div class="c2d-title">C2DPost Helper • กรอกข้อมูลสำเร็จ</div>
-        <div class="c2d-desc">กรอก Username (${username}) และ Password เข้าสู่ ${serviceName} แล้ว</div>
+        <div class="c2d-desc">กรอก Username (${username}) และ Password เข้าสู่ ${serviceName} เรียบร้อยแล้ว</div>
       </div>
       <button type="button" class="c2d-close" title="ปิด">✕</button>
     `;
@@ -121,32 +122,33 @@
     }, 7000);
   }
 
-  // Retrieve saved credentials from Chrome extension storage
-  chrome.storage.local.get(["c2dpost_credentials"], (res) => {
-    const creds = res && res.c2dpost_credentials;
-    if (!creds || !creds.username) {
-      console.log("[C2DPost Helper] No credentials stored in extension yet.");
-      return;
-    }
+  // Core Autofill Execution Engine
+  function executeAutofill(creds) {
+    if (!creds || !creds.username) return;
 
     const host = window.location.hostname.toLowerCase();
 
     // 1. Target: DPost (dpost.thailandpost.com)
     if (host.includes("dpost.thailandpost.com")) {
       let attempts = 0;
-      const maxAttempts = 30; // Check up to 6 seconds
+      const maxAttempts = 35; // Try for ~7 seconds
 
       const checkAndFillDPost = () => {
         attempts++;
-        const userInput = document.getElementById("txtUsername") || document.querySelector('input[name="txtUsername"]');
-        const passInput = document.getElementById("txtPassword") || document.querySelector('input[name="txtPassword"]');
+        const userInput = 
+          document.getElementById("txtUsername") || 
+          document.querySelector('input[name="txtUsername"]') ||
+          document.querySelector('input[placeholder*="user" i]');
+
+        const passInput = 
+          document.getElementById("txtPassword") || 
+          document.querySelector('input[name="txtPassword"]') ||
+          document.querySelector('input[type="password"]');
 
         if (userInput && passInput) {
-          if (!userInput.value || userInput.value !== creds.username) {
-            setNativeValue(userInput, creds.username);
-            setNativeValue(passInput, creds.password);
-            showAutofillBadge("DPost", creds.username);
-          }
+          setNativeValue(userInput, creds.username);
+          setNativeValue(passInput, creds.password || '');
+          showAutofillBadge("DPost", creds.username);
           return true;
         }
 
@@ -182,7 +184,7 @@
 
         if (userInput && passInput) {
           setNativeValue(userInput, creds.username);
-          setNativeValue(passInput, creds.password);
+          setNativeValue(passInput, creds.password || '');
           filled = true;
           showAutofillBadge("e-AR", creds.username);
           return true;
@@ -192,7 +194,6 @@
 
       // Try immediate
       if (!tryFillEar()) {
-        // Observe Next.js DOM changes / hydration
         const observer = new MutationObserver(() => {
           if (tryFillEar()) {
             observer.disconnect();
@@ -207,9 +208,33 @@
           });
         }
 
-        // Safety timeout to disconnect observer after 15 seconds
         setTimeout(() => observer.disconnect(), 15000);
       }
     }
-  });
+  }
+
+  // Initial lookup on tab load
+  if (chrome && chrome.storage && chrome.storage.local) {
+    chrome.storage.local.get(["c2dpost_credentials"], (res) => {
+      const creds = res && res.c2dpost_credentials;
+      if (creds && creds.username) {
+        executeAutofill(creds);
+      } else {
+        console.log("[C2DPost Helper] Waiting for credentials from C2DPost Web...");
+      }
+    });
+
+    // Proactively listen for storage changes (handles cases where C2DPost web syncs credentials while this tab is opening)
+    if (chrome.storage.onChanged) {
+      chrome.storage.onChanged.addListener((changes, areaName) => {
+        if (areaName === "local" && changes.c2dpost_credentials) {
+          const newCreds = changes.c2dpost_credentials.newValue;
+          if (newCreds && newCreds.username) {
+            console.log("[C2DPost Helper] Credentials synced to extension, executing autofill...");
+            executeAutofill(newCreds);
+          }
+        }
+      });
+    }
+  }
 })();
