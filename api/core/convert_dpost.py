@@ -37,7 +37,7 @@ except Exception as e:
     print(f"Error registering fonts: {e}")
     FONT_REGISTERED = False
 
-__version__ = "2026.0917.1050"
+__version__ = "2026.0917.1415"
 
 # Thailand Post API Credentials
 API_KEY = "V9JN25IFH5hdZYc1k8NNRVgnLYXyQLzc"
@@ -329,10 +329,10 @@ def parse_receiver_label(text):
     # Post-processing cleanup: Remove amphur, province, and zipcode from receiver_address if present
     if amphur:
         receiver_address = re.sub(r'(?:อำเภอ/เขต|อำเภอ|อ\.)\s*' + re.escape(amphur), '', receiver_address)
-        receiver_address = re.sub(r'\b' + re.escape(amphur) + r'\b', '', receiver_address)
+        receiver_address = re.sub(r'(?<!ต\.)(?<!ต\.\s)(?<!ตำบล\s)(?<!ตำบล)\b' + re.escape(amphur) + r'\b', '', receiver_address)
     if province:
         receiver_address = re.sub(r'(?:จังหวัด|จ\.)\s*' + re.escape(province), '', receiver_address)
-        receiver_address = re.sub(r'\b' + re.escape(province) + r'\b', '', receiver_address)
+        receiver_address = re.sub(r'(?<!ต\.)(?<!ต\.\s)(?<!ตำบล\s)(?<!ตำบล)\b' + re.escape(province) + r'\b', '', receiver_address)
     if zipcode:
         receiver_address = receiver_address.replace(zipcode, "")
         
@@ -423,12 +423,29 @@ def parse_envelope_label(text):
                 receiver_name = rem
                 break
                 
+    # 2. Search for common Thai title prefixes (including น.ส., ด.ช., ด.ญ., ยศตำรวจ/ทหาร, etc.)
+    prefix_pat = r'^(?:นาย|นางสาว|นาง|น\.ส\.|น\.ส|เด็กชาย|เด็กหญิง|ด\.ช\.|ด\.ญ\.|นายก|ว่าที่\s*(?:ร\.ต\.|ร้อยตรี)?|พันตำรวจ|ร้อยตำรวจ|พลฯ|ผู้ใหญ่บ้าน|กำนัน|ด\.ต\.|จ\.ส\.ต\.|จ\.ส\.อ\.|ร\.ต\.|ร\.ท\.|ร\.อ\.|พ\.ต\.|พ\.ท\.|พ\.อ\.|พล\.ต\.|พล\.ท\.|พล\.อ\.|นพ\.|พญ\.|ทพ\.|ทพญ\.|ผศ\.|รศ\.|ศ\.|ดร\.|พระ|พระครู|พระมหา|ม\.ร\.ว\.|ม\.ล\.)\s*[\u0e00-\u0e7f]'
     if not receiver_name:
         for line in candidate_lines:
-            if re.match(r'^(?:นาย|นางสาว|นาง|นายก|ว่าที่|พันตำรวจ|ร้อยตำรวจ|พลฯ|ผู้ใหญ่บ้าน|กำนัน)\s*[\u0e00-\u0e7f]', line):
+            if re.match(prefix_pat, line):
                 if not line.startswith("("):
                     receiver_name = line.strip()
                     break
+
+    # 3. Fallback: line that looks like Thai Firstname Lastname (no numbers, no address keywords)
+    if not receiver_name:
+        for line in candidate_lines:
+            if line.startswith("ที่") or "ผู้รับ" in line:
+                continue
+            clean_l = clean_thai_digits(line)
+            if any(c.isdigit() for c in clean_l):
+                continue
+            if any(k in line for k in ['จังหวัด', 'อำเภอ', 'ตำบล', 'หมู่', 'ถนน', 'ซอย', 'จ.', 'อ.', 'ต.', 'ปณ.', 'สาขา']):
+                continue
+            words = line.split()
+            if 1 <= len(words) <= 4 and len(line) >= 4:
+                receiver_name = line.strip()
+                break
 
     for line in candidate_lines:
         clean_l = clean_thai_digits(line)
@@ -457,10 +474,10 @@ def parse_envelope_label(text):
     addr_clean = re.sub(r'ตำบล/แขวง|ตำบล', 'ต.', addr_clean)
     if amphur:
         addr_clean = re.sub(r'(?:อำเภอ/เขต|อำเภอ|อ\.)\s*' + re.escape(amphur), '', addr_clean)
-        addr_clean = re.sub(r'\b' + re.escape(amphur) + r'\b', '', addr_clean)
+        addr_clean = re.sub(r'(?<!ต\.)(?<!ต\.\s)(?<!ตำบล\s)(?<!ตำบล)\b' + re.escape(amphur) + r'\b', '', addr_clean)
     if province:
         addr_clean = re.sub(r'(?:จังหวัด|จ\.)\s*' + re.escape(province), '', addr_clean)
-        addr_clean = re.sub(r'\b' + re.escape(province) + r'\b', '', addr_clean)
+        addr_clean = re.sub(r'(?<!ต\.)(?<!ต\.\s)(?<!ตำบล\s)(?<!ตำบล)\b' + re.escape(province) + r'\b', '', addr_clean)
     if zipcode:
         addr_clean = addr_clean.replace(zipcode, '')
     addr_clean = re.sub(r'ต\.\s+', 'ต.', addr_clean)
