@@ -226,4 +226,13 @@
        - สั่งกดปุ่ม `button[type="submit"]` ("ค้นหา") ให้โดยอัตโนมัติ แสดงผลแถวข้อมูลรายการพัสดุและป้าย "มีลายเซ็น" ทันทีโดยที่ผู้ใช้ไม่ต้องกดค้นหาเอง
        - แสดงป้ายแจ้งเตือนสีเขียวมรกตลอยมุมจอ: `⚡ C2DPost Helper • ค้นหาพัสดุสำเร็จ`
     3. อัปเกรดไฟล์แพ็กเกจส่วนขยาย `c2dpost-extension.zip` และ `C2DPost_Helper_v1.2.0_WebStore.zip` สู่เวอร์ชัน 1.2.0 พร้อมใช้งาน
+- [x] **4.52 ดึงข้อมูลฟิลด์ signature จาก getOrderByBarcode มาแสดงที่ "ชื่อผู้รับจริง" (Real Signer & Signature Field Integration) (`v2026.0917.1645`)**
+  - จากคู่มือ API `API Standard preload Data on e-Parcel.pdf` ระบุว่าฟิลด์ `signature` คือ `ชื่อ-นามสกุล ผู้รับสินค้า`
+  - ปรับปรุง Backend `api/index.py` ในฟังก์ชัน `get_tracking`:
+    - ทำการเรียก API `getOrderByBarcode?barcode={barcode}` เพิ่มเติมควบคู่กับ `getHistoryStatus` เพื่อดึงข้อมูล `signature` และ `customerName` จากระบบ e-Parcel อย่างเป็นทางการ
+    - นำค่า `signature` ที่ได้ใส่ลงใน Event ขั้นตอน "นำจ่ายสำเร็จ" (`delivered`) และส่งคืนใน Response
+  - ปรับปรุง UI ทั้งในโมดอล `TrackingTimelineModal.jsx` และหน้าสืบค้น `TrackingInquiryView.jsx`:
+    - เปลี่ยนป้ายกำกับจาก `ผู้เซ็นรับจริง:` เป็น **`ชื่อผู้รับจริง:`** ตามความต้องการของผู้ใช้และคู่มือ ปณท
+    - หากในระบบมีค่า `signature` (เช่นชื่อผู้รับที่พิมพ์ไว้) จะแสดงผลทันที: `✍️ ชื่อผู้รับจริง: [signature]`
+    - หากระบบ e-Parcel ส่งค่า `signature` เป็นค่าว่าง `""` จะแสดงคำแนะนำพร้อมปุ่มลิงก์เปิดสืบค้นภาพลายเซ็นใน e-AR ให้โดยอัตโนมัติ
   - คอมไพล์โปรเจกต์ `npm run build` และ Deploy ขึ้นสู่ Vercel Production สำเร็จ 100%

@@ -662,18 +662,18 @@ export default function TrackingInquiryView({ currentPerson, records = [], initi
                                       </span>
                                     )}
                                     {isDelivered ? (
-                                      <span className="stepper-meta-item signature" title={ev.signature ? `ผู้เซ็นรับจริง: ${ev.signature}` : 'ไม่พบชื่อพิมพ์ในระบบ e-Parcel / ภาพลายเซ็นอยู่ในระบบ e-AR'}>
+                                      <span className="stepper-meta-item signature" title={ev.signature ? `ชื่อผู้รับจริง: ${ev.signature}` : 'ไม่พบข้อมูล signature ในระบบ e-Parcel / ลายเซ็นอยู่ในระบบ e-AR'}>
                                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                           <path d="M12 19l7-7 3 3-7 7-3-3z"></path>
                                           <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"></path>
                                           <path d="M2 2l7.586 7.586"></path>
                                         </svg>
                                         {ev.signature ? (
-                                          <span><strong>ผู้เซ็นรับจริง:</strong> <span className="sig-name">{ev.signature}</span></span>
+                                          <span><strong>ชื่อผู้รับจริง:</strong> <span className="sig-name">{ev.signature}</span></span>
                                         ) : (
                                           <span>
-                                            <strong>ผู้เซ็นรับจริง:</strong>{' '}
-                                            <span className="sig-hint">(ไม่พบชื่อพิมพ์ในระบบ e-Parcel / ลายเซ็นอยู่ในระบบ e-AR)</span>{' '}
+                                            <strong>ชื่อผู้รับจริง:</strong>{' '}
+                                            <span className="sig-hint">(ไม่พบข้อมูล signature ในระบบ e-Parcel / ตรวจสอบลายเซ็นใน e-AR)</span>{' '}
                                             <a
                                               href={`https://e-ar.thailandpost.com/ear#barcode=${encodeURIComponent(result.barcode)}`}
                                               target="_blank"

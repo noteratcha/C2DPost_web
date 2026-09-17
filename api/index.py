@@ -882,6 +882,29 @@ def get_tracking(req: TrackingRequest):
                 except Exception:
                     raw = response.text
                 events = _parse_tracking_events(raw, barcode) or []
+
+                # Also query getOrderByBarcode to retrieve official metadata including 'signature' and 'customerName'
+                order_signature = ""
+                order_customer = ""
+                try:
+                    order_url = f"https://r_dservice.thailandpost.com/webservice/getOrderByBarcode?barcode={barcode}"
+                    order_resp = requests.get(order_url, headers=headers, auth=HTTPBasicAuth(username, password), timeout=8, verify=False)
+                    if order_resp.status_code == 200:
+                        try:
+                            odata = order_resp.json()
+                            if isinstance(odata, dict):
+                                order_signature = str(odata.get("signature") or "").strip()
+                                order_customer = str(odata.get("customerName") or "").strip()
+                                for ev in events:
+                                    if ev.get("status_key") == "delivered":
+                                        if order_signature:
+                                            ev["signature"] = order_signature
+                                        if order_customer and not ev.get("receiver_name"):
+                                            ev["receiver_name"] = order_customer
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
             else:
                 api_error = f"API ตอบกลับสถานะ {response.status_code}: {response.text[:200]}"
         except Exception as e:
@@ -898,6 +921,10 @@ def get_tracking(req: TrackingRequest):
     latest_status_label = latest_event.get("status_label", "อยู่ระหว่างการนำจ่าย") if latest_event else "อยู่ระหว่างการนำจ่าย"
     latest_datetime = latest_event.get("datetime", "") if latest_event else ""
     latest_location = latest_event.get("location", "") if latest_event else ""
+    final_signature = ""
+    for ev in events:
+        if ev.get("signature"):
+            final_signature = ev["signature"]
 
     return {
         "success": True,
@@ -905,6 +932,7 @@ def get_tracking(req: TrackingRequest):
         "is_mock": bool(is_demo_user),
         "api_notice": api_error if not is_demo_user else None,
         "events": events,
+        "signature": final_signature,
         "latest_status_key": latest_status_key,
         "latest_status_label": latest_status_label,
         "latest_datetime": latest_datetime,
