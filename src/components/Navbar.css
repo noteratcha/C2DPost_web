@@ -836,6 +836,59 @@
   color: #f8fafc;
 }
 
+/* 5. Drawer Version Pill (Below Theme Switcher) */
+.drawer-footer-version {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+:root[data-theme="dark"] .drawer-footer-version {
+  border-top-color: rgba(255, 255, 255, 0.08);
+}
+
+.drawer-version-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 6px 12px;
+  background: #f1f5f9;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 20px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: #475569;
+  text-align: center;
+  letter-spacing: -0.1px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+}
+
+.drawer-version-pill:hover {
+  background: #e2e8f0;
+  border-color: rgba(0, 0, 0, 0.12);
+  color: #0f172a;
+  transform: translateY(-1px);
+}
+
+:root[data-theme="dark"] .drawer-version-pill {
+  background: rgba(15, 23, 42, 0.6);
+  border-color: rgba(255, 255, 255, 0.08);
+  color: #94a3b8;
+}
+
+:root[data-theme="dark"] .drawer-version-pill:hover {
+  background: rgba(30, 41, 59, 0.9);
+  border-color: rgba(255, 255, 255, 0.15);
+  color: #f1f5f9;
+  transform: translateY(-1px);
+}
+
 /* Navbar Right Buttons */
 .navbar-right {
   display: flex;

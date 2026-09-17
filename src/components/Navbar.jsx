@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import AboutModal from './AboutModal';
 import { syncCredentialsToExtension } from '../utils/extensionBridge';
+import { APP_VERSION } from '../config';
 import './Navbar.css';
 
 export default function Navbar({ 
@@ -650,6 +651,22 @@ export default function Navbar({
                         </svg>
                         <span>มืด</span>
                       </button>
+                    </div>
+                  </div>
+
+                  {/* 5. System Version Badge (Underneath Theme Display) */}
+                  <div className="drawer-footer-version">
+                    <div 
+                      className="drawer-version-pill"
+                      onClick={() => {
+                        setIsNavMenuOpen(false);
+                        setShowAboutModal(true);
+                      }}
+                      title="คลิกเพื่อดูรายละเอียดเกี่ยวกับระบบ (About)"
+                      role="button"
+                      tabIndex={0}
+                    >
+                      <span>C2DPost Web Edition {APP_VERSION} — ส่วน ทข.ปข.10</span>
                     </div>
                   </div>
                 </div>
