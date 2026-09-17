@@ -747,9 +747,9 @@ export default function DepositReportModal({ isOpen, onClose, currentPerson, onS
                   const statusInfo = getDeliveryStatusInfo(rec);
                   const globalIdx = (currentPage - 1) * PAGE_SIZE + idx + 1;
                   const rawDesc = (rec.status_description_raw || rec.status_description || '').trim();
-                  const hasSpecificDetail = rawDesc && rawDesc !== statusInfo.label && !statusInfo.label.includes(rawDesc);
-                  const isException = /บ้านปิด|ออกใบแจ้ง|ไม่ชัดเจน|ไม่มีเลขบ้าน|ไม่ยอมรับ|ไม่มีผู้รับ|ไม่มารับตามกำหนด|รอจ่าย|ย้าย|เสียหาย|ระงับ|คืน/i.test(rawDesc);
-                  const tooltipText = hasSpecificDetail
+                  const isException = /บ้านปิด|ออกใบแจ้ง|ไม่ชัดเจน|ไม่มีเลขบ้าน|ไม่ยอมรับ|ไม่มีผู้รับ|ไม่มารับตามกำหนด|รอจ่าย|ย้าย|เสียหาย|ระงับ|คืน|ตกค้าง|อายัด|จ่าหน้าไม่ชัดเจน|ติดต่อไม่ได้/i.test(rawDesc);
+                  const shouldShowAlertSubtext = isException && rawDesc;
+                  const tooltipText = rawDesc && rawDesc !== statusInfo.label
                     ? `${statusInfo.label} (${rawDesc})`
                     : statusInfo.label;
                   return (
@@ -808,12 +808,12 @@ export default function DepositReportModal({ isOpen, onClose, currentPerson, onS
                             <span className={`status-dot dot-${statusInfo.key}`}></span>
                             <span>{statusInfo.label}</span>
                           </span>
-                          {hasSpecificDetail && (
+                          {shouldShowAlertSubtext && (
                             <div 
-                              className={`status-subtext ${isException ? 'status-subtext-alert' : 'status-subtext-transit'}`}
-                              title={`สถานะย่อย: ${rawDesc}`}
+                              className="status-subtext status-subtext-alert"
+                              title={`ข้อยกเว้นการนำจ่าย: ${rawDesc}`}
                             >
-                              {isException && <span className="status-subtext-icon">⚠️</span>}
+                              <span className="status-subtext-icon">⚠️</span>
                               <span>{rawDesc}</span>
                             </div>
                           )}
