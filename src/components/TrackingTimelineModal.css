@@ -632,6 +632,7 @@
 
 .track-step-datetime,
 .track-step-location,
+.track-step-receiver,
 .track-step-signature {
   display: flex;
   align-items: center;
@@ -639,10 +640,12 @@
   font-size: 0.78rem;
   color: #64748b;
   margin-top: 0.25rem;
+  flex-wrap: wrap;
 }
 
 [data-theme='dark'] .track-step-datetime,
 [data-theme='dark'] .track-step-location,
+[data-theme='dark'] .track-step-receiver,
 [data-theme='dark'] .track-step-signature {
   color: #94a3b8;
 }
@@ -655,17 +658,97 @@
   color: #d97706;
 }
 
+.track-step-receiver svg {
+  color: #0284c7;
+}
+
+.track-step-signature svg {
+  color: #10b981;
+}
+
+.track-step-receiver {
+  color: #334155;
+  background: rgba(0, 0, 0, 0.03);
+  padding: 0.2rem 0.5rem;
+  border-radius: 6px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+[data-theme='dark'] .track-step-receiver {
+  color: #cbd5e1;
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
 .track-step-signature {
   color: #059669;
+  background: rgba(16, 185, 129, 0.07);
+  padding: 0.2rem 0.5rem;
+  border-radius: 6px;
+  border: 1px solid rgba(16, 185, 129, 0.18);
   font-weight: 500;
 }
 
 [data-theme='dark'] .track-step-signature {
   color: #34d399;
+  background: rgba(16, 185, 129, 0.14);
+  border-color: rgba(52, 211, 153, 0.25);
 }
 
-.track-step-signature svg {
-  color: #10b981;
+.step-field-label {
+  color: #0f172a;
+  font-weight: 600;
+}
+
+[data-theme='dark'] .step-field-label {
+  color: #f8fafc;
+}
+
+.sig-name {
+  font-weight: 700;
+  color: #059669;
+}
+
+[data-theme='dark'] .sig-name {
+  color: #34d399;
+}
+
+.sig-hint {
+  color: #64748b;
+  font-style: normal;
+}
+
+[data-theme='dark'] .sig-hint {
+  color: #94a3b8;
+}
+
+.sig-ear-link {
+  color: #2563eb;
+  font-weight: 600;
+  text-decoration: none;
+  padding: 0.05rem 0.35rem;
+  border-radius: 4px;
+  background: rgba(37, 99, 235, 0.08);
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  margin-left: 0.25rem;
+}
+
+.sig-ear-link:hover {
+  background: rgba(37, 99, 235, 0.18);
+  text-decoration: underline;
+  color: #1d4ed8;
+}
+
+[data-theme='dark'] .sig-ear-link {
+  color: #60a5fa;
+  background: rgba(96, 165, 250, 0.15);
+}
+
+[data-theme='dark'] .sig-ear-link:hover {
+  background: rgba(96, 165, 250, 0.25);
+  color: #93c5fd;
 }
 
 /* Footer */

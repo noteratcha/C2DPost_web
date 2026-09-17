@@ -250,8 +250,6 @@ export default function TrackingTimelineModal({ isOpen, barcode, recInfo, curren
                   (ev.status_description || '').includes('นำจ่ายสำเร็จ') ||
                   (ev.status_description || '').includes('ผู้รับได้รับ');
 
-                const recipientDisplay = ev.signature || (isDelivered ? receiverName : '');
-
                 return (
                   <li key={ev.seq || idx} className={`track-step-item ${isLast ? 'last' : ''} ${isReceived ? 'received' : ''} ${isDelivered ? 'delivered' : ''}`}>
                     <div className="track-step-marker">
@@ -284,14 +282,50 @@ export default function TrackingTimelineModal({ isOpen, barcode, recInfo, curren
                           <span>{formatStationWithZipcode(ev.location, recInfo)}</span>
                         </div>
                       )}
-                      {recipientDisplay && (
-                        <div className="track-step-signature" title={ev.signature ? `ผู้ลงนาม: ${ev.signature}` : `ผู้รับสิ่งของ: ${recipientDisplay}`}>
+                      {isDelivered && receiverName && (
+                        <div className="track-step-receiver" title={`ผู้รับตามจ่าหน้า: ${receiverName}`}>
                           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
                             <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
                             <circle cx="12" cy="7" r="4"></circle>
                           </svg>
-                          <span>{ev.signature ? `ผู้ลงนาม: ${ev.signature}` : `ผู้รับ: ${recipientDisplay}`}</span>
+                          <span><strong className="step-field-label">ผู้รับตามจ่าหน้า:</strong> {receiverName}</span>
                         </div>
+                      )}
+                      {isDelivered ? (
+                        <div className="track-step-signature" title={ev.signature ? `ผู้เซ็นรับจริง: ${ev.signature}` : 'ไม่พบชื่อพิมพ์ในระบบ e-Parcel / ภาพลายเซ็นอยู่ในระบบ e-AR'}>
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                            <path d="M12 19l7-7 3 3-7 7-3-3z"></path>
+                            <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"></path>
+                            <path d="M2 2l7.586 7.586"></path>
+                          </svg>
+                          {ev.signature ? (
+                            <span><strong className="step-field-label">ผู้เซ็นรับจริง:</strong> <span className="sig-name">{ev.signature}</span></span>
+                          ) : (
+                            <span>
+                              <strong className="step-field-label">ผู้เซ็นรับจริง:</strong>{' '}
+                              <span className="sig-hint">(ไม่พบชื่อพิมพ์ในระบบ e-Parcel / ลายเซ็นอยู่ในระบบ e-AR)</span>{' '}
+                              <a
+                                href="https://e-ar.thailandpost.com"
+                                target="_blank"
+                                rel="noreferrer"
+                                className="sig-ear-link"
+                                title="คลิกเพื่อเปิดระบบ e-AR ดูภาพลายเซ็นใบตอบรับ"
+                              >
+                                ดูภาพลายเซ็นใน e-AR ↗
+                              </a>
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        ev.signature && (
+                          <div className="track-step-signature" title={`ผู้ลงนาม: ${ev.signature}`}>
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                              <circle cx="12" cy="7" r="4"></circle>
+                            </svg>
+                            <span><strong className="step-field-label">ผู้ลงนาม:</strong> {ev.signature}</span>
+                          </div>
+                        )
                       )}
                     </div>
                   </li>
