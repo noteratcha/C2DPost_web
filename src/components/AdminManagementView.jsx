@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { NO_EDIT_USERNAMES } from '../config';
+import { exportAdminUsersExcel } from '../utils/api';
 import './AdminManagementView.css';
 
 export default function AdminManagementView({
@@ -38,11 +39,14 @@ export default function AdminManagementView({
     TypeBarcode: 'EMS'
   };
 
-  const [formData, setFormData] = useState(initialFormState);
-  const [selectedUserIndex, setSelectedUserIndex] = useState(null);
-  const [formError, setFormError] = useState('');
-  const [formSuccess, setFormSuccess] = useState('');
-  const [isSaving, setIsSaving] = useState(false);
+  // User Edit Modal State
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editModalPerson, setEditModalPerson] = useState(null);
+  const [editModalData, setEditModalData] = useState({});
+  const [editModalError, setEditModalError] = useState('');
+  const [editModalSuccess, setEditModalSuccess] = useState('');
+  const [isModalSaving, setIsModalSaving] = useState(false);
+  const [isModalDeleting, setIsModalDeleting] = useState(false);
 
   // Search & Filter State for Table
   const [searchTerm, setSearchTerm] = useState('');
@@ -81,43 +85,10 @@ export default function AdminManagementView({
     if (onServicesChange) onServicesChange(services);
   }, [services, onServicesChange]);
 
-  // Form Change Handler
-  const handleInputChange = (field, value) => {
-    setFormError('');
-    setFormSuccess('');
-
-    // Tel validation (digits only, max 10)
-    if (field.startsWith('TelContactPerson')) {
-      const digitsOnly = value.replace(/\D/g, '').slice(0, 10);
-      setFormData((prev) => ({ ...prev, [field]: digitsOnly }));
-      return;
-    }
-
-    // English/Symbols only for UserName, Password, Email
-    if (['UserName', 'Password', 'Email'].includes(field)) {
-      // Allow letters, numbers, and basic symbols
-      const cleanVal = value.replace(/[^\x20-\x7E]/g, '');
-      setFormData((prev) => ({ ...prev, [field]: cleanVal }));
-      return;
-    }
-
-    setFormData((prev) => ({ ...prev, [field]: value }));
-  };
-
-  // Clear Form
-  const handleClearForm = () => {
-    setFormData(initialFormState);
-    setSelectedUserIndex(null);
-    setFormError('');
-    setFormSuccess('');
-  };
-
-  // Select User Row from Table
-  const handleSelectUser = (person, index) => {
-    setSelectedUserIndex(index);
-    setFormError('');
-    setFormSuccess('');
-    setFormData({
+  // Open row edit modal
+  const handleRowClick = (person, idx) => {
+    setEditModalPerson({ ...person, _idx: idx, _isNew: false });
+    setEditModalData({
       UserName: person.UserName || '',
       Password: person.Password || '',
       Email: person.Email || '',
@@ -135,87 +106,130 @@ export default function AdminManagementView({
       Status: person.Status || 'DOL',
       TypeBarcode: person.TypeBarcode || 'EMS'
     });
+    setEditModalError('');
+    setEditModalSuccess('');
+    setEditModalOpen(true);
   };
 
-  // Save / Update User
-  const handleSaveUser = async (e) => {
-    e.preventDefault();
-    setFormError('');
-    setFormSuccess('');
+  // Open modal in Add New User mode
+  const handleOpenAddModal = () => {
+    setEditModalPerson({ _isNew: true });
+    setEditModalData({
+      UserName: '',
+      Password: '',
+      Email: '',
+      Prefix: '',
+      Organization: '',
+      ResponsiblePostoffice: '',
+      ResponsibleZipcode: '',
+      ActivationDate: new Date().toLocaleDateString('th-TH'),
+      ContactPerson1: '',
+      TelContactPerson1: '',
+      ContactPerson2: '',
+      TelContactPerson2: '',
+      ContactPerson3: '',
+      TelContactPerson3: '',
+      Status: 'DOL',
+      TypeBarcode: 'EMS'
+    });
+    setEditModalError('');
+    setEditModalSuccess('');
+    setEditModalOpen(true);
+  };
 
-    // Required fields validation matching Python
-    const required = [
-      'UserName',
-      'Password',
-      'Email',
-      'Prefix',
-      'Organization',
-      'ResponsiblePostoffice',
-      'ResponsibleZipcode',
-      'ActivationDate',
-      'ContactPerson1',
-      'TelContactPerson1'
-    ];
+  const handleCloseEditModal = () => {
+    setEditModalOpen(false);
+    setEditModalPerson(null);
+    setEditModalError('');
+    setEditModalSuccess('');
+  };
 
-    for (const req of required) {
-      if (!formData[req] || !String(formData[req]).trim()) {
-        setFormError(`กรุณาระบุ ${req}`);
-        return;
+  // Close modal on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && editModalOpen) {
+        handleCloseEditModal();
       }
-    }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [editModalOpen]);
 
-    // Phone length validation
-    for (const tel of ['TelContactPerson1', 'TelContactPerson2', 'TelContactPerson3']) {
-      const val = formData[tel]?.trim();
-      if (val && val.length < 9) {
-        setFormError(`${tel} ต้องมี 9-10 หลัก`);
-        return;
-      }
-    }
-
-    // Protected usernames check
-    if (NO_EDIT_USERNAMES.includes(formData.UserName.toLowerCase()) && formData.Status !== 'ADMIN') {
-      setFormError(`ไม่อนุญาตให้แก้ไขสถานะของบัญชีผู้ดูแลระบบ (${formData.UserName})`);
+  const handleModalInputChange = (field, value) => {
+    setEditModalError('');
+    setEditModalSuccess('');
+    if (field.startsWith('TelContactPerson')) {
+      setEditModalData(prev => ({ ...prev, [field]: value.replace(/\D/g, '').slice(0, 10) }));
       return;
     }
+    if (['UserName', 'Password', 'Email'].includes(field)) {
+      setEditModalData(prev => ({ ...prev, [field]: value.replace(/[^\x20-\x7E]/g, '') }));
+      return;
+    }
+    setEditModalData(prev => ({ ...prev, [field]: value }));
+  };
 
-    setIsSaving(true);
-
+  const handleModalSave = async () => {
+    setEditModalError('');
+    setEditModalSuccess('');
+    const required = ['UserName','Password','Email','Prefix','Organization','ResponsiblePostoffice','ResponsibleZipcode','ActivationDate','ContactPerson1','TelContactPerson1'];
+    for (const req of required) {
+      if (!editModalData[req]?.trim()) { setEditModalError(`กรุณาระบุ ${req}`); return; }
+    }
+    setIsModalSaving(true);
     try {
-      const payload = {
-        action: 'update_user',
-        ...formData
-      };
-
       const res = await fetch('/api/admin/update_user', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify({ action: 'update_user', ...editModalData })
       });
-
       const data = await res.json();
-
       if (data.status === 'success' || data.success) {
-        setFormSuccess(`บันทึกข้อมูลผู้ใช้ "${formData.UserName}" เรียบร้อยแล้ว!`);
-        if (onRefreshPeople) {
-          onRefreshPeople();
-        }
+        setEditModalSuccess(`บันทึก "${editModalData.UserName}" เรียบร้อยแล้ว`);
+        if (onRefreshPeople) onRefreshPeople();
+        setTimeout(() => {
+          handleCloseEditModal();
+        }, 1200);
       } else {
-        setFormError(data.message || 'เกิดข้อผิดพลาดในการบันทึกข้อมูล');
+        setEditModalError(data.message || 'เกิดข้อผิดพลาด');
       }
-    } catch (err) {
-      console.error('Update user error:', err);
-      // If deployed in demo/standalone mode where Google Script might be simulated
-      setFormSuccess(`บันทึกข้อมูลผู้ใช้ "${formData.UserName}" สำเร็จ (โหมดการแสดงผล)`);
-      if (onRefreshPeople) {
-        onRefreshPeople();
-      }
+    } catch {
+      setEditModalSuccess(`บันทึก "${editModalData.UserName}" สำเร็จ (โหมดการแสดงผล)`);
+      if (onRefreshPeople) onRefreshPeople();
+      setTimeout(() => {
+        handleCloseEditModal();
+      }, 1200);
     } finally {
-      setIsSaving(false);
+      setIsModalSaving(false);
+    }
+  };
+
+  const handleModalDelete = async () => {
+    if (!window.confirm(`ยืนยันการลบบัญชีผู้ใช้ "${editModalData.UserName}" ?`)) return;
+    setIsModalDeleting(true);
+    try {
+      const res = await fetch('/api/admin/update_user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'delete_user', UserName: editModalData.UserName })
+      });
+      const data = await res.json();
+      if (data.status === 'success' || data.success) {
+        handleCloseEditModal();
+        if (onRefreshPeople) onRefreshPeople();
+      } else {
+        setEditModalError(data.message || 'ลบไม่สำเร็จ');
+      }
+    } catch {
+      setEditModalError('เกิดข้อผิดพลาดในการลบ (โหมดการแสดงผล)');
+    } finally {
+      setIsModalDeleting(false);
     }
   };
 
   // Filter Users Table
+  const [isExportingExcel, setIsExportingExcel] = useState(false);
+
   const filteredUsers = useMemo(() => {
     return people.filter((p) => {
       // Status tab filter
@@ -238,6 +252,25 @@ export default function AdminManagementView({
     });
   }, [people, statusFilter, searchTerm]);
 
+  // Export all users or filtered list to Excel
+  const handleExportExcel = async () => {
+    if (!people || people.length === 0) {
+      alert('ไม่พบข้อมูลผู้ใช้งานในระบบสำหรับส่งออก');
+      return;
+    }
+    setIsExportingExcel(true);
+    try {
+      // If user filtered or searched, export filtered list; otherwise export all people
+      const exportTarget = (searchTerm || statusFilter !== 'ALL') ? filteredUsers : people;
+      await exportAdminUsersExcel(exportTarget);
+    } catch (err) {
+      console.error('Export user excel error:', err);
+      alert(`เกิดข้อผิดพลาดในการส่งออกไฟล์ Excel: ${err.message || err}`);
+    } finally {
+      setIsExportingExcel(false);
+    }
+  };
+
   return (
     <div className="admin-management-container">
       {/* 1. Admin Top Navigation Bar */}
@@ -258,291 +291,35 @@ export default function AdminManagementView({
             </p>
           </div>
         </div>
+
+        <div className="admin-bar-right">
+          <a
+            href="https://chrome.google.com/webstore/devconsole/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn-admin-webstore-link"
+            title="เปิด Chrome Web Store Developer Console เพื่ออัปโหลดไฟล์ Extension ZIP เวอร์ชันใหม่"
+          >
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10"/>
+              <circle cx="12" cy="12" r="4"/>
+              <line x1="21.17" y1="8" x2="12" y2="8"/>
+              <line x1="3.95" y1="6.06" x2="8.54" y2="14"/>
+              <line x1="10.88" y1="21.94" x2="15.46" y2="14"/>
+            </svg>
+            <span>อัปเดต Extension (Chrome Web Store)</span>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+              <polyline points="15 3 21 3 21 9"/>
+              <line x1="10" y1="14" x2="21" y2="3"/>
+            </svg>
+          </a>
+        </div>
       </header>
 
       {/* 2. Main Content Split Layout */}
       <div className="admin-split-layout">
-        {/* LEFT COLUMN: Data Entry Form */}
-        <aside className="admin-form-panel">
-          <div className="panel-header-row">
-            <h3 className="panel-title">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-              </svg>
-              {selectedUserIndex !== null ? 'แก้ไขข้อมูลผู้ใช้งาน' : 'เพิ่ม / บันทึกข้อมูลผู้ใช้งาน'}
-            </h3>
-            {selectedUserIndex !== null && (
-              <span className="form-mode-pill">กำลังแก้ไข: #{selectedUserIndex + 1}</span>
-            )}
-          </div>
-
-          {/* Alerts */}
-          {formError && (
-            <div className="admin-alert error">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
-              <span>{formError}</span>
-            </div>
-          )}
-
-          {formSuccess && (
-            <div className="admin-alert success">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
-              <span>{formSuccess}</span>
-            </div>
-          )}
-
-          <form className="admin-entry-form" onSubmit={handleSaveUser}>
-            {/* Account Credentials Group */}
-            <div className="form-section-title">ข้อมูลบัญชีผู้ใช้</div>
-            
-            <div className="form-grid-2">
-              <div className="form-group">
-                <label>UserName <span className="req-star">*</span></label>
-                <input
-                  type="text"
-                  className="admin-input"
-                  placeholder="เช่น renu_officer"
-                  value={formData.UserName}
-                  onChange={(e) => handleInputChange('UserName', e.target.value)}
-                  disabled={NO_EDIT_USERNAMES.includes(formData.UserName.toLowerCase()) && selectedUserIndex !== null}
-                  required
-                />
-              </div>
-
-              <div className="form-group">
-                <label>Password <span className="req-star">*</span></label>
-                <input
-                  type="text"
-                  className="admin-input"
-                  placeholder="รหัสผ่าน"
-                  value={formData.Password}
-                  onChange={(e) => handleInputChange('Password', e.target.value)}
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="form-grid-2">
-              <div className="form-group">
-                <label>Email <span className="req-star">*</span></label>
-                <input
-                  type="email"
-                  className="admin-input"
-                  placeholder="email@domain.com"
-                  value={formData.Email}
-                  onChange={(e) => handleInputChange('Email', e.target.value)}
-                  required
-                />
-              </div>
-
-              <div className="form-group">
-                <label>Prefix (นำหน้ารหัส) <span className="req-star">*</span></label>
-                <input
-                  type="text"
-                  className="admin-input"
-                  placeholder="เช่น RN, SK, C2D"
-                  value={formData.Prefix}
-                  onChange={(e) => handleInputChange('Prefix', e.target.value)}
-                  required
-                />
-              </div>
-            </div>
-
-            {/* Organization & Location Group */}
-            <div className="form-section-title">หน่วยงานและไปรษณีย์รับผิดชอบ</div>
-
-            <div className="form-group">
-              <label>Organization (หน่วยงาน) <span className="req-star">*</span></label>
-              <input
-                type="text"
-                className="admin-input"
-                placeholder="สำนักงานที่ดิน..."
-                value={formData.Organization}
-                onChange={(e) => handleInputChange('Organization', e.target.value)}
-                required
-              />
-            </div>
-
-            <div className="form-grid-2">
-              <div className="form-group">
-                <label>ไปรษณีย์รับผิดชอบ <span className="req-star">*</span></label>
-                <input
-                  type="text"
-                  className="admin-input"
-                  placeholder="เช่น ไปรษณีย์เรณูนคร"
-                  value={formData.ResponsiblePostoffice}
-                  onChange={(e) => handleInputChange('ResponsiblePostoffice', e.target.value)}
-                  required
-                />
-              </div>
-
-              <div className="form-group">
-                <label>รหัสไปรษณีย์ <span className="req-star">*</span></label>
-                <input
-                  type="text"
-                  className="admin-input"
-                  placeholder="เช่น 48170"
-                  value={formData.ResponsibleZipcode}
-                  onChange={(e) => handleInputChange('ResponsibleZipcode', e.target.value.replace(/\D/g, '').slice(0, 5))}
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="form-group">
-              <label>ActivationDate (วันที่เปิดใช้งาน) <span className="req-star">*</span></label>
-              <input
-                type="text"
-                className="admin-input"
-                placeholder="วัน/เดือน/ปี เช่น 1/9/2026"
-                value={formData.ActivationDate}
-                onChange={(e) => handleInputChange('ActivationDate', e.target.value)}
-                required
-              />
-            </div>
-
-            {/* Contact Persons Group */}
-            <div className="form-section-title">ผู้ประสานงานและเบอร์โทรศัพท์</div>
-
-            <div className="form-grid-2">
-              <div className="form-group">
-                <label>ผู้ประสานงาน 1 <span className="req-star">*</span></label>
-                <input
-                  type="text"
-                  className="admin-input"
-                  placeholder="ชื่อ-นามสกุล"
-                  value={formData.ContactPerson1}
-                  onChange={(e) => handleInputChange('ContactPerson1', e.target.value)}
-                  required
-                />
-              </div>
-
-              <div className="form-group">
-                <label>เบอร์โทรศัพท์ 1 <span className="req-star">*</span></label>
-                <input
-                  type="text"
-                  className="admin-input"
-                  placeholder="08xxxxxxxx (9-10 หลัก)"
-                  value={formData.TelContactPerson1}
-                  onChange={(e) => handleInputChange('TelContactPerson1', e.target.value)}
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="form-grid-2">
-              <div className="form-group">
-                <label>ผู้ประสานงาน 2</label>
-                <input
-                  type="text"
-                  className="admin-input"
-                  placeholder="ชื่อ-นามสกุล"
-                  value={formData.ContactPerson2}
-                  onChange={(e) => handleInputChange('ContactPerson2', e.target.value)}
-                />
-              </div>
-
-              <div className="form-group">
-                <label>เบอร์โทรศัพท์ 2</label>
-                <input
-                  type="text"
-                  className="admin-input"
-                  placeholder="08xxxxxxxx"
-                  value={formData.TelContactPerson2}
-                  onChange={(e) => handleInputChange('TelContactPerson2', e.target.value)}
-                />
-              </div>
-            </div>
-
-            <div className="form-grid-2">
-              <div className="form-group">
-                <label>ผู้ประสานงาน 3</label>
-                <input
-                  type="text"
-                  className="admin-input"
-                  placeholder="ชื่อ-นามสกุล"
-                  value={formData.ContactPerson3}
-                  onChange={(e) => handleInputChange('ContactPerson3', e.target.value)}
-                />
-              </div>
-
-              <div className="form-group">
-                <label>เบอร์โทรศัพท์ 3</label>
-                <input
-                  type="text"
-                  className="admin-input"
-                  placeholder="08xxxxxxxx"
-                  value={formData.TelContactPerson3}
-                  onChange={(e) => handleInputChange('TelContactPerson3', e.target.value)}
-                />
-              </div>
-            </div>
-
-            {/* System Status & Barcode Type */}
-            <div className="form-section-title">สิทธิ์และประเภทการส่ง</div>
-
-            <div className="form-grid-2">
-              <div className="form-group">
-                <label>Status (สถานะสิทธิ์) <span className="req-star">*</span></label>
-                <select
-                  className="admin-select"
-                  value={formData.Status}
-                  onChange={(e) => handleInputChange('Status', e.target.value)}
-                >
-                  <option value="DOL">DOL (เปิดใช้งาน)</option>
-                  <option value="INACTIVE">INACTIVE (ปิดการใช้งาน)</option>
-                  <option value="ADMIN">ADMIN (ผู้ดูแลระบบ)</option>
-                </select>
-              </div>
-
-              <div className="form-group">
-                <label>TypeBarcode (ประเภทบาร์โค้ด) <span className="req-star">*</span></label>
-                <select
-                  className="admin-select"
-                  value={formData.TypeBarcode}
-                  onChange={(e) => handleInputChange('TypeBarcode', e.target.value)}
-                >
-                  <option value="EMS">EMS (ด่วนพิเศษ)</option>
-                  <option value="R">R (ลงทะเบียน)</option>
-                  <option value="eCo">eCo (พัสดุประหยัด)</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Form Actions */}
-            <div className="form-buttons-row">
-              <button
-                type="submit"
-                className="btn-admin-save"
-                disabled={isSaving}
-              >
-                {isSaving ? (
-                  <>
-                    <span className="btn-spinner"></span>
-                    <span>กำลังบันทึก...</span>
-                  </>
-                ) : (
-                  <>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
-                    <span>บันทึกข้อมูล</span>
-                  </>
-                )}
-              </button>
-
-              <button
-                type="button"
-                className="btn-admin-clear"
-                onClick={handleClearForm}
-                disabled={isSaving}
-              >
-                <span>ล้างฟอร์ม</span>
-              </button>
-            </div>
-          </form>
-        </aside>
-
-        {/* RIGHT COLUMN: User List Table */}
+        {/* User List Table */}
         <main className="admin-table-panel">
           {/* Table Header Controls */}
           <div className="table-controls-bar">
@@ -609,6 +386,49 @@ export default function AdminManagementView({
                 )}
               </div>
 
+              {/* Add User Button */}
+              <button
+                type="button"
+                className="btn-admin-add-user"
+                onClick={handleOpenAddModal}
+                title="เพิ่มผู้ใช้งานใหม่"
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4">
+                  <line x1="12" y1="5" x2="12" y2="19"></line>
+                  <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                <span>เพิ่มผู้ใช้</span>
+              </button>
+
+              {/* Export Excel Button */}
+              <button
+                type="button"
+                className="btn-admin-export-excel"
+                onClick={handleExportExcel}
+                disabled={isExportingExcel || people.length === 0}
+                title={`ส่งออกข้อมูลผู้ใช้ทั้งหมดในระบบเป็นไฟล์ Excel (.xlsx) (${(searchTerm || statusFilter !== 'ALL') ? filteredUsers.length : people.length} รายการ)`}
+              >
+                {isExportingExcel ? (
+                  <>
+                    <svg className="spin-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4">
+                      <circle cx="12" cy="12" r="10" strokeDasharray="32" strokeDashoffset="12" />
+                    </svg>
+                    <span>กำลังส่งออก...</span>
+                  </>
+                ) : (
+                  <>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                      <polyline points="14 2 14 8 20 8"></polyline>
+                      <path d="M8 13h2"></path>
+                      <path d="M8 17h8"></path>
+                      <path d="M14 13h2"></path>
+                    </svg>
+                    <span>ส่งออก Excel</span>
+                  </>
+                )}
+              </button>
+
               {/* Refresh Button */}
               {onRefreshPeople && (
                 <button
@@ -667,7 +487,7 @@ export default function AdminManagementView({
                   </tr>
                 ) : (
                   filteredUsers.map((person, idx) => {
-                    const isSelected = selectedUserIndex === idx;
+                    const isSelected = editModalOpen && editModalPerson?.UserName === person.UserName;
                     const isProtected = NO_EDIT_USERNAMES.includes((person.UserName || '').toLowerCase());
                     const statusVal = (person.Status || '').trim().toUpperCase();
 
@@ -675,8 +495,8 @@ export default function AdminManagementView({
                       <tr
                         key={person.UserName || idx}
                         className={`user-table-row ${isSelected ? 'row-selected' : ''}`}
-                        onClick={() => handleSelectUser(person, idx)}
-                        title="คลิกเพื่อนำข้อมูลไปแก้ไขในฟอร์ม"
+                        onClick={() => handleRowClick(person, idx)}
+                        title="คลิกเพื่อแก้ไข / ดูข้อมูลผู้ใช้"
                       >
                         <td className="col-no">{String(idx + 1).padStart(2, '0')}</td>
                         
@@ -722,10 +542,216 @@ export default function AdminManagementView({
           {/* Table Footer */}
           <div className="admin-table-footer">
             <span>แสดง <strong>{filteredUsers.length}</strong> จากทั้งหมด <strong>{people.length}</strong> รายชื่อ</span>
-            <span className="table-hint">💡 คลิกที่แถวใดแถวหนึ่งเพื่อโหลดข้อมูลเข้าฟอร์มฝั่งซ้ายเพื่อแก้ไข</span>
+            <span className="table-hint">💡 คลิกที่แถวใดแถวหนึ่งเพื่อแก้ไข / ดูข้อมูลผู้ใช้</span>
           </div>
         </main>
       </div>
+
+      {/* ─── User Edit Modal Popup ─── */}
+      {editModalOpen && editModalPerson && (
+        <div className="admin-edit-modal-overlay" onClick={handleCloseEditModal}>
+          <div className="admin-edit-modal" onClick={e => e.stopPropagation()}>
+            {/* Modal Header */}
+            <div className="aem-header">
+              <div className="aem-header-left">
+                <div className="aem-icon">
+                  {editModalPerson._isNew ? (
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
+                  ) : (
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                  )}
+                </div>
+                <div>
+                  <div className="aem-title">
+                    {editModalPerson._isNew ? 'เพิ่มข้อมูลผู้ใช้งานใหม่' : (editModalData.UserName || 'แก้ไขข้อมูลผู้ใช้งาน')}
+                  </div>
+                  <div className="aem-subtitle">
+                    {editModalPerson._isNew ? (
+                      <span className="aem-org-text">บันทึกข้อมูลผู้ใช้งานระบบเพื่อเปิดสิทธิ์ DOL</span>
+                    ) : (
+                      <>
+                        <span className={`aem-status-badge status-${(editModalData.Status||'').toLowerCase()}`}>{editModalData.Status || '-'}</span>
+                        <span className="aem-org-text">{editModalData.Organization || '-'}</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <div className="aem-header-actions">
+                {!editModalPerson._isNew && (
+                  <button
+                    type="button"
+                    className="aem-btn-header-add"
+                    onClick={handleOpenAddModal}
+                    title="สลับเป็นโหมดเพิ่มผู้ใช้ใหม่"
+                  >
+                    + เพิ่มใหม่
+                  </button>
+                )}
+                <button className="aem-close-btn" onClick={handleCloseEditModal} title="ปิด (Esc)">✕</button>
+              </div>
+            </div>
+
+            {/* Alerts */}
+            {editModalError && (
+              <div className="aem-alert error">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                <span>{editModalError}</span>
+              </div>
+            )}
+            {editModalSuccess && (
+              <div className="aem-alert success">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                <span>{editModalSuccess}</span>
+              </div>
+            )}
+
+            {/* Modal Body - Form Fields */}
+            <div className="aem-body">
+              {/* Row 1: UserName + Password */}
+              <div className="aem-section-label">บัญชีผู้ใช้</div>
+              <div className="aem-grid-2">
+                <div className="aem-field">
+                  <label>UserName <span className="req-star">*</span></label>
+                  <input className="aem-input" value={editModalData.UserName}
+                    onChange={e => handleModalInputChange('UserName', e.target.value)}
+                    placeholder="เช่น renu_officer"
+                    disabled={!editModalPerson._isNew && NO_EDIT_USERNAMES.includes((editModalData.UserName||'').toLowerCase())}
+                  />
+                </div>
+                <div className="aem-field">
+                  <label>Password <span className="req-star">*</span></label>
+                  <input className="aem-input" value={editModalData.Password}
+                    placeholder="รหัสผ่าน"
+                    onChange={e => handleModalInputChange('Password', e.target.value)} />
+                </div>
+              </div>
+
+              {/* Row 2: Email + Prefix */}
+              <div className="aem-grid-2">
+                <div className="aem-field">
+                  <label>Email <span className="req-star">*</span></label>
+                  <input className="aem-input" type="email" value={editModalData.Email}
+                    placeholder="email@domain.com"
+                    onChange={e => handleModalInputChange('Email', e.target.value)} />
+                </div>
+                <div className="aem-field">
+                  <label>Prefix (นำหน้ารหัส) <span className="req-star">*</span></label>
+                  <input className="aem-input" value={editModalData.Prefix}
+                    placeholder="เช่น RN, SK, C2D"
+                    onChange={e => handleModalInputChange('Prefix', e.target.value)} />
+                </div>
+              </div>
+
+              {/* Organization */}
+              <div className="aem-section-label">หน่วยงานและไปรษณีย์</div>
+              <div className="aem-field">
+                <label>Organization (หน่วยงาน) <span className="req-star">*</span></label>
+                <input className="aem-input" value={editModalData.Organization}
+                  placeholder="เช่น สำนักงานที่ดินจังหวัดนครพนม สาขาเรณูนคร"
+                  onChange={e => handleModalInputChange('Organization', e.target.value)} />
+              </div>
+              <div className="aem-grid-3">
+                <div className="aem-field">
+                  <label>ไปรษณีย์รับผิดชอบ <span className="req-star">*</span></label>
+                  <input className="aem-input" value={editModalData.ResponsiblePostoffice}
+                    placeholder="เช่น ไปรษณีย์เรณูนคร"
+                    onChange={e => handleModalInputChange('ResponsiblePostoffice', e.target.value)} />
+                </div>
+                <div className="aem-field">
+                  <label>รหัส ปณ. <span className="req-star">*</span></label>
+                  <input className="aem-input" value={editModalData.ResponsibleZipcode}
+                    placeholder="48170"
+                    onChange={e => handleModalInputChange('ResponsibleZipcode', e.target.value.replace(/\D/g,'').slice(0,5))} />
+                </div>
+                <div className="aem-field">
+                  <label>วันที่เปิดใช้งาน <span className="req-star">*</span></label>
+                  <input className="aem-input" value={editModalData.ActivationDate}
+                    placeholder="18/9/2569"
+                    onChange={e => handleModalInputChange('ActivationDate', e.target.value)} />
+                </div>
+              </div>
+
+              {/* Contacts */}
+              <div className="aem-section-label">ผู้ประสานงาน</div>
+              {[1,2,3].map(n => (
+                <div key={n} className="aem-grid-2">
+                  <div className="aem-field">
+                    <label>ผู้ประสานงาน {n}{n===1 && <span className="req-star"> *</span>}</label>
+                    <input className="aem-input" value={editModalData[`ContactPerson${n}`] || ''}
+                      placeholder={`ชื่อ-นามสกุล ผู้ประสานงาน ${n}`}
+                      onChange={e => handleModalInputChange(`ContactPerson${n}`, e.target.value)} />
+                  </div>
+                  <div className="aem-field">
+                    <label>เบอร์โทร {n}{n===1 && <span className="req-star"> *</span>}</label>
+                    <input className="aem-input" value={editModalData[`TelContactPerson${n}`] || ''}
+                      placeholder="08xxxxxxxx"
+                      onChange={e => handleModalInputChange(`TelContactPerson${n}`, e.target.value)} />
+                  </div>
+                </div>
+              ))}
+
+              {/* Status & TypeBarcode */}
+              <div className="aem-section-label">สิทธิ์และประเภทบาร์โค้ด</div>
+              <div className="aem-grid-2">
+                <div className="aem-field">
+                  <label>Status <span className="req-star">*</span></label>
+                  <select className="aem-select" value={editModalData.Status || 'DOL'}
+                    onChange={e => handleModalInputChange('Status', e.target.value)}>
+                    <option value="DOL">DOL (เปิดใช้งาน)</option>
+                    <option value="INACTIVE">INACTIVE (ปิดการใช้งาน)</option>
+                    <option value="ADMIN">ADMIN (ผู้ดูแลระบบ)</option>
+                  </select>
+                </div>
+                <div className="aem-field">
+                  <label>TypeBarcode <span className="req-star">*</span></label>
+                  <select className="aem-select" value={editModalData.TypeBarcode || 'EMS'}
+                    onChange={e => handleModalInputChange('TypeBarcode', e.target.value)}>
+                    <option value="EMS">EMS (ด่วนพิเศษ)</option>
+                    <option value="R">R (ลงทะเบียน)</option>
+                    <option value="eCo">eCo (พัสดุประหยัด)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer Actions - No redundant close button, only actions */}
+            <div className="aem-footer">
+              <div className="aem-footer-left">
+                {!editModalPerson._isNew && !NO_EDIT_USERNAMES.includes((editModalData.UserName||'').toLowerCase()) && (
+                  <button
+                    type="button"
+                    className="aem-btn-delete"
+                    onClick={handleModalDelete}
+                    disabled={isModalDeleting || isModalSaving}
+                    title="ลบบัญชีผู้ใช้นี้"
+                  >
+                    {isModalDeleting ? (
+                      <><span className="btn-spinner" /><span>กำลังลบ...</span></>
+                    ) : (
+                      <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg><span>ลบบัญชี</span></>
+                    )}
+                  </button>
+                )}
+              </div>
+              <div className="aem-footer-right">
+                <button
+                  type="button"
+                  className="aem-btn-save"
+                  onClick={handleModalSave}
+                  disabled={isModalSaving || isModalDeleting}
+                >
+                  {isModalSaving ? (
+                    <><span className="btn-spinner" /><span>กำลังบันทึก...</span></>
+                  ) : (
+                    <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg><span>{editModalPerson._isNew ? 'บันทึกผู้ใช้ใหม่' : 'บันทึกข้อมูล'}</span></>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

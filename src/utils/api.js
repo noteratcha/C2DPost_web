@@ -453,5 +453,78 @@ export async function updateEparcelStatusInSheet(barcodes, status = 'yes') {
   }
 }
 
+/**
+ * Export all Admin User Accounts to Excel (.xlsx)
+ * Calls the backend /api/admin/export-users-excel, with client-side CSV/XLS UTF-8 fallback.
+ *
+ * @param {Array<Object>} users - list of user objects
+ */
+export async function exportAdminUsersExcel(users) {
+  if (!users || users.length === 0) {
+    throw new Error('ไม่พบข้อมูลผู้ใช้งานสำหรับส่งออก');
+  }
 
+  try {
+    const response = await fetch(`${API_BASE}/admin/export-users-excel`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ users })
+    });
 
+    if (response.ok) {
+      const fallback = `C2DPost_Users_${Date.now()}.xlsx`;
+      const filename = getFilenameFromHeader(response.headers.get('Content-Disposition'), fallback);
+      const blob = await response.blob();
+      downloadBlob(blob, filename);
+      return { success: true };
+    }
+  } catch (err) {
+    console.warn('Backend export-users-excel failed, using client fallback:', err);
+  }
+
+  // Client-side fallback with UTF-8 BOM so Excel opens Thai characters seamlessly
+  const headers = [
+    'ลำดับ',
+    'UserName',
+    'Password',
+    'Email',
+    'Prefix',
+    'Organization',
+    'ไปรษณีย์รับผิดชอบ',
+    'รหัสไปรษณีย์',
+    'วันที่เปิดใช้งาน',
+    'ผู้ประสานงาน 1',
+    'เบอร์โทร 1',
+    'ผู้ประสานงาน 2',
+    'เบอร์โทร 2',
+    'ผู้ประสานงาน 3',
+    'เบอร์โทร 3',
+    'Status',
+    'TypeBarcode'
+  ];
+
+  const rows = users.map((u, i) => [
+    u.NO || (i + 1),
+    `"${(u.UserName || '').replace(/"/g, '""')}"`,
+    `"${(u.Password || '').replace(/"/g, '""')}"`,
+    `"${(u.Email || '').replace(/"/g, '""')}"`,
+    `"${(u.Prefix || '').replace(/"/g, '""')}"`,
+    `"${(u.Organization || '').replace(/"/g, '""')}"`,
+    `"${(u.ResponsiblePostoffice || '').replace(/"/g, '""')}"`,
+    `\t${u.ResponsibleZipcode || ''}`,
+    `"${(u.ActivationDate || '').replace(/"/g, '""')}"`,
+    `"${(u.ContactPerson1 || '').replace(/"/g, '""')}"`,
+    `\t${u.TelContactPerson1 || ''}`,
+    `"${(u.ContactPerson2 || '').replace(/"/g, '""')}"`,
+    `\t${u.TelContactPerson2 || ''}`,
+    `"${(u.ContactPerson3 || '').replace(/"/g, '""')}"`,
+    `\t${u.TelContactPerson3 || ''}`,
+    `"${(u.Status || '').replace(/"/g, '""')}"`,
+    `"${(u.TypeBarcode || '').replace(/"/g, '""')}"`
+  ]);
+
+  const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(r => r.join(','))].join('\r\n');
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  downloadBlob(blob, `C2DPost_Users_${Date.now()}.csv`);
+  return { success: true };
+}

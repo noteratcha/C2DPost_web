@@ -5,112 +5,141 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>C2DPost Helper</title>
   <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
     body {
-      width: 280px;
-      font-family: 'Segoe UI', Tahoma, sans-serif;
-      margin: 0;
-      padding: 16px;
+      width: 260px;
+      font-family: 'Segoe UI', system-ui, sans-serif;
       background: #0f172a;
-      color: #f8fafc;
+      color: #f1f5f9;
+      padding: 16px;
     }
+
+    /* ─── Header ─── */
     .header {
       display: flex;
       align-items: center;
       gap: 10px;
-      margin-bottom: 12px;
-      padding-bottom: 10px;
-      border-bottom: 1px solid #334155;
+      margin-bottom: 14px;
     }
-    .logo-badge {
-      width: 32px;
-      height: 32px;
+    .logo {
+      width: 34px;
+      height: 34px;
       background: #059669;
-      color: white;
-      border-radius: 8px;
+      border-radius: 9px;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-weight: bold;
-      font-size: 16px;
+      font-weight: 800;
+      font-size: 13px;
+      letter-spacing: -0.5px;
+      color: #fff;
+      flex-shrink: 0;
     }
-    .title {
+    .brand-name {
       font-size: 14px;
-      font-weight: bold;
-      color: #f8fafc;
+      font-weight: 700;
+      color: #f1f5f9;
+      line-height: 1;
     }
-    .subtitle {
-      font-size: 11px;
-      color: #94a3b8;
+    .brand-ver {
+      font-size: 10px;
+      color: #64748b;
+      margin-top: 3px;
     }
-    .status-card {
-      background: #1e293b;
-      border-radius: 8px;
-      padding: 12px;
-      margin-bottom: 12px;
-      border: 1px solid #334155;
-    }
-    .status-indicator {
+
+    /* ─── Status pill ─── */
+    .status-pill {
       display: flex;
       align-items: center;
-      gap: 8px;
-      font-size: 13px;
+      gap: 7px;
+      background: #1e293b;
+      border: 1px solid #1e3a2f;
+      border-radius: 100px;
+      padding: 6px 12px;
+      margin-bottom: 12px;
+    }
+    .dot {
+      width: 8px;
+      height: 8px;
+      background: #10b981;
+      border-radius: 50%;
+      box-shadow: 0 0 6px #10b981;
+      flex-shrink: 0;
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.5; }
+    }
+    .status-text {
+      font-size: 12px;
       font-weight: 600;
       color: #34d399;
     }
-    .dot {
-      width: 10px;
-      height: 10px;
-      background: #10b981;
-      border-radius: 50%;
-      box-shadow: 0 0 8px #10b981;
-    }
-    .status-desc {
-      font-size: 11px;
-      color: #94a3b8;
-      margin-top: 6px;
-      line-height: 1.4;
-    }
-    .btn {
-      width: 100%;
-      padding: 8px 12px;
-      background: #059669;
-      color: white;
+
+    /* ─── Divider ─── */
+    hr {
       border: none;
-      border-radius: 6px;
-      font-size: 12px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: background 0.2s;
-      box-sizing: border-box;
-      text-align: center;
-      text-decoration: none;
-      display: block;
+      border-top: 1px solid #1e293b;
+      margin-bottom: 12px;
     }
-    .btn:hover {
-      background: #047857;
+
+    /* ─── CTA Button ─── */
+    .btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      width: 100%;
+      padding: 9px 14px;
+      background: #059669;
+      color: #fff;
+      text-decoration: none;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 700;
+      transition: background 0.18s, transform 0.1s;
+    }
+    .btn:hover  { background: #047857; }
+    .btn:active { transform: scale(0.98); }
+    .btn-icon { font-size: 13px; }
+
+    /* ─── Footer hint ─── */
+    .hint {
+      font-size: 10px;
+      color: #475569;
+      text-align: center;
+      margin-top: 10px;
+      line-height: 1.4;
     }
   </style>
 </head>
 <body>
+
+  <!-- Header -->
   <div class="header">
-    <div class="logo-badge">C2</div>
+    <div class="logo">C2</div>
     <div>
-      <div class="title">C2DPost Helper</div>
-      <div class="subtitle">v1.3.0 (Thailand Post Bridge)</div>
+      <div class="brand-name">C2DPost Helper</div>
+      <div class="brand-ver">v1.3.0 · Thailand Post Bridge</div>
     </div>
   </div>
 
-  <div class="status-card">
-    <div class="status-indicator">
-      <div class="dot"></div>
-      <span>พร้อมเชื่อมต่อระบบ</span>
-    </div>
-    <div class="status-desc">
-      พร้อมส่งต่อคำขอดึงบาร์โค้ดไปยัง PostOne ไปรษณีย์ไทยด้วย IP ประเทศไทยของคุณ
-    </div>
+  <!-- Status -->
+  <div class="status-pill">
+    <div class="dot"></div>
+    <span class="status-text">พร้อมเชื่อมต่อระบบ</span>
   </div>
 
-  <a href="https://c2dpost-web.vercel.app" target="_blank" class="btn" id="openWebBtn">เปิดระบบ C2DPost Web</a>
+  <hr>
+
+  <!-- CTA -->
+  <a href="https://c2dpost-web.vercel.app" target="_blank" class="btn" id="openWebBtn">
+    <span class="btn-icon">🌐</span> เปิดระบบ C2DPost Web
+  </a>
+
+  <div class="hint">ส่งต่อบาร์โค้ด PostOne ด้วย IP ไทยของคุณ</div>
 
   <script src="popup.js"></script>
 </body>

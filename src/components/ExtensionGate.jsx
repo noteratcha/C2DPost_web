@@ -192,14 +192,14 @@ export default function ExtensionGate({ onUnlocked, theme = 'light', onToggleThe
               </svg>
               <div>
                 <strong>
-                  <span className="opt-label opt-2">ทางเลือกที่ 2:</span> ติดตั้งผ่านไฟล์ .ZIP v1.1.0 (พร้อมระบบกรอกข้อมูลอัตโนมัติ)
+                  <span className="opt-label opt-2">ทางเลือกที่ 2:</span> ติดตั้งผ่านไฟล์ .ZIP v1.3.0 (พร้อมระบบกรอกข้อมูลและค้นหา e-AR อัตโนมัติ)
                 </strong>
                 <p>ดาวน์โหลดและติดตั้งในโหมดนักพัฒนา ใช้งานได้ทันทีไม่ต้องรออนุมัติ</p>
               </div>
             </div>
             <a 
-              href="/C2DPost_Helper_v1.1.0_WebStore.zip" 
-              download="C2DPost_Helper_v1.1.0_WebStore.zip"
+              href="/C2DPost_Helper_v1.3.0_WebStore.zip" 
+              download="C2DPost_Helper_v1.3.0_WebStore.zip"
               className="btn-download-ext"
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -207,7 +207,7 @@ export default function ExtensionGate({ onUnlocked, theme = 'light', onToggleThe
                 <polyline points="7 10 12 15 17 10"/>
                 <line x1="12" y1="15" x2="12" y2="3"/>
               </svg>
-              ดาวน์โหลดไฟล์ C2DPost Helper v1.1.0 (.zip)
+              ดาวน์โหลดไฟล์ C2DPost Helper v1.3.0 (.zip)
             </a>
           </div>
         </div>

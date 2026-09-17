@@ -838,29 +838,6 @@ def get_received_report(req: ReceivedReportRequest):
     }
 
 
-def _fetch_ear_details(barcode: str) -> dict:
-    """
-    Fetches the official e-AR (Electronic Acknowledgement Receipt) PDF from Thailand Post e-AR API:
-    POST https://e-ar.thailandpost.com/ear-api/print/e-ar with body [barcode].
-    Extracts:
-    - has_ear: bool
-    - relationship: string (e.g. เจ้าหน้าที่เวรรับส่ง, ผู้รับรับเอง, คนในบ้าน)
-    - delivery_officer: string (e.g. นายธนพนธ์ พรมพันธ์)
-    - status: string (e.g. นำจ่ายถึงผู้รับแล้ว)
-    - signature_image: base64 Data URL (upright PNG)
-    - pdf_url: relative URL for client PDF viewing
-    """
-    result = {
-        "has_ear": False,
-        "relationship": "",
-        "delivery_officer": "",
-        "status": "",
-        "signature_image": "",
-        "pdf_url": f"/api/reports/ear-pdf?barcode={barcode}" if barcode else ""
-    }
-    if not barcode:
-        return result
-
 def _parse_ear_pdf_content(pdf_bytes: bytes) -> dict:
     """
     Robustly parses e-AR PDF bytes.
@@ -886,45 +863,78 @@ def _parse_ear_pdf_content(pdf_bytes: bytes) -> dict:
         import pypdf
         reader = pypdf.PdfReader(io.BytesIO(pdf_bytes))
         page = reader.pages[0]
+        candidates = []
         for img in page.images:
-            im = Image.open(io.BytesIO(img.data))
-            if (im.width < 650 and im.height > 200) or (im.width > 200 and im.height < 650 and len(img.data) < 40000):
-                if im.height > im.width:
-                    im = im.rotate(90, expand=True)
-                # Composite onto crisp white background
-                bg = Image.new("RGBA", im.size, (255, 255, 255, 255))
-                final_im = Image.alpha_composite(bg, im.convert("RGBA")).convert("RGB")
-                buf = io.BytesIO()
-                final_im.save(buf, format="PNG")
-                b64_str = base64.b64encode(buf.getvalue()).decode("utf-8")
-                data["signature_image"] = f"data:image/png;base64,{b64_str}"
-                break
+            try:
+                im = Image.open(io.BytesIO(img.data))
+                w, h = im.size
+                ratio = w / h if h > 0 else 0
+
+                # Exclude wide banners (e.g. Thailand Post logo ratio 4.71)
+                if ratio > 2.2 or (h / w > 3.5 if w > 0 else False):
+                    continue
+                # Exclude huge stamp composite images (> 700x700 or > 90KB)
+                if (w > 700 and h > 700) or len(img.data) > 90000:
+                    continue
+                # Exclude tiny icons (< 60x60)
+                if w < 60 or h < 60:
+                    continue
+
+                # Scoring candidate
+                score = 0
+                if im.mode == 'RGBA':
+                    score += 100
+                if h > w:
+                    score += 50
+                if len(img.data) < 40000:
+                    score += 30
+                if 120 <= w <= 650 and 180 <= h <= 700:
+                    score += 50
+
+                candidates.append((score, img, im))
+            except Exception:
+                continue
+
+        if candidates:
+            candidates.sort(key=lambda x: x[0], reverse=True)
+            best_score, best_img, best_im = candidates[0]
+            # Handheld PDA saves signature in vertical orientation; rotate 90° to make it upright
+            if best_im.height > best_im.width:
+                best_im = best_im.rotate(90, expand=True)
+
+            # Auto-trim transparent whitespace margins around pen strokes
+            bbox = best_im.getbbox()
+            if bbox:
+                pad = 12
+                bw, bh = best_im.size
+                crop_box = (max(0, bbox[0] - pad), max(0, bbox[1] - pad), min(bw, bbox[2] + pad), min(bh, bbox[3] + pad))
+                best_im = best_im.crop(crop_box)
+
+            # Composite onto crisp white background
+            bg = Image.new("RGBA", best_im.size, (255, 255, 255, 255))
+            final_im = Image.alpha_composite(bg, best_im.convert("RGBA")).convert("RGB")
+            buf = io.BytesIO()
+            final_im.save(buf, format="PNG")
+            b64_str = base64.b64encode(buf.getvalue()).decode("utf-8")
+            data["signature_image"] = f"data:image/png;base64,{b64_str}"
     except Exception:
         pass
 
-    # Fallback to PyMuPDF image extraction if pypdf didn't get signature
+    # Fallback to PyMuPDF signature box clip if pypdf didn't get signature
     if not data["signature_image"]:
         try:
             import fitz
             doc = fitz.open(stream=pdf_bytes, filetype="pdf")
             page = doc[0]
-            for img_info in page.get_images():
-                xref = img_info[0]
-                rects = page.get_image_rects(xref)
-                w, h = img_info[2], img_info[3]
-                if any(rect.y0 < 150 and rect.x0 > 400 for rect in rects) or (w < 400 and h > 400):
-                    pix = fitz.Pixmap(doc, xref)
-                    if pix.alpha:
-                        # Convert to RGB with white background
-                        pix = fitz.Pixmap(fitz.csRGB, pix)
-                    im = Image.open(io.BytesIO(pix.tobytes("png")))
-                    if im.height > im.width:
-                        im = im.rotate(90, expand=True)
-                    buf = io.BytesIO()
-                    im.save(buf, format="PNG")
-                    b64_str = base64.b64encode(buf.getvalue()).decode("utf-8")
-                    data["signature_image"] = f"data:image/png;base64,{b64_str}"
-                    break
+            clip_rect = fitz.Rect(465, 92, 520, 142)
+            pix = page.get_pixmap(clip=clip_rect, dpi=200)
+            im = Image.open(io.BytesIO(pix.tobytes("png")))
+            if im.height > im.width:
+                im = im.rotate(90, expand=True)
+            buf = io.BytesIO()
+            im.save(buf, format="PNG")
+            b64_str = base64.b64encode(buf.getvalue()).decode("utf-8")
+            data["signature_image"] = f"data:image/png;base64,{b64_str}"
         except Exception:
             pass
 
@@ -1644,6 +1654,130 @@ async def admin_update_user(request: Request):
             return {"status": "error", "message": text or f"Response code: {r.status_code}"}
     except Exception as e:
         return {"status": "error", "message": f"การเชื่อมต่อล้มเหลว: {str(e)}"}
+
+@app.post("/api/admin/export-users-excel")
+async def export_users_excel(request: Request):
+    """
+    Exports all system users into a beautifully formatted Excel (.xlsx) file with openpyxl.
+    """
+    try:
+        body = await request.json()
+        users = body.get("users", [])
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid payload: {str(e)}")
+
+    if not users:
+        raise HTTPException(status_code=400, detail="No user records provided")
+
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "C2DPost_Users"
+
+    # Header definitions: (label, width, alignment)
+    columns = [
+        ("ลำดับ", 8, "center"),
+        ("ชื่อผู้ใช้ (UserName)", 22, "center"),
+        ("รหัสผ่าน (Password)", 18, "center"),
+        ("อีเมล (Email)", 28, "left"),
+        ("คำนำหน้ารหัส (Prefix)", 16, "center"),
+        ("หน่วยงาน (Organization)", 38, "left"),
+        ("ไปรษณีย์รับผิดชอบ", 26, "left"),
+        ("รหัสไปรษณีย์", 14, "center"),
+        ("วันที่เปิดใช้งาน", 18, "center"),
+        ("ผู้ประสานงาน 1", 24, "left"),
+        ("เบอร์โทรศัพท์ 1", 18, "center"),
+        ("ผู้ประสานงาน 2", 24, "left"),
+        ("เบอร์โทรศัพท์ 2", 18, "center"),
+        ("ผู้ประสานงาน 3", 24, "left"),
+        ("เบอร์โทรศัพท์ 3", 18, "center"),
+        ("สถานะ (Status)", 14, "center"),
+        ("ประเภทบาร์โค้ด", 16, "center"),
+    ]
+
+    header_fill = PatternFill(start_color="064E3B", end_color="064E3B", fill_type="solid")
+    header_font = Font(name="Sarabun", size=11, bold=True, color="FFFFFF")
+    data_font = Font(name="Sarabun", size=10)
+    thin_border_side = Side(style='thin', color="CBD5E1")
+    cell_border = Border(left=thin_border_side, right=thin_border_side, top=thin_border_side, bottom=thin_border_side)
+    alt_fill = PatternFill(start_color="F8FAFC", end_color="F8FAFC", fill_type="solid")
+
+    # Title row in Row 1
+    ws.merge_cells("A1:Q1")
+    title_cell = ws["A1"]
+    title_cell.value = f"รายชื่อบัญชีผู้ใช้งานระบบ C2DPost Web Edition — ส่วน ทข.ปข.10 (ส่งออก ณ วันที่ {datetime.now().strftime('%d/%m/%Y %H:%M:%S')})"
+    title_cell.font = Font(name="Sarabun", size=13, bold=True, color="064E3B")
+    title_cell.alignment = Alignment(horizontal="left", vertical="center")
+    ws.row_dimensions[1].height = 28
+
+    # Blank row 2
+    ws.row_dimensions[2].height = 6
+
+    # Table Headers in Row 3
+    for col_idx, (header_text, _, _) in enumerate(columns, 1):
+        cell = ws.cell(row=3, column=col_idx, value=header_text)
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        cell.border = cell_border
+    ws.row_dimensions[3].height = 26
+
+    # Data Rows starting from Row 4
+    for row_idx, user in enumerate(users, 4):
+        seq_no = user.get("NO") or (row_idx - 3)
+        row_values = [
+            seq_no,
+            str(user.get("UserName", "") or "").strip(),
+            str(user.get("Password", "") or "").strip(),
+            str(user.get("Email", "") or "").strip(),
+            str(user.get("Prefix", "") or "").strip(),
+            str(user.get("Organization", "") or "").strip(),
+            str(user.get("ResponsiblePostoffice", "") or "").strip(),
+            str(user.get("ResponsibleZipcode", "") or "").strip(),
+            str(user.get("ActivationDate", "") or "").strip(),
+            str(user.get("ContactPerson1", "") or "").strip(),
+            str(user.get("TelContactPerson1", "") or "").strip(),
+            str(user.get("ContactPerson2", "") or "").strip(),
+            str(user.get("TelContactPerson2", "") or "").strip(),
+            str(user.get("ContactPerson3", "") or "").strip(),
+            str(user.get("TelContactPerson3", "") or "").strip(),
+            str(user.get("Status", "") or "").strip(),
+            str(user.get("TypeBarcode", "") or "").strip(),
+        ]
+        is_even = (row_idx % 2 == 0)
+        for col_idx, val in enumerate(row_values, 1):
+            cell = ws.cell(row=row_idx, column=col_idx, value=val)
+            cell.font = data_font
+            cell.border = cell_border
+            align_mode = columns[col_idx - 1][2]
+            cell.alignment = Alignment(horizontal=align_mode, vertical="center")
+            # Preserve leading zero numbers as text format
+            if col_idx in (2, 3, 5, 8, 11, 13, 15):
+                cell.number_format = '@'
+            if is_even:
+                cell.fill = alt_fill
+        ws.row_dimensions[row_idx].height = 22
+
+    # Auto Column Widths
+    for col_idx, (_, width, _) in enumerate(columns, 1):
+        col_letter = get_column_letter(col_idx)
+        ws.column_dimensions[col_letter].width = width
+
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"C2DPost_Users_{timestamp}.xlsx"
+
+    return StreamingResponse(
+        output,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+    )
 
 @app.get("/api/admin/check_services")
 def check_services():

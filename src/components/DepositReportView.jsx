@@ -317,6 +317,22 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
     handleFetchReport(s, e);
   };
 
+  // Reset to default: resets date range to today, clears search query, filter tab, page, cache, and fetches today
+  const handleResetToDefault = useCallback(() => {
+    try {
+      sessionStorage.removeItem(DEPOSIT_REPORT_CACHE_KEY);
+    } catch (err) {
+      console.warn('Error clearing deposit report cache:', err);
+    }
+    setStartDate(todayIso);
+    setEndDate(todayIso);
+    setSearchQuery('');
+    setFilterTab('all');
+    setCurrentPage(1);
+    setError('');
+    handleFetchReport(todayIso, todayIso);
+  }, [todayIso, handleFetchReport]);
+
   // Reset pagination to page 1 whenever filters change (skip initial mount to preserve restored page)
   const isInitialMount = useRef(true);
   useEffect(() => {
@@ -583,27 +599,43 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
             </div>
           </div>
 
-          <button
-            type="button"
-            className="btn-fetch-report"
-            onClick={() => handleFetchReport(startDate, endDate)}
-            disabled={loading}
-          >
-            {loading ? (
-              <>
-                <span className="spinner-small"></span>
-                <span>กำลังดึงข้อมูล...</span>
-              </>
-            ) : (
-              <>
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-                  <circle cx="11" cy="11" r="8"></circle>
-                  <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                </svg>
-                <span>อัปเดตข้อมูล</span>
-              </>
-            )}
-          </button>
+          <div className="deposit-control-actions">
+            <button
+              type="button"
+              className="btn-reset-deposit"
+              onClick={handleResetToDefault}
+              disabled={loading}
+              title="คืนค่าการค้นหา วันที่ และตัวกรองทั้งหมดเป็นค่าเริ่มต้น"
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                <path d="M3 3v5h5" />
+              </svg>
+              <span>คืนค่าเริ่มต้น</span>
+            </button>
+
+            <button
+              type="button"
+              className="btn-fetch-report"
+              onClick={() => handleFetchReport(startDate, endDate)}
+              disabled={loading}
+            >
+              {loading ? (
+                <>
+                  <span className="spinner-small"></span>
+                  <span>กำลังดึงข้อมูล...</span>
+                </>
+              ) : (
+                <>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                  </svg>
+                  <span>อัปเดตข้อมูล</span>
+                </>
+              )}
+            </button>
+          </div>
         </div>
 
         {/* Alerts & Notices */}

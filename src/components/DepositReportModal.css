@@ -264,6 +264,47 @@
   border-color: rgba(16, 185, 129, 0.4);
 }
 
+.btn-reset-deposit {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.5rem 0.95rem;
+  background: rgba(100, 116, 139, 0.08);
+  color: var(--text-main, #334155);
+  border: 1px solid var(--border-color, #cbd5e1);
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap !important;
+}
+
+[data-theme='dark'] .btn-reset-deposit {
+  background: rgba(255, 255, 255, 0.06);
+  color: #cbd5e1;
+  border-color: #334155;
+}
+
+.btn-reset-deposit:hover:not(:disabled) {
+  background: rgba(100, 116, 139, 0.16);
+  color: #0f172a;
+  border-color: #94a3b8;
+  transform: translateY(-1px);
+}
+
+[data-theme='dark'] .btn-reset-deposit:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12);
+  color: #f8fafc;
+  border-color: #475569;
+  transform: translateY(-1px);
+}
+
+.btn-reset-deposit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .btn-fetch-deposit {
   display: inline-flex;
   align-items: center;

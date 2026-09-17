@@ -169,18 +169,7 @@ export default function LoginModal({ onLogin, people = [], loading = false, erro
             </a>
           </div>
 
-          {/* Version footer matching Python app */}
-          <div className="login-version-footer">
-            <a
-              href="https://drive.google.com/drive/folders/1ksrVAQVwkHDBE7qiqLT2ndyPHPQhz6vZ"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="version-link"
-              title="โฟลเดอร์รวมตัวติดตั้งและอัปเดตเวอร์ชัน"
-            >
-              {APP_VERSION} (เวอร์ชันล่าสุด)
-            </a>
-          </div>
+        
         </div>
       </div>
 

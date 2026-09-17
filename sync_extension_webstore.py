@@ -21,35 +21,46 @@ def sync():
     
     print(f"Packaging Extension version {version}...")
     
-    # Target folders
-    target_folders = [
-        os.path.join(base_dir, 'extension_Webstore'),
-        os.path.join(parent_dir, 'extension_Webstore')
-    ]
+    # Target folder (Only inside C2DPost_web to prevent duplicate folders)
+    tf = os.path.join(base_dir, 'extension_Webstore')
+    os.makedirs(tf, exist_ok=True)
     
-    for tf in target_folders:
-        os.makedirs(tf, exist_ok=True)
-        # 1. Unpacked folder
-        unpacked_dir = os.path.join(tf, f"C2DPost_Helper_v{version}_unpacked")
-        if os.path.exists(unpacked_dir):
-            shutil.rmtree(unpacked_dir)
-        shutil.copytree(ext_dir, unpacked_dir)
+    # Versioned Zip in extension_Webstore for Chrome Web Store Developer Console upload
+    zip_path = os.path.join(tf, zip_name)
+    with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:
+        for root, _, files in os.walk(ext_dir):
+            for f in files:
+                if f.lower() in ('desktop.ini', 'thumbs.db') or f.endswith('.ini'):
+                    continue
+                full_path = os.path.join(root, f)
+                rel_path = os.path.relpath(full_path, ext_dir)
+                zf.write(full_path, rel_path)
+    print(f"Created: {zip_path}")
+    
+    # 3. Clean up obsolete zip files in extension_Webstore
+    for f in os.listdir(tf):
+        if f.endswith('_WebStore.zip') and f != zip_name:
+            try:
+                os.remove(os.path.join(tf, f))
+                print(f"Removed obsolete zip: {f}")
+            except Exception:
+                pass
         
-        # 2. Versioned Zip
-        zip_path = os.path.join(tf, zip_name)
-        with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:
-            for root, _, files in os.walk(ext_dir):
-                for f in files:
-                    full_path = os.path.join(root, f)
-                    rel_path = os.path.relpath(full_path, ext_dir)
-                    zf.write(full_path, rel_path)
-        print(f"Created: {zip_path}")
-        
-    # Also update public/c2dpost-extension.zip for web direct download
-    public_zip = os.path.join(base_dir, 'public', 'c2dpost-extension.zip')
-    shutil.copy2(os.path.join(target_folders[0], zip_name), public_zip)
-    print(f"Updated public zip: {public_zip}")
-    print(f"Successfully synced extension v{version} to extension_Webstore!")
+    # 4. Also update public/ directory for direct web download
+    public_dir = os.path.join(base_dir, 'public')
+    shutil.copy2(zip_path, os.path.join(public_dir, zip_name))
+    shutil.copy2(zip_path, os.path.join(public_dir, 'c2dpost-extension.zip'))
+    
+    # Clean up obsolete zip files in public
+    for f in os.listdir(public_dir):
+        if f.startswith('C2DPost_Helper_v') and f.endswith('_WebStore.zip') and f != zip_name:
+            try:
+                os.remove(os.path.join(public_dir, f))
+                print(f"Removed obsolete public zip: {f}")
+            except Exception:
+                pass
+                
+    print(f"Successfully synced extension v{version} cleanly without duplicates!")
 
 if __name__ == '__main__':
     sync()

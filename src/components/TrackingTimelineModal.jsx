@@ -84,61 +84,118 @@ export default function TrackingTimelineModal({ isOpen, barcode, recInfo, curren
   const latestEvent = sortedEvents.length > 0 ? sortedEvents[sortedEvents.length - 1] : null;
   const latestDatetime = trackData?.latest_datetime || latestEvent?.datetime || '';
 
+  const [copied, setCopied] = useState(false);
+  const handleCopyBarcode = useCallback(() => {
+    if (!barcode) return;
+    navigator.clipboard?.writeText(barcode);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }, [barcode]);
+
   const statusInfo = useMemo(() => {
+    // Check if description represents a delivery exception/issue
+    const checkException = (desc) => {
+      if (!desc) return null;
+      const normalized = desc.replace(/ํา/g, 'ำ');
+      const isEx = /บ้านปิด|ออกใบแจ้ง|ไม่ชัดเจน|ไม่มีเลขบ้าน|ไม่มีเลขที่|ไม่ยอมรับ|ไม่มีผู้รับ|ไม่มารับตามกำหนด|รอจ่าย|ย้าย|เสียหาย|ระงับ|คืน/i.test(normalized);
+      return isEx ? desc : null;
+    };
+
     if (!latestEvent) {
       const rKey = recInfo?.status_key;
       const rLabel = recInfo?.status_label;
+      const rawDesc = recInfo?.status_description_raw || '';
+      const exceptionDesc = checkException(rawDesc);
+
+      if (exceptionDesc) {
+        return {
+          key: 'exception',
+          label: `นำจ่ายไม่สำเร็จ (${exceptionDesc})`,
+          badgeClass: 'exception',
+          dotClass: 'dot-amber',
+          isException: true,
+          rawDesc
+        };
+      }
       if (rKey === 'delivered' || rLabel === 'นำจ่ายสำเร็จ') {
         return {
           key: 'delivered',
           label: 'นำจ่ายสำเร็จ',
           badgeClass: 'delivered',
           dotClass: 'dot-green',
-          rawDesc: recInfo?.status_description_raw
+          isException: false,
+          rawDesc
         };
       }
       if (rKey === 'returned' || rLabel === 'ส่งคืน') {
         return {
           key: 'returned',
-          label: 'ส่งคืน',
+          label: 'ส่งคืนต้นทาง',
           badgeClass: 'returned',
           dotClass: 'dot-rose',
-          rawDesc: recInfo?.status_description_raw
+          isException: false,
+          rawDesc
         };
       }
       return {
         key: 'in_transit',
-        label: rLabel || 'รอรับฝาก / อยู่ระหว่างนำส่ง',
+        label: rLabel || 'อยู่ระหว่างการนำส่ง',
         badgeClass: 'in-transit',
         dotClass: 'dot-amber',
-        rawDesc: recInfo?.status_description_raw
+        isException: false,
+        rawDesc
       };
     }
-    const key = latestEvent.status_key || 'in_transit';
-    if (key === 'delivered') {
+
+    const rawDesc = latestEvent.status_description || '';
+    const descNormalized = rawDesc.replace(/ํา/g, 'ำ');
+    const exceptionDesc = checkException(descNormalized);
+
+    const isDelivered = latestEvent.status_key === 'delivered' || 
+      String(latestEvent.status) === '4' || 
+      String(latestEvent.status) === '501' || 
+      /นำจ่ายถึงผู้รับ|นำจ่ายสำเร็จ|ผู้รับได้รับ|จัดส่งสำเร็จ/i.test(descNormalized);
+
+    if (isDelivered) {
       return {
         key: 'delivered',
         label: 'นำจ่ายสำเร็จ',
         badgeClass: 'delivered',
         dotClass: 'dot-green',
-        rawDesc: latestEvent.status_description
+        isException: false,
+        rawDesc
       };
     }
-    if (key === 'returned') {
+
+    if (exceptionDesc) {
+      return {
+        key: 'exception',
+        label: `นำจ่ายไม่สำเร็จ (${exceptionDesc})`,
+        badgeClass: 'exception',
+        dotClass: 'dot-amber',
+        isException: true,
+        rawDesc
+      };
+    }
+
+    if (latestEvent.status_key === 'returned' || /ส่งคืน|ตีกลับ/i.test(descNormalized)) {
       return {
         key: 'returned',
-        label: 'ส่งคืน',
+        label: 'ส่งคืนต้นทาง',
         badgeClass: 'returned',
         dotClass: 'dot-rose',
-        rawDesc: latestEvent.status_description
+        isException: false,
+        rawDesc
       };
     }
+
     return {
       key: 'in_transit',
       label: 'อยู่ระหว่างการนำจ่าย',
       badgeClass: 'in-transit',
       dotClass: 'dot-amber',
-      rawDesc: latestEvent.status_description
+      isException: false,
+      rawDesc
     };
   }, [latestEvent, recInfo]);
 
@@ -159,7 +216,10 @@ export default function TrackingTimelineModal({ isOpen, barcode, recInfo, curren
               </svg>
             </div>
             <div>
-              <h3 className="track-modal-title">ประวัติสถานะรายชิ้น (Tracking Timeline)</h3>
+              <div className="track-modal-title-row">
+                <h3 className="track-modal-title">ประวัติสถานะรายชิ้น</h3>
+                <span className="track-title-badge">Tracking Timeline</span>
+              </div>
               <p className="track-modal-subtitle">
                 ไทม์ไลน์การนำส่งพัสดุจากระบบ e-Parcel ไปรษณีย์ไทย
               </p>
@@ -170,43 +230,82 @@ export default function TrackingTimelineModal({ isOpen, barcode, recInfo, curren
           </button>
         </div>
 
-        {/* Barcode Summary */}
-        <div className="track-summary-bar">
-          <div className="track-summary-barcode">
-            <span className="track-summary-label">หมายเลข Barcode</span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
-              <span className="track-barcode-mono">{barcode || '-'}</span>
-              {latestDatetime && (
-                <span className="result-latest-badge" style={{ fontSize: '0.78rem', padding: '0.15rem 0.5rem' }}>
-                  อัปเดต: {latestDatetime}
-                </span>
-              )}
+        {/* Barcode Summary Card (Structured 2-Tier Layout) */}
+        <div className="track-summary-card">
+          <div className="track-summary-top">
+            <div className="track-summary-barcode-box">
+              <span className="track-summary-label">หมายเลข Barcode</span>
+              <div className="track-barcode-row">
+                <span className="track-barcode-mono">{barcode || '-'}</span>
+                {barcode && (
+                  <button
+                    type="button"
+                    className={`btn-copy-barcode ${copied ? 'copied' : ''}`}
+                    onClick={handleCopyBarcode}
+                    title="คัดลอกหมายเลขพัสดุ"
+                  >
+                    {copied ? (
+                      <>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6">
+                          <polyline points="20 6 9 17 4 12"></polyline>
+                        </svg>
+                        <span>คัดลอกแล้ว</span>
+                      </>
+                    ) : (
+                      <>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                        </svg>
+                        <span>คัดลอก</span>
+                      </>
+                    )}
+                  </button>
+                )}
+                {latestDatetime && (
+                  <span className="track-update-badge" title="เวลาอัปเดตสถานะล่าสุดจาก e-Parcel">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                      <circle cx="12" cy="12" r="10"></circle>
+                      <polyline points="12 6 12 12 16 14"></polyline>
+                    </svg>
+                    <span>อัปเดต: {latestDatetime}</span>
+                  </span>
+                )}
+              </div>
             </div>
-          </div>
-          {(receiverName || invNo) && (
-            <div className="track-summary-receiver">
-              <span className="track-summary-label">ผู้รับ / เลขที่อ้างอิง</span>
-              <span className="track-summary-value">
-                {receiverName || '-'} {invNo ? `(${invNo})` : ''}
+
+            {/* Permanent Anchored Status Badge (Top-Right) */}
+            <div className="track-summary-status-box">
+              <span className={`status-pill ${statusInfo.badgeClass}`} title={statusInfo.rawDesc || statusInfo.label}>
+                {statusInfo.isException ? (
+                  <span className="status-pill-icon">⚠️</span>
+                ) : (
+                  <span className={`status-dot ${statusInfo.dotClass}`}></span>
+                )}
+                <span className="status-pill-text">{statusInfo.label}</span>
               </span>
             </div>
-          )}
-          <div className="track-summary-status">
-            <span className={`status-pill ${statusInfo.badgeClass}`} title={statusInfo.rawDesc || statusInfo.label}>
-              <span className={`status-dot ${statusInfo.dotClass}`}></span>
-              {statusInfo.label}
-            </span>
-            {statusInfo.rawDesc && statusInfo.rawDesc !== statusInfo.label && !statusInfo.label.includes(statusInfo.rawDesc) && (
-              <div 
-                className={`status-subtext ${/บ้านปิด|ออกใบแจ้ง|ไม่ชัดเจน|ไม่มีเลขบ้าน|ไม่ยอมรับ|ไม่มีผู้รับ|ไม่มารับตามกำหนด|รอจ่าย|ย้าย|เสียหาย|ระงับ|คืน/i.test(statusInfo.rawDesc) ? 'status-subtext-alert' : 'status-subtext-transit'}`}
-                style={{ marginTop: '0.35rem', justifyContent: 'flex-end' }}
-                title={`สถานะละเอียด: ${statusInfo.rawDesc}`}
-              >
-                {/บ้านปิด|ออกใบแจ้ง|ไม่ชัดเจน|ไม่มีเลขบ้าน|ไม่ยอมรับ|ไม่มีผู้รับ|ไม่มารับตามกำหนด|รอจ่าย|ย้าย|เสียหาย|ระงับ|คืน/i.test(statusInfo.rawDesc) && <span className="status-subtext-icon">⚠️</span>}
-                <span>{statusInfo.rawDesc}</span>
-              </div>
-            )}
           </div>
+
+          {/* Bottom Tier: Recipient & Reference Information Banner */}
+          {(receiverName || invNo) && (
+            <div className="track-summary-recipient-row">
+              <div className="track-recipient-pill" title={`ผู้รับตามจ่าหน้า: ${receiverName || '-'}`}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                  <circle cx="12" cy="7" r="4"></circle>
+                </svg>
+                <span className="recipient-label">ผู้รับ:</span>
+                <span className="recipient-value">{receiverName || '-'}</span>
+              </div>
+              {invNo && (
+                <div className="track-ref-pill" title={`เลขที่อ้างอิง: ${invNo}`}>
+                  <span className="ref-label">เลขที่อ้างอิง:</span>
+                  <span className="ref-value">{invNo}</span>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Alerts */}
@@ -268,29 +367,84 @@ export default function TrackingTimelineModal({ isOpen, barcode, recInfo, curren
             <ol className="track-stepper-list">
               {sortedEvents.map((ev, idx) => {
                 const isLast = idx === sortedEvents.length - 1;
+                const descNormalized = (ev.status_description || '').replace(/ํา/g, 'ำ');
+
                 const isReceived = _isReceivedText(`${ev.status_description || ''} ${ev.status || ''}`) ||
                   ['1', '001', 'p001'].includes(String(ev.status || '').toLowerCase());
-                const descNormalized = (ev.status_description || '').replace(/ํา/g, 'ำ');
+
                 const isDelivered = ev.status_key === 'delivered' || 
                   String(ev.status) === '4' || 
                   String(ev.status) === '501' || 
                   /นำจ่ายถึงผู้รับ|นำจ่ายสำเร็จ|ผู้รับได้รับ|จัดส่งสำเร็จ/i.test(descNormalized);
 
+                const isException = /บ้านปิด|ออกใบแจ้ง|ไม่ชัดเจน|ไม่มีเลขบ้าน|ไม่มีเลขที่|ไม่ยอมรับ|ไม่มีผู้รับ|ไม่มารับตามกำหนด|รอจ่าย|ย้าย|เสียหาย|ระงับ|คืน/i.test(descNormalized);
+
+                const isReturned = ev.status_key === 'returned' || /ส่งคืน|ตีกลับ/i.test(descNormalized);
+
+                // Determine step marker dot and class
+                let dotContent;
+                let dotClass = '';
+                let itemClass = '';
+
+                if (isDelivered) {
+                  dotContent = '✓';
+                  dotClass = 'delivered';
+                  itemClass = 'delivered-step';
+                } else if (isException) {
+                  dotContent = '⚠️';
+                  dotClass = 'exception';
+                  itemClass = 'exception-step';
+                } else if (isReturned) {
+                  dotContent = '↩';
+                  dotClass = 'returned';
+                  itemClass = 'returned-step';
+                } else if (isReceived) {
+                  dotContent = '✓';
+                  dotClass = 'received';
+                  itemClass = 'received-step';
+                } else if (isLast) {
+                  dotContent = '🚚';
+                  dotClass = 'in-transit-active';
+                  itemClass = 'in-transit-step';
+                } else {
+                  dotContent = idx + 1;
+                  dotClass = 'normal';
+                  itemClass = 'normal-step';
+                }
+
                 return (
-                  <li key={ev.seq || idx} className={`track-step-item ${isLast ? 'last' : ''} ${isReceived ? 'received' : ''} ${isDelivered ? 'delivered' : ''}`}>
+                  <li key={ev.seq || idx} className={`track-step-item ${isLast ? 'last' : ''} ${itemClass}`}>
                     <div className="track-step-marker">
-                      <span className={`track-step-dot ${isReceived || isDelivered ? 'ok' : ''}`}>
-                        {isReceived || isDelivered ? '✓' : idx + 1}
+                      <span className={`track-step-dot ${dotClass}`}>
+                        {isLast && (isException || dotClass === 'in-transit-active') && (
+                          <span className="track-step-pulse-ring"></span>
+                        )}
+                        {dotContent}
                       </span>
-                      {!isLast && <span className="track-step-line"></span>}
+                      {!isLast && <span className={`track-step-line ${isException ? 'line-amber' : ''} ${isDelivered ? 'line-emerald' : ''}`}></span>}
                     </div>
                     <div className="track-step-content">
                       <div className="track-step-head">
-                        <span className={`track-step-title ${isReceived || isDelivered ? 'text-emerald' : ''}`}>
+                        <span className={`track-step-title ${isDelivered ? 'text-emerald' : isException ? 'text-amber' : isReturned ? 'text-rose' : ''}`}>
                           {ev.status_description || 'อัปเดตสถานะ'}
                         </span>
-                        {isReceived && <span className="track-received-badge">รับฝากแล้ว</span>}
-                        {isDelivered && <span className="track-received-badge delivered-badge">นำจ่ายสำเร็จ</span>}
+                        {isException && (
+                          <span className="track-badge-pill warning">ข้อยกเว้น: {ev.status_description}</span>
+                        )}
+                        {isDelivered && (
+                          <span className="track-badge-pill success">นำจ่ายสำเร็จ</span>
+                        )}
+                        {isReturned && (
+                          <span className="track-badge-pill danger">ส่งคืนต้นทาง</span>
+                        )}
+                        {isReceived && !isDelivered && !isException && !isReturned && (
+                          !(ev.status_description || '').includes('รับฝากแล้ว') && (
+                            <span className="track-badge-pill teal">รับฝากแล้ว</span>
+                          )
+                        )}
+                        {isLast && !isDelivered && !isException && !isReturned && !isReceived && (
+                          <span className="track-badge-pill active">สถานะล่าสุด</span>
+                        )}
                       </div>
                       <div className="track-step-datetime">
                         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
@@ -502,10 +656,19 @@ export default function TrackingTimelineModal({ isOpen, barcode, recInfo, curren
         <div className="track-modal-footer">
           <div className="track-footer-info">
             {trackData && !loading && (
-              <>
-                แสดง <strong>{sortedEvents.length}</strong> เหตุการณ์ • ล่าสุด: “
-                <strong>{sortedEvents[sortedEvents.length - 1]?.status_description || '-'}</strong>”
-              </>
+              <div className="track-event-counter-pill">
+                <span className="counter-count">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                    <polyline points="9 11 12 14 22 4"></polyline>
+                    <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+                  </svg>
+                  {sortedEvents.length} เหตุการณ์
+                </span>
+                <span className="counter-divider">•</span>
+                <span className="counter-latest">
+                  ล่าสุด: <strong>{sortedEvents[sortedEvents.length - 1]?.status_description || '-'}</strong>
+                </span>
+              </div>
             )}
           </div>
           <div className="track-footer-actions">
@@ -548,9 +711,6 @@ export default function TrackingTimelineModal({ isOpen, barcode, recInfo, curren
                 <span>เปิดหน้าตรวจสอบเต็มจอ</span>
               </button>
             )}
-            <button type="button" className="btn-track-close" onClick={onClose}>
-              ปิดหน้าต่าง
-            </button>
           </div>
         </div>
       </div>

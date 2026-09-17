@@ -258,6 +258,13 @@ export default function App() {
     return status === 'ADMIN' || status === 'ADMINISTRATOR';
   }, [user, currentPerson]);
 
+  // Enforce admin to stay in admin management view
+  useEffect(() => {
+    if (isAdmin && activePage !== 'admin') {
+      setActivePage('admin');
+    }
+  }, [isAdmin, activePage]);
+
   // Synchronize credentials to Chrome extension whenever currentPerson is resolved
   useEffect(() => {
     if (user && currentPerson?.UserName) {

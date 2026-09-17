@@ -852,6 +852,7 @@
 
 .drawer-version-pill {
   display: inline-flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   width: 100%;
@@ -864,29 +865,15 @@
   color: #475569;
   text-align: center;
   letter-spacing: -0.1px;
-  cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  cursor: default;
   user-select: none;
-}
-
-.drawer-version-pill:hover {
-  background: #e2e8f0;
-  border-color: rgba(0, 0, 0, 0.12);
-  color: #0f172a;
-  transform: translateY(-1px);
+  line-height: 1.5;
 }
 
 :root[data-theme="dark"] .drawer-version-pill {
   background: rgba(15, 23, 42, 0.6);
   border-color: rgba(255, 255, 255, 0.08);
   color: #94a3b8;
-}
-
-:root[data-theme="dark"] .drawer-version-pill:hover {
-  background: rgba(30, 41, 59, 0.9);
-  border-color: rgba(255, 255, 255, 0.15);
-  color: #f1f5f9;
-  transform: translateY(-1px);
 }
 
 /* Navbar Right Buttons */
@@ -1215,6 +1202,90 @@
 
 :root[data-theme="dark"] .user-dropdown-divider {
   background: rgba(255, 255, 255, 0.08);
+}
+
+/* User Dropdown Item Link (Admin Extension Link) */
+.user-dropdown-item-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 9px;
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.16s ease;
+  font-family: inherit;
+  text-decoration: none;
+  box-sizing: border-box;
+  margin-bottom: 4px;
+}
+
+.user-dropdown-item-link:hover {
+  background: rgba(16, 185, 129, 0.08);
+  border-color: rgba(16, 185, 129, 0.25);
+}
+
+:root[data-theme="dark"] .user-dropdown-item-link:hover {
+  background: rgba(16, 185, 129, 0.15);
+  border-color: rgba(16, 185, 129, 0.35);
+}
+
+.item-icon-box {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: rgba(16, 185, 129, 0.12);
+  color: #059669;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.16s ease;
+}
+
+:root[data-theme="dark"] .item-icon-box {
+  color: #34d399;
+}
+
+.user-dropdown-item-link:hover .item-icon-box {
+  background: #059669;
+  color: #ffffff;
+  transform: scale(1.05);
+}
+
+.item-text-stack {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.item-text-main {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #0f172a;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
+:root[data-theme="dark"] .item-text-main {
+  color: #f8fafc;
+}
+
+.item-text-sub {
+  font-size: 0.68rem;
+  color: #64748b;
+  line-height: 1.2;
+  margin-top: 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+:root[data-theme="dark"] .item-text-sub {
+  color: #94a3b8;
 }
 
 /* User Dropdown Logout Button */
