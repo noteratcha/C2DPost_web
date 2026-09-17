@@ -2,18 +2,22 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { fetchTrackingHistory } from '../utils/api';
 import { formatStationWithZipcode } from '../utils/postalUtils';
 import { openEarWithBarcode } from '../utils/extensionBridge';
+import { fetchEarDetailsClient } from '../utils/earService';
 import './TrackingTimelineModal.css';
 
 export default function TrackingTimelineModal({ isOpen, barcode, recInfo, currentPerson, onClose, onOpenTrackingPage, onTrackingUpdated }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [trackData, setTrackData] = useState(null);
+  const [clientEarData, setClientEarData] = useState(null);
+  const [selectedSigModal, setSelectedSigModal] = useState(null);
 
   const handleFetch = useCallback(async (bcode) => {
     if (!bcode) return;
     setLoading(true);
     setError('');
     setTrackData(null);
+    setClientEarData(null);
     try {
       const username = currentPerson?.UserName || '';
       const password = currentPerson?.Password || '';
@@ -22,6 +26,22 @@ export default function TrackingTimelineModal({ isOpen, barcode, recInfo, curren
         setTrackData(result);
         if (onTrackingUpdated) {
           onTrackingUpdated(bcode, result);
+        }
+        // Fetch client-side e-AR details if parcel is delivered
+        const hasDelivered = (result.events || []).some(ev => 
+          ev.status_key === 'delivered' || 
+          String(ev.status) === '4' || 
+          String(ev.status) === '501' || 
+          (ev.status_description || '').includes('นำจ่ายถึงผู้รับ') || 
+          (ev.status_description || '').includes('นำจ่ายสำเร็จ') ||
+          (ev.status_description || '').includes('ผู้รับได้รับ')
+        );
+        if (hasDelivered) {
+          fetchEarDetailsClient(bcode).then(earRes => {
+            if (earRes && earRes.has_ear) {
+              setClientEarData(earRes);
+            }
+          }).catch(err => console.warn('Client e-AR fetch error:', err));
         }
       } else {
         setError(result.message || 'ไม่สามารถดึงประวัติสถานะได้');
@@ -293,34 +313,121 @@ export default function TrackingTimelineModal({ isOpen, barcode, recInfo, curren
                         </div>
                       )}
                       {isDelivered ? (
-                        <div className="track-step-signature" title={ev.signature ? `ชื่อผู้รับจริง: ${ev.signature}` : 'ไม่พบข้อมูล signature ในระบบ e-Parcel / ลายเซ็นอยู่ในระบบ e-AR'}>
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-                            <path d="M12 19l7-7 3 3-7 7-3-3z"></path>
-                            <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"></path>
-                            <path d="M2 2l7.586 7.586"></path>
-                          </svg>
-                          {ev.signature ? (
-                            <span><strong className="step-field-label">ชื่อผู้รับจริง:</strong> <span className="sig-name">{ev.signature}</span></span>
-                          ) : (
-                            <span>
-                              <strong className="step-field-label">ชื่อผู้รับจริง:</strong>{' '}
-                              <span className="sig-hint">(ไม่พบข้อมูล signature ในระบบ e-Parcel / ตรวจสอบลายเซ็นใน e-AR)</span>{' '}
-                              <a
-                                href={`https://e-ar.thailandpost.com/ear#barcode=${encodeURIComponent(barcode)}`}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="sig-ear-link"
-                                title="คลิกเพื่อเปิดระบบ e-AR และค้นหาภาพลายเซ็นอัตโนมัติ"
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  openEarWithBarcode(barcode);
-                                }}
-                              >
-                                ดูภาพลายเซ็นใน e-AR ↗
-                              </a>
-                            </span>
-                          )}
-                        </div>
+                        (() => {
+                          const earInfo = clientEarData || ev.ear_info || trackData?.ear_info;
+                          const sigImg = clientEarData?.signature_image || ev.signature_image || earInfo?.signature_image;
+                          const rel = clientEarData?.relationship || ev.relationship || earInfo?.relationship;
+                          const officer = clientEarData?.delivery_officer || ev.delivery_officer || earInfo?.delivery_officer;
+                          const earPdfUrl = clientEarData?.blob_url || earInfo?.pdf_url || `/api/reports/ear-pdf?barcode=${encodeURIComponent(barcode)}`;
+
+                          if (sigImg || rel || earInfo?.has_ear) {
+                            return (
+                              <div className="track-step-ear-box">
+                                <div className="ear-box-header">
+                                  <span className="ear-box-title">
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                                      <path d="M12 19l7-7 3 3-7 7-3-3z"></path>
+                                      <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"></path>
+                                      <path d="M2 2l7.586 7.586"></path>
+                                    </svg>
+                                    หลักฐานการลงนาม (ระบบ e-AR)
+                                  </span>
+                                  {earInfo?.has_ear && (
+                                    <a
+                                      href={earPdfUrl}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="ear-box-pdf-btn"
+                                      title="เปิดดูใบตอบรับ e-AR ฉบับจริง (PDF)"
+                                    >
+                                      📄 ดูใบตอบรับ e-AR (PDF) ↗
+                                    </a>
+                                  )}
+                                </div>
+
+                                <div className="ear-box-body">
+                                  {sigImg && (
+                                    <div 
+                                      className="ear-sig-thumb-wrap" 
+                                      onClick={() => setSelectedSigModal({ img: sigImg, rel, officer, barcode })}
+                                      title="คลิกเพื่อดูภาพลายเซ็นขนาดใหญ่"
+                                    >
+                                      <img src={sigImg} alt="ลายมือชื่อผู้รับ" className="ear-sig-thumb-img" />
+                                      <span className="ear-sig-thumb-hint">🔍 ดูรูปใหญ่</span>
+                                    </div>
+                                  )}
+
+                                  <div className="ear-sig-details">
+                                    {rel && (
+                                      <div className="ear-detail-row">
+                                        <span className="ear-detail-label">ความสัมพันธ์:</span>
+                                        <span className="ear-detail-badge">{rel}</span>
+                                      </div>
+                                    )}
+                                    {officer && (
+                                      <div className="ear-detail-row">
+                                        <span className="ear-detail-label">จนท.นำจ่าย:</span>
+                                        <span className="ear-detail-val">{officer}</span>
+                                      </div>
+                                    )}
+                                    {ev.signature && (
+                                      <div className="ear-detail-row">
+                                        <span className="ear-detail-label">ชื่อผู้รับ:</span>
+                                        <span className="ear-detail-val font-semibold">{ev.signature}</span>
+                                      </div>
+                                    )}
+                                    {!sigImg && (
+                                      <a
+                                        href={`https://e-ar.thailandpost.com/ear#barcode=${encodeURIComponent(barcode)}`}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="sig-ear-link"
+                                        title="คลิกเพื่อเปิดระบบ e-AR และค้นหาภาพลายเซ็นอัตโนมัติ"
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          openEarWithBarcode(barcode);
+                                        }}
+                                      >
+                                        ดูภาพลายเซ็นใน e-AR ↗
+                                      </a>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          }
+
+                          return (
+                            <div className="track-step-signature" title={ev.signature ? `ชื่อผู้รับจริง: ${ev.signature}` : 'ไม่พบข้อมูล signature ในระบบ e-Parcel / ลายเซ็นอยู่ในระบบ e-AR'}>
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                                <path d="M12 19l7-7 3 3-7 7-3-3z"></path>
+                                <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"></path>
+                                <path d="M2 2l7.586 7.586"></path>
+                              </svg>
+                              {ev.signature ? (
+                                <span><strong className="step-field-label">ชื่อผู้รับจริง:</strong> <span className="sig-name">{ev.signature}</span></span>
+                              ) : (
+                                <span>
+                                  <strong className="step-field-label">ชื่อผู้รับจริง:</strong>{' '}
+                                  <span className="sig-hint">(ไม่พบข้อมูล signature ในระบบ e-Parcel / ตรวจสอบลายเซ็นใน e-AR)</span>{' '}
+                                  <a
+                                    href={`https://e-ar.thailandpost.com/ear#barcode=${encodeURIComponent(barcode)}`}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="sig-ear-link"
+                                    title="คลิกเพื่อเปิดระบบ e-AR และค้นหาภาพลายเซ็นอัตโนมัติ"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      openEarWithBarcode(barcode);
+                                    }}
+                                  >
+                                    ดูภาพลายเซ็นใน e-AR ↗
+                                  </a>
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })()
                       ) : (
                         ev.signature && (
                           <div className="track-step-signature" title={`ผู้ลงนาม: ${ev.signature}`}>
@@ -396,6 +503,36 @@ export default function TrackingTimelineModal({ isOpen, barcode, recInfo, curren
           </div>
         </div>
       </div>
+
+      {/* Lightbox Modal for Signature Zoom */}
+      {selectedSigModal && (
+        <div className="ear-lightbox-overlay" onClick={() => setSelectedSigModal(null)}>
+          <div className="ear-lightbox-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="ear-lightbox-header">
+              <span className="ear-lightbox-title">✍️ ภาพลายมือชื่อผู้รับ ({selectedSigModal.barcode})</span>
+              <button 
+                type="button" 
+                className="ear-lightbox-close" 
+                onClick={() => setSelectedSigModal(null)}
+                title="ปิดหน้าต่างภาพขยาย"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="ear-lightbox-img-wrap">
+              <img src={selectedSigModal.img} alt="ภาพลายมือชื่อผู้รับจริง" className="ear-lightbox-img" />
+            </div>
+            <div className="ear-lightbox-meta">
+              {selectedSigModal.rel && (
+                <div><strong>ความสัมพันธ์:</strong> {selectedSigModal.rel}</div>
+              )}
+              {selectedSigModal.officer && (
+                <div><strong>เจ้าหน้าที่นำจ่าย:</strong> {selectedSigModal.officer}</div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

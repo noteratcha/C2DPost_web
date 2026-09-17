@@ -9,7 +9,7 @@ from datetime import datetime
 
 from fastapi import FastAPI, UploadFile, File, HTTPException, Body, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse, JSONResponse
+from fastapi.responses import StreamingResponse, JSONResponse, Response
 from pydantic import BaseModel
 
 # Ensure api directory is in sys.path
@@ -838,6 +838,230 @@ def get_received_report(req: ReceivedReportRequest):
     }
 
 
+def _fetch_ear_details(barcode: str) -> dict:
+    """
+    Fetches the official e-AR (Electronic Acknowledgement Receipt) PDF from Thailand Post e-AR API:
+    POST https://e-ar.thailandpost.com/ear-api/print/e-ar with body [barcode].
+    Extracts:
+    - has_ear: bool
+    - relationship: string (e.g. เจ้าหน้าที่เวรรับส่ง, ผู้รับรับเอง, คนในบ้าน)
+    - delivery_officer: string (e.g. นายธนพนธ์ พรมพันธ์)
+    - status: string (e.g. นำจ่ายถึงผู้รับแล้ว)
+    - signature_image: base64 Data URL (upright PNG)
+    - pdf_url: relative URL for client PDF viewing
+    """
+    result = {
+        "has_ear": False,
+        "relationship": "",
+        "delivery_officer": "",
+        "status": "",
+        "signature_image": "",
+        "pdf_url": f"/api/reports/ear-pdf?barcode={barcode}" if barcode else ""
+    }
+    if not barcode:
+        return result
+
+    try:
+        import requests
+        import io
+        import base64
+        from PIL import Image
+
+        url = "https://e-ar.thailandpost.com/ear-api/print/e-ar"
+        headers = {
+            "Content-Type": "application/json",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
+        }
+        r = requests.post(url, json=[barcode], headers=headers, timeout=8, verify=False)
+        if r.status_code != 200 or "application/pdf" not in r.headers.get("Content-Type", ""):
+            return result
+
+        pdf_bytes = r.content
+        result["has_ear"] = True
+
+        # Try PyMuPDF (fitz) first
+        try:
+            import fitz
+            doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+            page = doc[0]
+            rawdict = page.get_text("rawdict")
+            for block in rawdict.get("blocks", []):
+                for line in block.get("lines", []):
+                    for span in line.get("spans", []):
+                        chars = span.get("chars", [])
+                        text = "".join(c.get("c", "") for c in chars).strip()
+                        origin = span.get("origin", (0, 0))
+                        if 140 <= origin[1] <= 147 and origin[0] > 470 and not text.startswith(".."):
+                            result["status"] = text
+                        elif 155 <= origin[1] <= 162 and origin[0] > 470 and not text.startswith(".."):
+                            result["relationship"] = text
+                        elif 170 <= origin[1] <= 177 and origin[0] > 470 and not text.startswith(".."):
+                            if not result["delivery_officer"]:
+                                result["delivery_officer"] = text
+                            else:
+                                result["delivery_officer"] += f" {text}"
+
+            for img_info in page.get_images():
+                xref = img_info[0]
+                rects = page.get_image_rects(xref)
+                w, h = img_info[2], img_info[3]
+                if any(rect.y0 < 150 and rect.x0 > 400 for rect in rects) or (w < 400 and h > 400):
+                    base_img = doc.extract_image(xref)
+                    im = Image.open(io.BytesIO(base_img["image"]))
+                    if im.height > im.width:
+                        im = im.rotate(90, expand=True)
+                    buf = io.BytesIO()
+                    im.save(buf, format="PNG")
+                    result["signature_image"] = f"data:image/png;base64,{base64.b64encode(buf.getvalue()).decode('utf-8')}"
+                    break
+        except Exception:
+            pass
+
+        # Fallback to pypdf + Pillow if signature_image still missing
+        if not result["signature_image"]:
+            try:
+                import pypdf
+                reader = pypdf.PdfReader(io.BytesIO(pdf_bytes))
+                page = reader.pages[0]
+                for name, img_file in page.images.items():
+                    im = Image.open(io.BytesIO(img_file.data))
+                    if (im.width < 600 and im.height > 250) or (im.width > 250 and im.height < 600 and len(img_file.data) < 30000):
+                        if im.height > im.width:
+                            im = im.rotate(90, expand=True)
+                        buf = io.BytesIO()
+                        im.save(buf, format="PNG")
+                        result["signature_image"] = f"data:image/png;base64,{base64.b64encode(buf.getvalue()).decode('utf-8')}"
+                        break
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+    return result
+
+
+@app.get("/api/reports/ear-pdf")
+def get_ear_pdf(barcode: str):
+    """
+    Proxies and serves the official e-AR PDF for a given barcode from Thailand Post.
+    Allows users to view or print the original PDF in browser without CORS/POST restrictions.
+    """
+    barcode = (barcode or "").strip()
+    if not barcode:
+        raise HTTPException(status_code=400, detail="กรุณาระบุหมายเลขบาร์โค้ด")
+    try:
+        import requests
+        url = "https://e-ar.thailandpost.com/ear-api/print/e-ar"
+        headers = {
+            "Content-Type": "application/json",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
+        }
+        r = requests.post(url, json=[barcode], headers=headers, timeout=12, verify=False)
+        if r.status_code == 200 and "application/pdf" in r.headers.get("Content-Type", ""):
+            return Response(
+                content=r.content,
+                media_type="application/pdf",
+                headers={
+                    "Content-Disposition": f"inline; filename=e-AR-{barcode}.pdf",
+                    "Cache-Control": "public, max-age=3600"
+                }
+            )
+        return JSONResponse(
+            status_code=404, 
+            content={
+                "error": "ไม่พบข้อมูลใบตอบรับ e-AR สำหรับพัสดุนี้",
+                "upstream_status": r.status_code,
+                "upstream_content_type": r.headers.get("Content-Type", ""),
+                "upstream_text": r.text[:300]
+            }
+        )
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": f"เกิดข้อผิดพลาดในการเชื่อมต่อ e-AR: {str(e)}"})
+
+
+@app.post("/api/reports/parse-ear-pdf")
+async def parse_ear_pdf(request: Request):
+    """
+    Parses e-AR PDF bytes provided by the client (bypassing foreign edge geoblocking).
+    Extracts signature image, relationship, delivery officer, and delivery status.
+    """
+    try:
+        import io
+        import base64
+        from PIL import Image
+
+        pdf_bytes = await request.body()
+        if not pdf_bytes or len(pdf_bytes) < 300:
+            return JSONResponse(status_code=400, content={"success": False, "error": "Invalid PDF data"})
+
+        data = {
+            "relationship": "",
+            "delivery_officer": "",
+            "status": "",
+            "signature_image": ""
+        }
+
+        # 1. Try PyMuPDF (fitz)
+        try:
+            import fitz
+            doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+            page = doc[0]
+            rawdict = page.get_text("rawdict")
+            for block in rawdict.get("blocks", []):
+                for line in block.get("lines", []):
+                    for span in line.get("spans", []):
+                        chars = span.get("chars", [])
+                        text = "".join(c.get("c", "") for c in chars).strip()
+                        origin = span.get("origin", (0, 0))
+                        if 140 <= origin[1] <= 147 and origin[0] > 470 and not text.startswith(".."):
+                            data["status"] = text
+                        elif 155 <= origin[1] <= 162 and origin[0] > 470 and not text.startswith(".."):
+                            data["relationship"] = text
+                        elif 170 <= origin[1] <= 177 and origin[0] > 470 and not text.startswith(".."):
+                            if not data["delivery_officer"]:
+                                data["delivery_officer"] = text
+                            else:
+                                data["delivery_officer"] += f" {text}"
+
+            for img_info in page.get_images():
+                xref = img_info[0]
+                rects = page.get_image_rects(xref)
+                w, h = img_info[2], img_info[3]
+                if any(rect.y0 < 150 and rect.x0 > 400 for rect in rects) or (w < 400 and h > 400):
+                    base_img = doc.extract_image(xref)
+                    im = Image.open(io.BytesIO(base_img["image"]))
+                    if im.height > im.width:
+                        im = im.rotate(90, expand=True)
+                    buf = io.BytesIO()
+                    im.save(buf, format="PNG")
+                    data["signature_image"] = f"data:image/png;base64,{base64.b64encode(buf.getvalue()).decode('utf-8')}"
+                    break
+        except Exception:
+            pass
+
+        # 2. Fallback to pypdf + Pillow if signature_image missing
+        if not data["signature_image"]:
+            try:
+                import pypdf
+                reader = pypdf.PdfReader(io.BytesIO(pdf_bytes))
+                page = reader.pages[0]
+                for name, img_file in page.images.items():
+                    im = Image.open(io.BytesIO(img_file.data))
+                    if (im.width < 600 and im.height > 250) or (im.width > 250 and im.height < 600 and len(img_file.data) < 30000):
+                        if im.height > im.width:
+                            im = im.rotate(90, expand=True)
+                        buf = io.BytesIO()
+                        im.save(buf, format="PNG")
+                        data["signature_image"] = f"data:image/png;base64,{base64.b64encode(buf.getvalue()).decode('utf-8')}"
+                        break
+            except Exception:
+                pass
+
+        return {"success": True, "data": data}
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"success": False, "error": str(e)})
+
+
 @app.post("/api/reports/tracking")
 def get_tracking(req: TrackingRequest):
     """
@@ -905,6 +1129,23 @@ def get_tracking(req: TrackingRequest):
                             pass
                 except Exception:
                     pass
+                # Query e-AR details if parcel is delivered
+                has_delivered = any(ev.get("status_key") == "delivered" for ev in events)
+                if has_delivered:
+                    try:
+                        ear_data = _fetch_ear_details(barcode)
+                        if ear_data.get("has_ear"):
+                            for ev in events:
+                                if ev.get("status_key") == "delivered":
+                                    ev["ear_info"] = ear_data
+                                    if ear_data.get("signature_image"):
+                                        ev["signature_image"] = ear_data["signature_image"]
+                                    if ear_data.get("relationship"):
+                                        ev["relationship"] = ear_data["relationship"]
+                                    if ear_data.get("delivery_officer"):
+                                        ev["delivery_officer"] = ear_data["delivery_officer"]
+                    except Exception:
+                        pass
             else:
                 api_error = f"API ตอบกลับสถานะ {response.status_code}: {response.text[:200]}"
         except Exception as e:
@@ -922,9 +1163,12 @@ def get_tracking(req: TrackingRequest):
     latest_datetime = latest_event.get("datetime", "") if latest_event else ""
     latest_location = latest_event.get("location", "") if latest_event else ""
     final_signature = ""
+    ear_info_res = None
     for ev in events:
         if ev.get("signature"):
             final_signature = ev["signature"]
+        if ev.get("ear_info") and not ear_info_res:
+            ear_info_res = ev["ear_info"]
 
     return {
         "success": True,
@@ -933,6 +1177,7 @@ def get_tracking(req: TrackingRequest):
         "api_notice": api_error if not is_demo_user else None,
         "events": events,
         "signature": final_signature,
+        "ear_info": ear_info_res,
         "latest_status_key": latest_status_key,
         "latest_status_label": latest_status_label,
         "latest_datetime": latest_datetime,

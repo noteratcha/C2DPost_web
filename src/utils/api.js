@@ -2,7 +2,7 @@
  * Backend API Client
  */
 
-const API_BASE = '/api';
+export const API_BASE = '/api';
 
 /**
  * Trigger browser file download from Blob
