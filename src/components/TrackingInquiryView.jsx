@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { fetchTrackingHistory } from '../utils/api';
+import { formatStationWithZipcode } from '../utils/postalUtils';
 import './TrackingInquiryView.css';
 
 /**
@@ -598,12 +599,20 @@ export default function TrackingInquiryView({ currentPerson, records = [], initi
                           {events.map((ev, evIndex) => {
                             const isLast = evIndex === events.length - 1;
                             const isRec = `${ev.status_description || ''} ${ev.status || ''}`.includes('รับฝาก');
+                            const isDelivered = ev.status_key === 'delivered' || 
+                              String(ev.status) === '4' || 
+                              String(ev.status) === '501' || 
+                              (ev.status_description || '').includes('นำจ่ายถึงผู้รับ') || 
+                              (ev.status_description || '').includes('นำจ่ายสำเร็จ') ||
+                              (ev.status_description || '').includes('ผู้รับได้รับ');
+
+                            const recipientDisplay = ev.signature || (isDelivered ? (matchedRecord?.name || matchedRecord?.receiver_name || '') : '');
 
                             return (
-                              <div key={evIndex} className={`stepper-item ${isLast ? 'latest' : ''}`}>
+                              <div key={evIndex} className={`stepper-item ${isLast ? 'latest' : ''} ${isDelivered ? 'delivered' : ''}`}>
                                 <div className="stepper-rail">
-                                  <div className={`stepper-dot ${isRec ? 'dot-success' : isLast ? 'dot-active' : ''}`}>
-                                    {isRec ? '✓' : evIndex + 1}
+                                  <div className={`stepper-dot ${isRec || isDelivered ? 'dot-success' : isLast ? 'dot-active' : ''}`}>
+                                    {isRec || isDelivered ? '✓' : evIndex + 1}
                                   </div>
                                   {!isLast && <div className="stepper-line"></div>}
                                 </div>
@@ -612,11 +621,12 @@ export default function TrackingInquiryView({ currentPerson, records = [], initi
                                   <div className="stepper-status-row">
                                     <span className="stepper-status-desc">{ev.status_description}</span>
                                     {ev.status_label && (
-                                      <span className={`stepper-badge-status ${ev.status_key || 'in_transit'}`}>
+                                      <span className={`stepper-badge-status ${ev.status_key || (isDelivered ? 'delivered' : 'in_transit')}`}>
                                         {ev.status_label}
                                       </span>
                                     )}
                                     {isRec && <span className="stepper-tag-rec">รับฝากแล้ว</span>}
+                                    {isDelivered && !isRec && <span className="stepper-tag-rec delivered">นำจ่ายสำเร็จ</span>}
                                     {isLast && <span className="stepper-tag-latest">ล่าสุด</span>}
                                   </div>
 
@@ -638,16 +648,16 @@ export default function TrackingInquiryView({ currentPerson, records = [], initi
                                           <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
                                           <circle cx="12" cy="10" r="3"></circle>
                                         </svg>
-                                        <span>{ev.location}</span>
+                                        <span>{formatStationWithZipcode(ev.location)}</span>
                                       </span>
                                     )}
-                                    {ev.signature && (
-                                      <span className="stepper-meta-item signature" title="ผู้ลงนาม">
+                                    {recipientDisplay && (
+                                      <span className="stepper-meta-item signature" title={ev.signature ? `ผู้ลงนาม: ${ev.signature}` : `ผู้รับสิ่งของ: ${recipientDisplay}`}>
                                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                           <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
                                           <circle cx="12" cy="7" r="4"></circle>
                                         </svg>
-                                        <span>ผู้ลงนาม: {ev.signature}</span>
+                                        <span>{ev.signature ? `ผู้ลงนาม: ${ev.signature}` : `ผู้รับ: ${recipientDisplay}`}</span>
                                       </span>
                                     )}
                                   </div>

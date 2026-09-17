@@ -158,7 +158,15 @@ def _parse_tracking_events(raw, barcode):
             or ev_dict.get("postoffice")
             or ""
         ).strip()
-        sig = str(ev_dict.get("signature") or ev_dict.get("employee") or ev_dict.get("officer") or "").strip()
+        sig = str(
+            ev_dict.get("signature")
+            or ev_dict.get("signatureName")
+            or ev_dict.get("receiverName")
+            or ev_dict.get("customerName")
+            or ev_dict.get("employee")
+            or ev_dict.get("officer")
+            or ""
+        ).strip()
 
         status_key, status_label = classify_delivery_status(status, desc)
 

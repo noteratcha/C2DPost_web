@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { fetchTrackingHistory } from '../utils/api';
+import { formatStationWithZipcode } from '../utils/postalUtils';
 import './TrackingTimelineModal.css';
 
 export default function TrackingTimelineModal({ isOpen, barcode, recInfo, currentPerson, onClose, onOpenTrackingPage, onTrackingUpdated }) {
@@ -242,18 +243,30 @@ export default function TrackingTimelineModal({ isOpen, barcode, recInfo, curren
                 const isLast = idx === sortedEvents.length - 1;
                 const isReceived = _isReceivedText(`${ev.status_description || ''} ${ev.status || ''}`) ||
                   ['1', '001', 'p001'].includes(String(ev.status || '').toLowerCase());
+                const isDelivered = ev.status_key === 'delivered' || 
+                  String(ev.status) === '4' || 
+                  String(ev.status) === '501' || 
+                  (ev.status_description || '').includes('นำจ่ายถึงผู้รับ') || 
+                  (ev.status_description || '').includes('นำจ่ายสำเร็จ') ||
+                  (ev.status_description || '').includes('ผู้รับได้รับ');
+
+                const recipientDisplay = ev.signature || (isDelivered ? receiverName : '');
+
                 return (
-                  <li key={ev.seq || idx} className={`track-step-item ${isLast ? 'last' : ''} ${isReceived ? 'received' : ''}`}>
+                  <li key={ev.seq || idx} className={`track-step-item ${isLast ? 'last' : ''} ${isReceived ? 'received' : ''} ${isDelivered ? 'delivered' : ''}`}>
                     <div className="track-step-marker">
-                      <span className={`track-step-dot ${isReceived ? 'ok' : ''}`}>{isReceived ? '✓' : idx + 1}</span>
+                      <span className={`track-step-dot ${isReceived || isDelivered ? 'ok' : ''}`}>
+                        {isReceived || isDelivered ? '✓' : idx + 1}
+                      </span>
                       {!isLast && <span className="track-step-line"></span>}
                     </div>
                     <div className="track-step-content">
                       <div className="track-step-head">
-                        <span className={`track-step-title ${isReceived ? 'text-emerald' : ''}`}>
+                        <span className={`track-step-title ${isReceived || isDelivered ? 'text-emerald' : ''}`}>
                           {ev.status_description || 'อัปเดตสถานะ'}
                         </span>
                         {isReceived && <span className="track-received-badge">รับฝากแล้ว</span>}
+                        {isDelivered && <span className="track-received-badge delivered-badge">นำจ่ายสำเร็จ</span>}
                       </div>
                       <div className="track-step-datetime">
                         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
@@ -263,21 +276,21 @@ export default function TrackingTimelineModal({ isOpen, barcode, recInfo, curren
                         <span>{ev.datetime || '-'}</span>
                       </div>
                       {ev.location && (
-                        <div className="track-step-location">
+                        <div className="track-step-location" title="ที่ทำการไปรษณีย์ / สถานที่">
                           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
                             <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
                             <circle cx="12" cy="10" r="3"></circle>
                           </svg>
-                          <span>{ev.location}</span>
+                          <span>{formatStationWithZipcode(ev.location, recInfo)}</span>
                         </div>
                       )}
-                      {ev.signature && (
-                        <div className="track-step-signature">
-                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                      {recipientDisplay && (
+                        <div className="track-step-signature" title={ev.signature ? `ผู้ลงนาม: ${ev.signature}` : `ผู้รับสิ่งของ: ${recipientDisplay}`}>
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
                             <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
                             <circle cx="12" cy="7" r="4"></circle>
                           </svg>
-                          <span>{ev.signature}</span>
+                          <span>{ev.signature ? `ผู้ลงนาม: ${ev.signature}` : `ผู้รับ: ${recipientDisplay}`}</span>
                         </div>
                       )}
                     </div>
