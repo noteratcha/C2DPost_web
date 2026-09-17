@@ -143,3 +143,10 @@
   - คอมไพล์และ Deploy ขึ้นสู่ Vercel Production สำเร็จ 100%
 
 
+
+- [x] **4.42 แสดงเวอร์ชันส่วนขยายที่ติดตั้งบนป้ายสถานะแบบเรียลไทม์ (Installed Extension Version Status Chip) (`v2026.0917.1105`)**
+  - พัฒนาระบบตรวจจับและส่งต่อหมายเลขเวอร์ชันของส่วนขยาย Chrome Extension จาก `content.js` ผ่าน DOM Attribute (`data-c2dpost-version`), Custom Event (`C2DPOST_EXTENSION_READY`) และ Handshake Ping-Pong (`C2DPOST_PONG`) เข้าสู่ `extensionBridge.js`
+  - เชื่อมโยง State `extensionVersion` ใน `App.jsx` และส่งต่อไปยัง `<Navbar />` แบบเรียลไทม์
+  - อัปเดตป้ายสถานะ Extension Helper ในเมนูดรอปดาวน์แฮมเบอร์เกอร์ให้แสดงหมายเลขเวอร์ชันที่ติดตั้งอย่างชัดเจน เช่น `• ติดตั้งแล้ว (v1.1.0)` (หรือแสดง `• ติดตั้งแล้ว (v1.0.0)` สำหรับรุ่นเดิม และ fallback `ไม่พบ` หากยังไม่ได้ติดตั้ง)
+  - เพิ่ม CSS `white-space: nowrap;` และ `flex-shrink: 0;` บน `.status-badge-chip` เพื่อป้องกันข้อความเวอร์ชันล้นตกบรรทัด
+  - คอมไพล์โปรเจกต์ `npm run build` และ Deploy ขึ้นสู่ Vercel Production สำเร็จเรียบร้อย
