@@ -10,6 +10,7 @@ export default function TrackingTimelineModal({ isOpen, barcode, recInfo, curren
   const [error, setError] = useState('');
   const [trackData, setTrackData] = useState(null);
   const [clientEarData, setClientEarData] = useState(null);
+  const [earLoading, setEarLoading] = useState(false);
   const [selectedSigModal, setSelectedSigModal] = useState(null);
 
   const handleFetch = useCallback(async (bcode) => {
@@ -18,6 +19,7 @@ export default function TrackingTimelineModal({ isOpen, barcode, recInfo, curren
     setError('');
     setTrackData(null);
     setClientEarData(null);
+    setEarLoading(false);
     try {
       const username = currentPerson?.UserName || '';
       const password = currentPerson?.Password || '';
@@ -28,20 +30,24 @@ export default function TrackingTimelineModal({ isOpen, barcode, recInfo, curren
           onTrackingUpdated(bcode, result);
         }
         // Fetch client-side e-AR details if parcel is delivered
-        const hasDelivered = (result.events || []).some(ev => 
-          ev.status_key === 'delivered' || 
-          String(ev.status) === '4' || 
-          String(ev.status) === '501' || 
-          (ev.status_description || '').includes('นำจ่ายถึงผู้รับ') || 
-          (ev.status_description || '').includes('นำจ่ายสำเร็จ') ||
-          (ev.status_description || '').includes('ผู้รับได้รับ')
-        );
+        const hasDelivered = (result.events || []).some(ev => {
+          const desc = (ev.status_description || '').replace(/ํา/g, 'ำ');
+          return ev.status_key === 'delivered' || 
+            String(ev.status) === '4' || 
+            String(ev.status) === '501' || 
+            /นำจ่ายถึงผู้รับ|นำจ่ายสำเร็จ|ผู้รับได้รับ|จัดส่งสำเร็จ/i.test(desc);
+        });
         if (hasDelivered) {
+          setEarLoading(true);
           fetchEarDetailsClient(bcode).then(earRes => {
             if (earRes && earRes.has_ear) {
               setClientEarData(earRes);
             }
-          }).catch(err => console.warn('Client e-AR fetch error:', err));
+          }).catch(err => {
+            console.warn('Client e-AR fetch error:', err);
+          }).finally(() => {
+            setEarLoading(false);
+          });
         }
       } else {
         setError(result.message || 'ไม่สามารถดึงประวัติสถานะได้');
@@ -264,12 +270,11 @@ export default function TrackingTimelineModal({ isOpen, barcode, recInfo, curren
                 const isLast = idx === sortedEvents.length - 1;
                 const isReceived = _isReceivedText(`${ev.status_description || ''} ${ev.status || ''}`) ||
                   ['1', '001', 'p001'].includes(String(ev.status || '').toLowerCase());
+                const descNormalized = (ev.status_description || '').replace(/ํา/g, 'ำ');
                 const isDelivered = ev.status_key === 'delivered' || 
                   String(ev.status) === '4' || 
                   String(ev.status) === '501' || 
-                  (ev.status_description || '').includes('นำจ่ายถึงผู้รับ') || 
-                  (ev.status_description || '').includes('นำจ่ายสำเร็จ') ||
-                  (ev.status_description || '').includes('ผู้รับได้รับ');
+                  /นำจ่ายถึงผู้รับ|นำจ่ายสำเร็จ|ผู้รับได้รับ|จัดส่งสำเร็จ/i.test(descNormalized);
 
                 return (
                   <li key={ev.seq || idx} className={`track-step-item ${isLast ? 'last' : ''} ${isReceived ? 'received' : ''} ${isDelivered ? 'delivered' : ''}`}>
@@ -314,6 +319,17 @@ export default function TrackingTimelineModal({ isOpen, barcode, recInfo, curren
                       )}
                       {isDelivered ? (
                         (() => {
+                          if (earLoading) {
+                            return (
+                              <div className="track-step-ear-box" style={{ padding: '0.65rem 0.85rem', background: '#f0fdf4', border: '1px dashed #10b981' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', fontSize: '0.82rem', color: '#047857' }}>
+                                  <span className="track-spinner small" style={{ width: '14px', height: '14px', borderWidth: '2px', borderTopColor: '#059669' }}></span>
+                                  <span>กำลังโหลดภาพลายเซ็นและข้อมูลผู้รับจากระบบ e-AR...</span>
+                                </div>
+                              </div>
+                            );
+                          }
+
                           const earInfo = clientEarData || ev.ear_info || trackData?.ear_info;
                           const sigImg = clientEarData?.signature_image || ev.signature_image || earInfo?.signature_image;
                           const rel = clientEarData?.relationship || ev.relationship || earInfo?.relationship;
@@ -398,33 +414,68 @@ export default function TrackingTimelineModal({ isOpen, barcode, recInfo, curren
                           }
 
                           return (
-                            <div className="track-step-signature" title={ev.signature ? `ชื่อผู้รับจริง: ${ev.signature}` : 'ไม่พบข้อมูล signature ในระบบ e-Parcel / ลายเซ็นอยู่ในระบบ e-AR'}>
-                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-                                <path d="M12 19l7-7 3 3-7 7-3-3z"></path>
-                                <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"></path>
-                                <path d="M2 2l7.586 7.586"></path>
-                              </svg>
-                              {ev.signature ? (
-                                <span><strong className="step-field-label">ชื่อผู้รับจริง:</strong> <span className="sig-name">{ev.signature}</span></span>
-                              ) : (
-                                <span>
-                                  <strong className="step-field-label">ชื่อผู้รับจริง:</strong>{' '}
-                                  <span className="sig-hint">(ไม่พบข้อมูล signature ในระบบ e-Parcel / ตรวจสอบลายเซ็นใน e-AR)</span>{' '}
-                                  <a
-                                    href={`https://e-ar.thailandpost.com/ear#barcode=${encodeURIComponent(barcode)}`}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="sig-ear-link"
-                                    title="คลิกเพื่อเปิดระบบ e-AR และค้นหาภาพลายเซ็นอัตโนมัติ"
-                                    onClick={(e) => {
-                                      e.preventDefault();
-                                      openEarWithBarcode(barcode);
-                                    }}
-                                  >
-                                    ดูภาพลายเซ็นใน e-AR ↗
-                                  </a>
-                                </span>
-                              )}
+                            <div className="track-step-signature" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '0.4rem' }} title={ev.signature ? `ชื่อผู้รับจริง: ${ev.signature}` : 'ไม่พบข้อมูล signature ในระบบ e-Parcel / ลายเซ็นอยู่ในระบบ e-AR'}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                                  <path d="M12 19l7-7 3 3-7 7-3-3z"></path>
+                                  <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"></path>
+                                  <path d="M2 2l7.586 7.586"></path>
+                                </svg>
+                                {ev.signature ? (
+                                  <span><strong className="step-field-label">ชื่อผู้รับจริง:</strong> <span className="sig-name">{ev.signature}</span></span>
+                                ) : (
+                                  <span>
+                                    <strong className="step-field-label">ชื่อผู้รับจริง:</strong>{' '}
+                                    <span className="sig-hint">(ไม่พบข้อมูล signature ในระบบ e-Parcel / ตรวจสอบลายเซ็นใน e-AR)</span>{' '}
+                                    <a
+                                      href={`https://e-ar.thailandpost.com/ear#barcode=${encodeURIComponent(barcode)}`}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="sig-ear-link"
+                                      title="คลิกเพื่อเปิดระบบ e-AR และค้นหาภาพลายเซ็นอัตโนมัติ"
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        openEarWithBarcode(barcode);
+                                      }}
+                                    >
+                                      ดูภาพลายเซ็นใน e-AR ↗
+                                    </a>
+                                  </span>
+                                )}
+                              </div>
+
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.76rem', color: '#64748b' }}>
+                                <button
+                                  type="button"
+                                  style={{
+                                    background: '#f8fafc',
+                                    border: '1px solid #cbd5e1',
+                                    borderRadius: '4px',
+                                    padding: '0.2rem 0.5rem',
+                                    fontSize: '0.74rem',
+                                    color: '#047857',
+                                    fontWeight: 500,
+                                    cursor: 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '0.25rem'
+                                  }}
+                                  onClick={() => {
+                                    setEarLoading(true);
+                                    fetchEarDetailsClient(barcode, true).then(earRes => {
+                                      if (earRes && earRes.has_ear) {
+                                        setClientEarData(earRes);
+                                      }
+                                    }).finally(() => {
+                                      setEarLoading(false);
+                                    });
+                                  }}
+                                  title="กดเพื่อส่งคำขอเชื่อมต่อดึงภาพลายเซ็น e-AR อีกครั้ง"
+                                >
+                                  🔄 ลองดึงภาพลายเซ็น e-AR อีกครั้ง
+                                </button>
+                                <span>(ต้องใช้ส่วนเสริม C2DPost Helper v1.3.0)</span>
+                              </div>
                             </div>
                           );
                         })()

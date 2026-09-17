@@ -861,16 +861,187 @@ def _fetch_ear_details(barcode: str) -> dict:
     if not barcode:
         return result
 
+def _parse_ear_pdf_content(pdf_bytes: bytes) -> dict:
+    """
+    Robustly parses e-AR PDF bytes.
+    Extracts recipient relationship, delivery officer, status, and signature image.
+    Handles PDF smask alpha transparency and fonts with CMap.
+    """
+    data = {
+        "status": "",
+        "relationship": "",
+        "delivery_officer": "",
+        "signature_image": ""
+    }
+    if not pdf_bytes or len(pdf_bytes) < 300:
+        return data
+
+    import io
+    import base64
+    import re
+    from PIL import Image
+
+    # 1. Extract signature image using pypdf (handles PDF smask / transparency perfectly)
+    try:
+        import pypdf
+        reader = pypdf.PdfReader(io.BytesIO(pdf_bytes))
+        page = reader.pages[0]
+        for img in page.images:
+            im = Image.open(io.BytesIO(img.data))
+            if (im.width < 650 and im.height > 200) or (im.width > 200 and im.height < 650 and len(img.data) < 40000):
+                if im.height > im.width:
+                    im = im.rotate(90, expand=True)
+                # Composite onto crisp white background
+                bg = Image.new("RGBA", im.size, (255, 255, 255, 255))
+                final_im = Image.alpha_composite(bg, im.convert("RGBA")).convert("RGB")
+                buf = io.BytesIO()
+                final_im.save(buf, format="PNG")
+                b64_str = base64.b64encode(buf.getvalue()).decode("utf-8")
+                data["signature_image"] = f"data:image/png;base64,{b64_str}"
+                break
+    except Exception:
+        pass
+
+    # Fallback to PyMuPDF image extraction if pypdf didn't get signature
+    if not data["signature_image"]:
+        try:
+            import fitz
+            doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+            page = doc[0]
+            for img_info in page.get_images():
+                xref = img_info[0]
+                rects = page.get_image_rects(xref)
+                w, h = img_info[2], img_info[3]
+                if any(rect.y0 < 150 and rect.x0 > 400 for rect in rects) or (w < 400 and h > 400):
+                    pix = fitz.Pixmap(doc, xref)
+                    if pix.alpha:
+                        # Convert to RGB with white background
+                        pix = fitz.Pixmap(fitz.csRGB, pix)
+                    im = Image.open(io.BytesIO(pix.tobytes("png")))
+                    if im.height > im.width:
+                        im = im.rotate(90, expand=True)
+                    buf = io.BytesIO()
+                    im.save(buf, format="PNG")
+                    b64_str = base64.b64encode(buf.getvalue()).decode("utf-8")
+                    data["signature_image"] = f"data:image/png;base64,{b64_str}"
+                    break
+        except Exception:
+            pass
+
+    # 2. Extract text metadata using PyMuPDF (fitz)
+    try:
+        import fitz
+        doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+        page = doc[0]
+        rawdict = page.get_text("rawdict")
+        for block in rawdict.get("blocks", []):
+            for line in block.get("lines", []):
+                for span in line.get("spans", []):
+                    chars = span.get("chars", [])
+                    text = "".join(c.get("c", "") for c in chars).strip()
+                    origin = span.get("origin", (0, 0))
+                    if 140 <= origin[1] <= 147 and origin[0] > 470 and not text.startswith(".."):
+                        data["status"] = text
+                    elif 155 <= origin[1] <= 162 and origin[0] > 470 and not text.startswith(".."):
+                        data["relationship"] = text
+                    elif 170 <= origin[1] <= 177 and origin[0] > 470 and not text.startswith(".."):
+                        if not data["delivery_officer"]:
+                            data["delivery_officer"] = text
+                        else:
+                            data["delivery_officer"] += f" {text}"
+    except Exception:
+        pass
+
+    # 3. Pure python CMap fallback for text if relationship missing
+    if not data["relationship"]:
+        try:
+            import pypdf
+            reader = pypdf.PdfReader(io.BytesIO(pdf_bytes))
+            page = reader.pages[0]
+            fonts = page.get("/Resources", {}).get("/Font", {})
+            font_maps = {}
+            for fkey, fval in fonts.items():
+                fobj = fval.get_object()
+                if "/ToUnicode" in fobj:
+                    cmap_str = fobj["/ToUnicode"].get_object().get_data().decode("utf-8", errors="ignore")
+                    m = {}
+                    for item in re.finditer(r"<([0-9a-fA-F]{4})>\s+<([0-9a-fA-F]{4})>", cmap_str):
+                        m[int(item.group(1), 16)] = chr(int(item.group(2), 16))
+                    for item in re.finditer(r"<([0-9a-fA-F]{4})>\s+<([0-9a-fA-F]{4})>\s+<([0-9a-fA-F]{4})>", cmap_str):
+                        s_s, s_e, d_s = int(item.group(1), 16), int(item.group(2), 16), int(item.group(3), 16)
+                        for idx in range(s_e - s_s + 1):
+                            m[s_s + idx] = chr(d_s + idx)
+                    font_maps[fkey] = m
+            content = page.get_contents().get_data().decode("latin1", errors="ignore")
+            c_font = None
+            lines, curr = [], []
+            for part in re.split(r"(\/[Ff]\d+\s+[\d\.]+\s+T[fF]|<[0-9a-fA-F]+>|\[.*?\]|T\*|ET)", content):
+                if not part:
+                    continue
+                mf = re.search(r"/(F\d+)", part)
+                if mf:
+                    c_font = "/" + mf.group(1)
+                elif part.startswith("<") and part.endswith(">"):
+                    cmap = font_maps.get(c_font, {})
+                    hex_str = part[1:-1]
+                    curr.append("".join(cmap.get(int(hex_str[i:i+4], 16), "") for i in range(0, len(hex_str), 4)))
+                elif part.startswith("[") and part.endswith("]"):
+                    cmap = font_maps.get(c_font, {})
+                    for piece in re.findall(r"<([0-9a-fA-F]+)>", part):
+                        curr.append("".join(cmap.get(int(piece[i:i+4], 16), "") for i in range(0, len(piece), 4)))
+                elif part in ("T*", "ET"):
+                    if curr:
+                        lines.append("".join(curr))
+                        curr = []
+            if curr:
+                lines.append("".join(curr))
+            full_text = "\n".join(lines)
+            rel_m = re.search(r"ความสัมพันธ์\s*:\s*([^\n\.]+)", full_text)
+            officer_m = re.search(r"เจ้าหน้าที่นำจ่าย\s*:\s*([^\n\.]+)", full_text)
+            status_m = re.search(r"สถานะ\s*:\s*([^\n\.]+)", full_text)
+            if rel_m and not data["relationship"]:
+                data["relationship"] = rel_m.group(1).strip()
+            if officer_m and not data["delivery_officer"]:
+                data["delivery_officer"] = officer_m.group(1).strip()
+            if status_m and not data["status"]:
+                data["status"] = status_m.group(1).strip()
+        except Exception:
+            pass
+
+    return data
+
+
+def _fetch_ear_details(barcode: str) -> dict:
+    """
+    Attempts to fetch official e-AR PDF from Thailand Post and parse recipient signature + relationship.
+    Returns structured dict with signature image data URL and relationship info.
+    """
+    result = {
+        "has_ear": False,
+        "barcode": barcode,
+        "relationship": "",
+        "delivery_officer": "",
+        "status": "",
+        "signature_image": "",
+        "pdf_url": f"/api/reports/ear-pdf?barcode={barcode}"
+    }
+    if not barcode:
+        return result
+
     try:
         import requests
-        import io
-        import base64
-        from PIL import Image
 
         url = "https://e-ar.thailandpost.com/ear-api/print/e-ar"
         headers = {
             "Content-Type": "application/json",
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+            "Accept": "application/json, text/plain, */*",
+            "Accept-Language": "th-TH,th;q=0.9,en-US;q=0.8,en;q=0.7",
+            "Origin": "https://e-ar.thailandpost.com",
+            "Referer": "https://e-ar.thailandpost.com/ear",
+            "Sec-Fetch-Dest": "empty",
+            "Sec-Fetch-Mode": "cors",
+            "Sec-Fetch-Site": "same-origin"
         }
         r = requests.post(url, json=[barcode], headers=headers, timeout=8, verify=False)
         if r.status_code != 200 or "application/pdf" not in r.headers.get("Content-Type", ""):
@@ -879,61 +1050,11 @@ def _fetch_ear_details(barcode: str) -> dict:
         pdf_bytes = r.content
         result["has_ear"] = True
 
-        # Try PyMuPDF (fitz) first
-        try:
-            import fitz
-            doc = fitz.open(stream=pdf_bytes, filetype="pdf")
-            page = doc[0]
-            rawdict = page.get_text("rawdict")
-            for block in rawdict.get("blocks", []):
-                for line in block.get("lines", []):
-                    for span in line.get("spans", []):
-                        chars = span.get("chars", [])
-                        text = "".join(c.get("c", "") for c in chars).strip()
-                        origin = span.get("origin", (0, 0))
-                        if 140 <= origin[1] <= 147 and origin[0] > 470 and not text.startswith(".."):
-                            result["status"] = text
-                        elif 155 <= origin[1] <= 162 and origin[0] > 470 and not text.startswith(".."):
-                            result["relationship"] = text
-                        elif 170 <= origin[1] <= 177 and origin[0] > 470 and not text.startswith(".."):
-                            if not result["delivery_officer"]:
-                                result["delivery_officer"] = text
-                            else:
-                                result["delivery_officer"] += f" {text}"
-
-            for img_info in page.get_images():
-                xref = img_info[0]
-                rects = page.get_image_rects(xref)
-                w, h = img_info[2], img_info[3]
-                if any(rect.y0 < 150 and rect.x0 > 400 for rect in rects) or (w < 400 and h > 400):
-                    base_img = doc.extract_image(xref)
-                    im = Image.open(io.BytesIO(base_img["image"]))
-                    if im.height > im.width:
-                        im = im.rotate(90, expand=True)
-                    buf = io.BytesIO()
-                    im.save(buf, format="PNG")
-                    result["signature_image"] = f"data:image/png;base64,{base64.b64encode(buf.getvalue()).decode('utf-8')}"
-                    break
-        except Exception:
-            pass
-
-        # Fallback to pypdf + Pillow if signature_image still missing
-        if not result["signature_image"]:
-            try:
-                import pypdf
-                reader = pypdf.PdfReader(io.BytesIO(pdf_bytes))
-                page = reader.pages[0]
-                for name, img_file in page.images.items():
-                    im = Image.open(io.BytesIO(img_file.data))
-                    if (im.width < 600 and im.height > 250) or (im.width > 250 and im.height < 600 and len(img_file.data) < 30000):
-                        if im.height > im.width:
-                            im = im.rotate(90, expand=True)
-                        buf = io.BytesIO()
-                        im.save(buf, format="PNG")
-                        result["signature_image"] = f"data:image/png;base64,{base64.b64encode(buf.getvalue()).decode('utf-8')}"
-                        break
-            except Exception:
-                pass
+        parsed = _parse_ear_pdf_content(pdf_bytes)
+        result["status"] = parsed.get("status", "")
+        result["relationship"] = parsed.get("relationship", "")
+        result["delivery_officer"] = parsed.get("delivery_officer", "")
+        result["signature_image"] = parsed.get("signature_image", "")
     except Exception:
         pass
 
@@ -954,7 +1075,14 @@ def get_ear_pdf(barcode: str):
         url = "https://e-ar.thailandpost.com/ear-api/print/e-ar"
         headers = {
             "Content-Type": "application/json",
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+            "Accept": "application/json, text/plain, */*",
+            "Accept-Language": "th-TH,th;q=0.9,en-US;q=0.8,en;q=0.7",
+            "Origin": "https://e-ar.thailandpost.com",
+            "Referer": "https://e-ar.thailandpost.com/ear",
+            "Sec-Fetch-Dest": "empty",
+            "Sec-Fetch-Mode": "cors",
+            "Sec-Fetch-Site": "same-origin"
         }
         r = requests.post(url, json=[barcode], headers=headers, timeout=12, verify=False)
         if r.status_code == 200 and "application/pdf" in r.headers.get("Content-Type", ""):
@@ -986,77 +1114,11 @@ async def parse_ear_pdf(request: Request):
     Extracts signature image, relationship, delivery officer, and delivery status.
     """
     try:
-        import io
-        import base64
-        from PIL import Image
-
         pdf_bytes = await request.body()
         if not pdf_bytes or len(pdf_bytes) < 300:
             return JSONResponse(status_code=400, content={"success": False, "error": "Invalid PDF data"})
 
-        data = {
-            "relationship": "",
-            "delivery_officer": "",
-            "status": "",
-            "signature_image": ""
-        }
-
-        # 1. Try PyMuPDF (fitz)
-        try:
-            import fitz
-            doc = fitz.open(stream=pdf_bytes, filetype="pdf")
-            page = doc[0]
-            rawdict = page.get_text("rawdict")
-            for block in rawdict.get("blocks", []):
-                for line in block.get("lines", []):
-                    for span in line.get("spans", []):
-                        chars = span.get("chars", [])
-                        text = "".join(c.get("c", "") for c in chars).strip()
-                        origin = span.get("origin", (0, 0))
-                        if 140 <= origin[1] <= 147 and origin[0] > 470 and not text.startswith(".."):
-                            data["status"] = text
-                        elif 155 <= origin[1] <= 162 and origin[0] > 470 and not text.startswith(".."):
-                            data["relationship"] = text
-                        elif 170 <= origin[1] <= 177 and origin[0] > 470 and not text.startswith(".."):
-                            if not data["delivery_officer"]:
-                                data["delivery_officer"] = text
-                            else:
-                                data["delivery_officer"] += f" {text}"
-
-            for img_info in page.get_images():
-                xref = img_info[0]
-                rects = page.get_image_rects(xref)
-                w, h = img_info[2], img_info[3]
-                if any(rect.y0 < 150 and rect.x0 > 400 for rect in rects) or (w < 400 and h > 400):
-                    base_img = doc.extract_image(xref)
-                    im = Image.open(io.BytesIO(base_img["image"]))
-                    if im.height > im.width:
-                        im = im.rotate(90, expand=True)
-                    buf = io.BytesIO()
-                    im.save(buf, format="PNG")
-                    data["signature_image"] = f"data:image/png;base64,{base64.b64encode(buf.getvalue()).decode('utf-8')}"
-                    break
-        except Exception:
-            pass
-
-        # 2. Fallback to pypdf + Pillow if signature_image missing
-        if not data["signature_image"]:
-            try:
-                import pypdf
-                reader = pypdf.PdfReader(io.BytesIO(pdf_bytes))
-                page = reader.pages[0]
-                for name, img_file in page.images.items():
-                    im = Image.open(io.BytesIO(img_file.data))
-                    if (im.width < 600 and im.height > 250) or (im.width > 250 and im.height < 600 and len(img_file.data) < 30000):
-                        if im.height > im.width:
-                            im = im.rotate(90, expand=True)
-                        buf = io.BytesIO()
-                        im.save(buf, format="PNG")
-                        data["signature_image"] = f"data:image/png;base64,{base64.b64encode(buf.getvalue()).decode('utf-8')}"
-                        break
-            except Exception:
-                pass
-
+        data = _parse_ear_pdf_content(pdf_bytes)
         return {"success": True, "data": data}
     except Exception as e:
         return JSONResponse(status_code=500, content={"success": False, "error": str(e)})

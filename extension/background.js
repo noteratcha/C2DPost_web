@@ -89,12 +89,59 @@ async function fetchPostOneBarcodes(count, typ = 2) {
   }
 }
 
+/**
+ * Fetch official e-AR PDF from Thailand Post using extension privileges (no CORS)
+ */
+async function fetchEarPdf(barcode) {
+  if (!barcode) return { success: false, error: "No barcode provided" };
+  const cleanBarcode = String(barcode).trim().toUpperCase();
+  const url = "https://e-ar.thailandpost.com/ear-api/print/e-ar";
+
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify([cleanBarcode])
+    });
+
+    if (!response.ok) {
+      return { success: false, error: `HTTP ${response.status}` };
+    }
+
+    const arrayBuffer = await response.arrayBuffer();
+    if (arrayBuffer.byteLength < 500) {
+      return { success: false, error: "Invalid PDF size or not found" };
+    }
+
+    const bytes = new Uint8Array(arrayBuffer);
+    let binary = "";
+    const len = bytes.byteLength;
+    const chunkSize = 8192;
+    for (let i = 0; i < len; i += chunkSize) {
+      const chunk = bytes.subarray(i, Math.min(i + chunkSize, len));
+      binary += String.fromCharCode.apply(null, chunk);
+    }
+    const base64Pdf = btoa(binary);
+
+    return {
+      success: true,
+      barcode: cleanBarcode,
+      pdfBase64: base64Pdf
+    };
+  } catch (err) {
+    console.error("[C2DPost Extension] e-AR fetch error:", err);
+    return { success: false, error: err.message };
+  }
+}
+
 // Listen for messages from content script
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === "PING") {
     sendResponse({
       success: true,
-      version: "1.2.0",
+      version: "1.3.0",
       status: "connected"
     });
     return true;
@@ -106,6 +153,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     fetchPostOneBarcodes(count, typ).then(result => {
       sendResponse(result);
+    });
+    return true; // Keep message channel open for async response
+  }
+
+  if (message.action === "FETCH_EAR_PDF") {
+    fetchEarPdf(message.barcode).then(result => {
+      sendResponse(result);
+    }).catch(err => {
+      sendResponse({ success: false, error: err.message });
     });
     return true; // Keep message channel open for async response
   }

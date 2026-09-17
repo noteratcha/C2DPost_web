@@ -202,3 +202,47 @@ export function openEarWithBarcode(barcode) {
   }
 }
 
+/**
+ * Request e-AR PDF via Chrome Extension Bridge (bypasses CORS and Geoblocking)
+ * @param {string} barcode Barcode string e.g. "BC414111081TH"
+ * @returns {Promise<{success: boolean, barcode: string, pdfBase64?: string, error?: string}>}
+ */
+export function fetchEarPdfFromExtension(barcode) {
+  return new Promise((resolve) => {
+    if (typeof window === 'undefined') {
+      return resolve({ success: false, error: 'Window not available' });
+    }
+
+    const cleanBarcode = String(barcode || '').trim().toUpperCase();
+    if (!cleanBarcode) {
+      return resolve({ success: false, error: 'Empty barcode' });
+    }
+
+    const requestId = `ear_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const timeout = setTimeout(() => {
+      window.removeEventListener('message', handleResult);
+      resolve({ success: false, error: 'Extension e-AR request timeout' });
+    }, 8000);
+
+    const handleResult = (event) => {
+      if (event.data && event.data.type === 'C2DPOST_EAR_PDF_RESULT' && event.data.requestId === requestId) {
+        clearTimeout(timeout);
+        window.removeEventListener('message', handleResult);
+        resolve(event.data);
+      }
+    };
+
+    window.addEventListener('message', handleResult);
+
+    window.postMessage(
+      {
+        type: 'C2DPOST_FETCH_EAR_PDF',
+        requestId: requestId,
+        barcode: cleanBarcode
+      },
+      '*'
+    );
+  });
+}
+
+

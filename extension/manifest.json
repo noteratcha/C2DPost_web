@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "C2DPost Helper - Thailand Post API Bridge",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "ส่วนเสริมช่วยดึงหมายเลขบาร์โค้ด (PostOne), ช่วยกรอกข้อมูลเข้าสู่ระบบ DPost / e-AR และค้นหาพัสดุอัตโนมัติใน e-AR สำหรับ C2DPost Web",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAsUd2ChCjv0kmG3lut7krR4eDX3psq4qufzI/6Xf19oRqpvECuBV3M+oDUn22xywRl5BXOu7vDDQbqHt5rVBq1LTp7PfQia4NLsfkKyRSZEjSxVlOLvV7be8eqGNJ0Ck7WsoYjzVecdQmd+8o4MGp0/WB5omKtQyl1vBfzg7UyAjFlLjPUIh/nFfrRFe5j3t2d7XqVcHwESc6p+RXR09aI5yPqONH3LYfm89ZsUzisIbF43jY8154L5SyQeawZk+Bv7BS2JFonpfyS+eMhEG1bMj3UsT9sPWoKLHYpnrrn0sylVzpFxQ4AWgocgyKkdukshylPSb77zAkxZU2CgZ6xQIDAQAB",
   "permissions": ["storage"],

@@ -2,7 +2,7 @@
 // Injected into web pages (Vercel & Localhost)
 
 (function () {
-  const VERSION = "1.2.0";
+  const VERSION = "1.3.0";
 
   // Mark HTML element so the web page can detect immediately via DOM
   function markExtensionInstalled() {
@@ -110,6 +110,29 @@
             {
               type: "C2DPOST_EAR_SEARCH_SET_RESULT",
               ...(response || { success: true })
+            },
+            "*"
+          );
+        }
+      );
+      return;
+    }
+
+    // 5. Fetch e-AR PDF request
+    if (event.data.type === "C2DPOST_FETCH_EAR_PDF") {
+      const { requestId, barcode } = event.data;
+
+      chrome.runtime.sendMessage(
+        {
+          action: "FETCH_EAR_PDF",
+          barcode: barcode
+        },
+        (response) => {
+          window.postMessage(
+            {
+              type: "C2DPOST_EAR_PDF_RESULT",
+              requestId: requestId,
+              ...(response || { success: false, error: "No response from extension background worker" })
             },
             "*"
           );
