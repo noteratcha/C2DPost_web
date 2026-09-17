@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { fetchTrackingHistory } from '../utils/api';
 import { formatStationWithZipcode } from '../utils/postalUtils';
 import { openEarWithBarcode } from '../utils/extensionBridge';
-import { fetchEarDetailsClient } from '../utils/earService';
+import { fetchEarDetailsClient, downloadBatchEar } from '../utils/earService';
 import './TrackingInquiryView.css';
 
 /**
@@ -81,6 +81,22 @@ export default function TrackingInquiryView({ currentPerson, records = [], initi
   const [expandedCards, setExpandedCards] = useState({});
   const [clientEarMap, setClientEarMap] = useState({});
   const [selectedSigModal, setSelectedSigModal] = useState(null);
+
+  // Batch e-AR download states
+  const [isDownloadingEar, setIsDownloadingEar] = useState(false);
+  const [earProgressText, setEarProgressText] = useState('');
+  const [showEarDropdown, setShowEarDropdown] = useState(false);
+  const earDropdownRef = useRef(null);
+
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (earDropdownRef.current && !earDropdownRef.current.contains(e.target)) {
+        setShowEarDropdown(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Available barcodes from current session workspace
   const availableBarcodes = useMemo(() => {
@@ -261,6 +277,47 @@ export default function TrackingInquiryView({ currentPerson, records = [], initi
       received
     };
   }, [searchItems]);
+
+  const deliveredSearchItems = useMemo(() => {
+    return searchItems.filter((item) => item.statusInfo?.key === 'delivered' && item.barcode);
+  }, [searchItems]);
+
+  const handleBatchDownloadEar = async (format = 'pdf') => {
+    setShowEarDropdown(false);
+    if (deliveredSearchItems.length === 0) {
+      alert('ไม่พบรายการที่นำจ่ายสำเร็จสำหรับดาวน์โหลด e-AR');
+      return;
+    }
+
+    setIsDownloadingEar(true);
+    setEarProgressText(`กำลังเตรียมการดาวน์โหลด e-AR (0/${deliveredSearchItems.length})...`);
+
+    const recordsToDownload = deliveredSearchItems.map((item) => ({
+      barcode: item.barcode,
+      receiver_name: item.matchedRecord?.name || '',
+      inv_no: item.matchedRecord?.invNo || ''
+    }));
+
+    try {
+      const result = await downloadBatchEar({
+        records: recordsToDownload,
+        format: format,
+        onProgress: (current, total, currentBcode) => {
+          setEarProgressText(`กำลังรวบรวม e-AR (${current}/${total}) • ${currentBcode}`);
+        }
+      });
+      setEarProgressText(`ดาวน์โหลด e-AR สำเร็จแล้ว (${result.count} รายการ)`);
+      setTimeout(() => {
+        setEarProgressText('');
+      }, 4000);
+    } catch (err) {
+      console.error('Batch e-AR download error in tracking view:', err);
+      alert(err.message || 'เกิดข้อผิดพลาดในการดาวน์โหลด e-AR');
+      setEarProgressText('');
+    } finally {
+      setIsDownloadingEar(false);
+    }
+  };
 
   const addBarcodeToInput = (bcode) => {
     const existing = barcodeInput.trim();
@@ -455,6 +512,66 @@ export default function TrackingInquiryView({ currentPerson, records = [], initi
             </div>
 
             <div className="results-expand-actions">
+              {summary.delivered > 0 && (
+                <div className="ear-download-dropdown-wrap" ref={earDropdownRef}>
+                  <button
+                    type="button"
+                    className="btn-footer-ear"
+                    onClick={() => setShowEarDropdown((prev) => !prev)}
+                    disabled={isDownloadingEar}
+                    title={`ดาวน์โหลดใบตอบรับ e-AR สำหรับรายการที่นำจ่ายสำเร็จ (${summary.delivered} รายการ)`}
+                  >
+                    {isDownloadingEar ? (
+                      <>
+                        <span className="spinner-small"></span>
+                        <span>กำลังโหลด e-AR...</span>
+                      </>
+                    ) : (
+                      <>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                          <polyline points="7 10 12 15 17 10"></polyline>
+                          <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg>
+                        <span>โหลด e-AR ({summary.delivered})</span>
+                        <span className="dropdown-caret">▾</span>
+                      </>
+                    )}
+                  </button>
+
+                  {showEarDropdown && !isDownloadingEar && (
+                    <div className="ear-download-menu">
+                      <div className="ear-menu-header">
+                        <strong>เลือกรูปแบบดาวน์โหลด e-AR</strong>
+                        <span>(นำจ่ายสำเร็จ {summary.delivered} รายการ)</span>
+                      </div>
+                      <button
+                        type="button"
+                        className="ear-menu-item"
+                        onClick={() => handleBatchDownloadEar('pdf')}
+                      >
+                        <span className="menu-item-icon">📄</span>
+                        <div className="menu-item-text">
+                          <span className="menu-item-title">ไฟล์ PDF รวม 1 ฉบับ (Multi-Page)</span>
+                          <span className="menu-item-desc">รวมทุกใบตอบรับในเอกสารเดียว เหมาะสำหรับดูหรือสั่งพิมพ์</span>
+                        </div>
+                      </button>
+                      <button
+                        type="button"
+                        className="ear-menu-item"
+                        onClick={() => handleBatchDownloadEar('zip')}
+                      >
+                        <span className="menu-item-icon">📦</span>
+                        <div className="menu-item-text">
+                          <span className="menu-item-title">ไฟล์ ZIP บีบอัด (แยกรายพัสดุ)</span>
+                          <span className="menu-item-desc">แยกไฟล์ PDF แยกตามลำดับ, บาร์โค้ด และชื่อผู้รับ</span>
+                        </div>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
               <button
                 type="button"
                 className="btn-toggle-all-cards"
@@ -852,6 +969,15 @@ export default function TrackingInquiryView({ currentPerson, records = [], initi
               )}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Floating Progress Toast for Batch e-AR */}
+      {earProgressText && (
+        <div className="ear-progress-toast">
+          {isDownloadingEar && <span className="spinner-small"></span>}
+          {!isDownloadingEar && <span>✅</span>}
+          <span>{earProgressText}</span>
         </div>
       )}
     </main>

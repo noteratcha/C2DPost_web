@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { fetchReceivedReport, exportDepositReportExcel, exportDepositReportPdf, batchFetchTracking } from '../utils/api';
 import { formatStationWithZipcode } from '../utils/postalUtils';
+import { downloadBatchEar } from '../utils/earService';
 import TrackingTimelineModal from './TrackingTimelineModal';
 import './DepositReportView.css';
 
@@ -131,6 +132,24 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
   const [searchQuery, setSearchQuery] = useState(() => cachedState?.searchQuery || '');
   const [filterTab, setFilterTab] = useState(() => cachedState?.filterTab || 'all');
   const [selectedTrackingItem, setSelectedTrackingItem] = useState(null);
+
+  // Batch e-AR download & selection state
+  const [selectedBarcodes, setSelectedBarcodes] = useState(new Set());
+  const [isDownloadingEar, setIsDownloadingEar] = useState(false);
+  const [earProgressText, setEarProgressText] = useState('');
+  const [showEarDropdown, setShowEarDropdown] = useState(false);
+  const earDropdownRef = useRef(null);
+
+  // Close e-AR dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (earDropdownRef.current && !earDropdownRef.current.contains(e.target)) {
+        setShowEarDropdown(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Handle live tracking update from modal when viewed
   const handleTrackingUpdated = useCallback((bcode, trackResult) => {
@@ -479,6 +498,87 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
   const receivedCount = reportData?.records
     ? reportData.records.filter((r) => getDeliveryStatusInfo(r).key === 'received').length
     : (summary.received_count || 0);
+
+  // Delivered records helpers for batch e-AR download
+  const deliveredRecords = useMemo(() => {
+    if (!reportData?.records) return [];
+    return reportData.records.filter((r) => getDeliveryStatusInfo(r).key === 'delivered' && r.barcode);
+  }, [reportData]);
+
+  const filteredDeliveredRecords = useMemo(() => {
+    if (!filteredRecords) return [];
+    return filteredRecords.filter((r) => getDeliveryStatusInfo(r).key === 'delivered' && r.barcode);
+  }, [filteredRecords]);
+
+  const selectedDeliveredRecords = useMemo(() => {
+    if (selectedBarcodes.size === 0) return filteredDeliveredRecords;
+    return filteredDeliveredRecords.filter((r) => selectedBarcodes.has(r.barcode));
+  }, [selectedBarcodes, filteredDeliveredRecords]);
+
+  const isAllDeliveredSelected = useMemo(() => {
+    if (filteredDeliveredRecords.length === 0) return false;
+    return filteredDeliveredRecords.every((r) => selectedBarcodes.has(r.barcode));
+  }, [filteredDeliveredRecords, selectedBarcodes]);
+
+  const handleToggleSelectAllDelivered = () => {
+    if (isAllDeliveredSelected) {
+      setSelectedBarcodes((prev) => {
+        const next = new Set(prev);
+        filteredDeliveredRecords.forEach((r) => next.delete(r.barcode));
+        return next;
+      });
+    } else {
+      setSelectedBarcodes((prev) => {
+        const next = new Set(prev);
+        filteredDeliveredRecords.forEach((r) => next.add(r.barcode));
+        return next;
+      });
+    }
+  };
+
+  const handleToggleRowBarcode = (bcode) => {
+    setSelectedBarcodes((prev) => {
+      const next = new Set(prev);
+      if (next.has(bcode)) {
+        next.delete(bcode);
+      } else {
+        next.add(bcode);
+      }
+      return next;
+    });
+  };
+
+  const handleBatchDownloadEar = async (format = 'pdf') => {
+    setShowEarDropdown(false);
+    const targetRecords = selectedBarcodes.size > 0 ? selectedDeliveredRecords : filteredDeliveredRecords;
+    if (!targetRecords || targetRecords.length === 0) {
+      alert('ไม่พบรายการที่นำจ่ายสำเร็จสำหรับดาวน์โหลด e-AR');
+      return;
+    }
+
+    setIsDownloadingEar(true);
+    setEarProgressText(`กำลังเตรียมการดาวน์โหลด e-AR (0/${targetRecords.length})...`);
+
+    try {
+      const result = await downloadBatchEar({
+        records: targetRecords,
+        format: format,
+        onProgress: (current, total, currentBcode) => {
+          setEarProgressText(`กำลังรวบรวม e-AR (${current}/${total}) • ${currentBcode}`);
+        }
+      });
+      setEarProgressText(`ดาวน์โหลด e-AR สำเร็จแล้ว (${result.count} รายการ)`);
+      setTimeout(() => {
+        setEarProgressText('');
+      }, 4000);
+    } catch (err) {
+      console.error('Batch e-AR download error:', err);
+      alert(err.message || 'เกิดข้อผิดพลาดในการดาวน์โหลด e-AR');
+      setEarProgressText('');
+    } finally {
+      setIsDownloadingEar(false);
+    }
+  };
 
   const receivedRate = summary.total_items > 0
     ? Math.round((receivedCount / summary.total_items) * 100)
@@ -842,6 +942,22 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
             <table className="deposit-data-table">
               <thead>
                 <tr>
+                  <th style={{ width: '40px', textAlign: 'center' }}>
+                    <input
+                      type="checkbox"
+                      title={
+                        filteredDeliveredRecords.length === 0
+                          ? 'ไม่มีรายการนำจ่ายสำเร็จ'
+                          : isAllDeliveredSelected
+                          ? 'ยกเลิกการเลือกทั้งหมด'
+                          : `เลือกรายการนำจ่ายสำเร็จทั้งหมด (${filteredDeliveredRecords.length})`
+                      }
+                      checked={isAllDeliveredSelected}
+                      onChange={handleToggleSelectAllDelivered}
+                      disabled={filteredDeliveredRecords.length === 0}
+                      style={{ cursor: filteredDeliveredRecords.length > 0 ? 'pointer' : 'not-allowed' }}
+                    />
+                  </th>
                   <th style={{ width: '45px', textAlign: 'center' }}>#</th>
                   <th style={{ width: '150px' }}>หมายเลข Barcode</th>
                   <th style={{ width: '130px' }}>เลขที่คำขอ</th>
@@ -857,7 +973,7 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan="10" className="table-loading-cell">
+                    <td colSpan="11" className="table-loading-cell">
                       <div className="loading-spinner-wrap">
                         <span className="spinner-medium"></span>
                         <p>กำลังดึงข้อมูลรายงานจากไปรษณีย์ไทย e-Parcel...</p>
@@ -866,7 +982,7 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
                   </tr>
                 ) : filteredRecords.length === 0 ? (
                   <tr>
-                    <td colSpan="10" className="table-empty-cell">
+                    <td colSpan="11" className="table-empty-cell">
                       <div className="empty-state-wrap">
                         <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                           <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
@@ -892,8 +1008,28 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
                     const tooltipText = rawDesc && rawDesc !== statusInfo.label
                       ? `${statusInfo.label} (${rawDesc})`
                       : statusInfo.label;
+                    const isDelivered = statusInfo.key === 'delivered';
+                    const isRowSelected = selectedBarcodes.has(item.barcode);
                     return (
-                      <tr key={item.barcode || globalIdx} className={`row-status-${statusInfo.key}`}>
+                      <tr key={item.barcode || globalIdx} className={`row-status-${statusInfo.key} ${isRowSelected ? 'row-selected' : ''}`}>
+                        <td style={{ textAlign: 'center' }}>
+                          {isDelivered && item.barcode ? (
+                            <input
+                              type="checkbox"
+                              checked={isRowSelected}
+                              onChange={() => handleToggleRowBarcode(item.barcode)}
+                              title={`เลือกดาวน์โหลด e-AR: ${item.barcode}`}
+                              style={{ cursor: 'pointer' }}
+                            />
+                          ) : (
+                            <input
+                              type="checkbox"
+                              disabled
+                              style={{ opacity: 0.2, cursor: 'not-allowed' }}
+                              title="e-AR โหลดได้เฉพาะรายการที่นำจ่ายสำเร็จ"
+                            />
+                          )}
+                        </td>
                         <td style={{ textAlign: 'center' }}>{globalIdx}</td>
                         <td>
                           {item.barcode ? (
@@ -1027,6 +1163,79 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
             )}
 
             <div className="deposit-footer-actions">
+              {/* Batch e-AR Download Dropdown */}
+              <div className="ear-download-dropdown-wrap" ref={earDropdownRef}>
+                <button
+                  type="button"
+                  className={`btn-footer-ear ${selectedBarcodes.size > 0 ? 'has-selection' : ''}`}
+                  onClick={() => setShowEarDropdown((prev) => !prev)}
+                  disabled={isDownloadingEar || deliveredCount === 0}
+                  title={
+                    deliveredCount === 0
+                      ? 'ไม่มีรายการที่นำจ่ายสำเร็จสำหรับดาวน์โหลด e-AR'
+                      : selectedBarcodes.size > 0
+                      ? `ดาวน์โหลด e-AR ที่เลือก (${selectedDeliveredRecords.length} รายการ)`
+                      : `ดาวน์โหลด e-AR นำจ่ายสำเร็จทั้งหมด (${filteredDeliveredRecords.length} รายการ)`
+                  }
+                >
+                  {isDownloadingEar ? (
+                    <>
+                      <span className="spinner-small"></span>
+                      <span>กำลังโหลด e-AR...</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="7 10 12 15 17 10"></polyline>
+                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                      </svg>
+                      <span>
+                        {selectedBarcodes.size > 0
+                          ? `โหลด e-AR ที่เลือก (${selectedDeliveredRecords.length})`
+                          : `โหลด e-AR (${filteredDeliveredRecords.length})`}
+                      </span>
+                      <span className="dropdown-caret">▾</span>
+                    </>
+                  )}
+                </button>
+
+                {showEarDropdown && !isDownloadingEar && (
+                  <div className="ear-download-menu">
+                    <div className="ear-menu-header">
+                      <strong>เลือกรูปแบบดาวน์โหลด e-AR</strong>
+                      <span>
+                        ({selectedBarcodes.size > 0
+                          ? `ที่เลือก ${selectedDeliveredRecords.length} รายการ`
+                          : `นำจ่ายสำเร็จ ${filteredDeliveredRecords.length} รายการ`})
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      className="ear-menu-item"
+                      onClick={() => handleBatchDownloadEar('pdf')}
+                    >
+                      <span className="menu-item-icon">📄</span>
+                      <div className="menu-item-text">
+                        <span className="menu-item-title">ไฟล์ PDF รวม 1 ฉบับ (Multi-Page)</span>
+                        <span className="menu-item-desc">รวมทุกใบตอบรับในเอกสารเดียว เหมาะสำหรับดูหรือสั่งพิมพ์</span>
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      className="ear-menu-item"
+                      onClick={() => handleBatchDownloadEar('zip')}
+                    >
+                      <span className="menu-item-icon">📦</span>
+                      <div className="menu-item-text">
+                        <span className="menu-item-title">ไฟล์ ZIP บีบอัด (แยกรายพัสดุ)</span>
+                        <span className="menu-item-desc">แยกไฟล์ PDF แยกตามลำดับ, บาร์โค้ด และชื่อผู้รับ</span>
+                      </div>
+                    </button>
+                  </div>
+                )}
+              </div>
+
               <button
                 type="button"
                 className="btn-footer-excel"
@@ -1079,6 +1288,15 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
         </div>
 
       </div>
+
+      {/* Floating Progress Toast for Batch e-AR */}
+      {earProgressText && (
+        <div className="ear-progress-toast">
+          {isDownloadingEar && <span className="spinner-small"></span>}
+          {!isDownloadingEar && <span>✅</span>}
+          <span>{earProgressText}</span>
+        </div>
+      )}
 
       {/* Tracking Timeline Modal for clicked barcode */}
       {selectedTrackingItem && (

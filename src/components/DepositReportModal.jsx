@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { fetchReceivedReport, exportDepositReportExcel, exportDepositReportPdf } from '../utils/api';
 import { getDeliveryStatusInfo } from './DepositReportView';
 import { formatStationWithZipcode } from '../utils/postalUtils';
+import { downloadBatchEar } from '../utils/earService';
 import TrackingTimelineModal from './TrackingTimelineModal';
 import './DepositReportModal.css';
 
@@ -64,6 +65,22 @@ export default function DepositReportModal({ isOpen, onClose, currentPerson, onS
   const [searchQuery, setSearchQuery] = useState('');
   const [filterTab, setFilterTab] = useState('all'); // 'all' | 'received'
   const [selectedTrackingItem, setSelectedTrackingItem] = useState(null);
+
+  // Batch e-AR download states
+  const [isDownloadingEar, setIsDownloadingEar] = useState(false);
+  const [earProgressText, setEarProgressText] = useState('');
+  const [showEarDropdown, setShowEarDropdown] = useState(false);
+  const earDropdownRef = useRef(null);
+
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (earDropdownRef.current && !earDropdownRef.current.contains(e.target)) {
+        setShowEarDropdown(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Fetch report function (accepts start & end dates)
   const handleFetchReport = useCallback(async (startToFetch, endToFetch) => {
@@ -372,6 +389,43 @@ export default function DepositReportModal({ isOpen, onClose, currentPerson, onS
   const returnedRate = summary.total_items > 0
     ? Math.round((returnedCount / summary.total_items) * 100)
     : 0;
+
+  // Delivered items for batch e-AR
+  const deliveredRecords = useMemo(() => {
+    if (!reportData?.records) return [];
+    return reportData.records.filter((r) => getDeliveryStatusInfo(r).key === 'delivered' && r.barcode);
+  }, [reportData]);
+
+  const handleBatchDownloadEar = async (format = 'pdf') => {
+    setShowEarDropdown(false);
+    if (!deliveredRecords || deliveredRecords.length === 0) {
+      alert('ไม่พบรายการที่นำจ่ายสำเร็จสำหรับดาวน์โหลด e-AR');
+      return;
+    }
+
+    setIsDownloadingEar(true);
+    setEarProgressText(`กำลังเตรียมการดาวน์โหลด e-AR (0/${deliveredRecords.length})...`);
+
+    try {
+      const result = await downloadBatchEar({
+        records: deliveredRecords,
+        format: format,
+        onProgress: (current, total, currentBcode) => {
+          setEarProgressText(`กำลังรวบรวม e-AR (${current}/${total}) • ${currentBcode}`);
+        }
+      });
+      setEarProgressText(`ดาวน์โหลด e-AR สำเร็จแล้ว (${result.count} รายการ)`);
+      setTimeout(() => {
+        setEarProgressText('');
+      }, 4000);
+    } catch (err) {
+      console.error('Batch e-AR download error:', err);
+      alert(err.message || 'เกิดข้อผิดพลาดในการดาวน์โหลด e-AR');
+      setEarProgressText('');
+    } finally {
+      setIsDownloadingEar(false);
+    }
+  };
 
   return (
     <div className="deposit-modal-overlay" onClick={onClose}>
@@ -904,6 +958,69 @@ export default function DepositReportModal({ isOpen, onClose, currentPerson, onS
           )}
 
           <div className="footer-action-buttons">
+            {/* Batch e-AR Download Dropdown */}
+            <div className="ear-download-dropdown-wrap" ref={earDropdownRef}>
+              <button
+                type="button"
+                className="btn-footer-ear"
+                onClick={() => setShowEarDropdown((prev) => !prev)}
+                disabled={loading || isDownloadingEar || deliveredCount === 0}
+                title={
+                  deliveredCount === 0
+                    ? 'ไม่มีรายการที่นำจ่ายสำเร็จสำหรับดาวน์โหลด e-AR'
+                    : `ดาวน์โหลด e-AR นำจ่ายสำเร็จ (${deliveredCount} รายการ)`
+                }
+              >
+                {isDownloadingEar ? (
+                  <>
+                    <span className="deposit-spinner small"></span>
+                    <span>กำลังโหลด e-AR...</span>
+                  </>
+                ) : (
+                  <>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                      <polyline points="7 10 12 15 17 10"></polyline>
+                      <line x1="12" y1="15" x2="12" y2="3"></line>
+                    </svg>
+                    <span>โหลด e-AR ({deliveredCount})</span>
+                    <span className="dropdown-caret">▾</span>
+                  </>
+                )}
+              </button>
+
+              {showEarDropdown && !isDownloadingEar && (
+                <div className="ear-download-menu">
+                  <div className="ear-menu-header">
+                    <strong>เลือกรูปแบบดาวน์โหลด e-AR</strong>
+                    <span>(นำจ่ายสำเร็จ {deliveredCount} รายการ)</span>
+                  </div>
+                  <button
+                    type="button"
+                    className="ear-menu-item"
+                    onClick={() => handleBatchDownloadEar('pdf')}
+                  >
+                    <span className="menu-item-icon">📄</span>
+                    <div className="menu-item-text">
+                      <span className="menu-item-title">ไฟล์ PDF รวม 1 ฉบับ (Multi-Page)</span>
+                      <span className="menu-item-desc">รวมทุกใบตอบรับในเอกสารเดียว เหมาะสำหรับดูหรือสั่งพิมพ์</span>
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    className="ear-menu-item"
+                    onClick={() => handleBatchDownloadEar('zip')}
+                  >
+                    <span className="menu-item-icon">📦</span>
+                    <div className="menu-item-text">
+                      <span className="menu-item-title">ไฟล์ ZIP บีบอัด (แยกรายพัสดุ)</span>
+                      <span className="menu-item-desc">แยกไฟล์ PDF แยกตามลำดับ, บาร์โค้ด และชื่อผู้รับ</span>
+                    </div>
+                  </button>
+                </div>
+              )}
+            </div>
+
             <button
               type="button"
               className="btn-export-excel"
@@ -960,6 +1077,16 @@ export default function DepositReportModal({ isOpen, onClose, currentPerson, onS
           </div>
         </div>
       </div>
+
+      {/* Floating Progress Toast for Batch e-AR */}
+      {earProgressText && (
+        <div className="ear-progress-toast">
+          {isDownloadingEar && <span className="deposit-spinner small"></span>}
+          {!isDownloadingEar && <span>✅</span>}
+          <span>{earProgressText}</span>
+        </div>
+      )}
+
 
       {/* Tracking Timeline Modal for Barcode click */}
       {selectedTrackingItem && (

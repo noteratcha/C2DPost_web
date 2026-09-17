@@ -99,6 +99,11 @@ class UpdateEparcelStatusRequest(BaseModel):
     barcodes: List[str]
     status: Optional[str] = "yes"
 
+class BatchEarPdfRequest(BaseModel):
+    barcodes: List[str]
+    format: Optional[str] = "pdf" # "pdf" (merged single document) or "zip" (archive of individual files)
+    client_blobs: Optional[List[dict]] = [] # [{barcode, receiver, inv_no, base64}]
+
 def _normalize_payload_list(raw):
     """Defensively extract a list from various e-Parcel API response shapes."""
     if isinstance(raw, dict):
@@ -1132,6 +1137,132 @@ async def parse_ear_pdf(request: Request):
         return {"success": True, "data": data}
     except Exception as e:
         return JSONResponse(status_code=500, content={"success": False, "error": str(e)})
+
+
+@app.post("/api/reports/batch-ear-pdf")
+async def batch_ear_pdf(req: BatchEarPdfRequest):
+    """
+    Combines or archives official e-AR PDFs for multiple delivered parcels.
+    Supports 'pdf' (Merged Multi-Page PDF) or 'zip' (Archive of individual PDFs).
+    Accepts client_blobs to bypass foreign cloud edge geoblocking.
+    """
+    barcodes = [str(b).strip().upper() for b in req.barcodes if str(b).strip()]
+    
+    pdf_map = {}  # barcode -> {"bytes": bytes, "receiver": str, "inv_no": str}
+
+    # 1. Process client-provided blobs (from domestic Thai browser / extension)
+    for item in (req.client_blobs or []):
+        bcode = str(item.get("barcode") or "").strip().upper()
+        b64 = item.get("base64") or item.get("pdfBase64") or ""
+        receiver = str(item.get("receiver") or "").strip()
+        inv_no = str(item.get("inv_no") or "").strip()
+        if bcode and b64:
+            try:
+                import base64
+                pdf_bytes = base64.b64decode(b64)
+                if len(pdf_bytes) > 500:
+                    pdf_map[bcode] = {
+                        "bytes": pdf_bytes,
+                        "receiver": receiver,
+                        "inv_no": inv_no
+                    }
+            except Exception as e:
+                print(f"[batch-ear-pdf] Error decoding client blob for {bcode}: {e}")
+
+    # 2. For remaining barcodes, attempt server-side fetch (fallback)
+    remaining = [b for b in barcodes if b not in pdf_map]
+    if remaining:
+        import requests
+        url = "https://e-ar.thailandpost.com/ear-api/print/e-ar"
+        headers = {
+            "Content-Type": "application/json",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+            "Origin": "https://e-ar.thailandpost.com",
+            "Referer": "https://e-ar.thailandpost.com/ear"
+        }
+        for b in remaining:
+            try:
+                r = requests.post(url, json=[b], headers=headers, timeout=8, verify=False)
+                if r.status_code == 200 and len(r.content) > 500 and "application/pdf" in r.headers.get("Content-Type", ""):
+                    pdf_map[b] = {
+                        "bytes": r.content,
+                        "receiver": "",
+                        "inv_no": ""
+                    }
+            except Exception as ex:
+                print(f"[batch-ear-pdf] Server-side fetch failed for {b}: {ex}")
+
+    if not pdf_map:
+        raise HTTPException(
+            status_code=404,
+            detail="ไม่พบข้อมูลใบตอบรับ e-AR จากไปรษณีย์ไทยสำหรับรายการที่เลือก (ระบบอาจยังไม่อัปโหลดภาพใบตอบรับ หรือต้องใช้งานผ่านส่วนขยาย C2DPost Helper)"
+        )
+
+    # Ordered list of barcodes to include
+    ordered_barcodes = [b for b in barcodes if b in pdf_map]
+    if not ordered_barcodes:
+        ordered_barcodes = list(pdf_map.keys())
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+    # Format A: Combined Multi-Page PDF
+    if (req.format or "pdf").lower() == "pdf":
+        import fitz
+        merged_doc = fitz.open()
+        for bcode in ordered_barcodes:
+            item = pdf_map.get(bcode)
+            if item and item.get("bytes"):
+                try:
+                    sub_doc = fitz.open(stream=item["bytes"], filetype="pdf")
+                    merged_doc.insert_pdf(sub_doc)
+                except Exception as ex:
+                    print(f"[batch-ear-pdf] Error merging PDF for {bcode}: {ex}")
+
+        # Fallback if none merged yet
+        if len(merged_doc) == 0:
+            for bcode, item in pdf_map.items():
+                try:
+                    sub_doc = fitz.open(stream=item["bytes"], filetype="pdf")
+                    merged_doc.insert_pdf(sub_doc)
+                except Exception:
+                    pass
+
+        out_bytes = merged_doc.tobytes()
+        filename = f"e-AR_Delivered_Combined_{timestamp}.pdf"
+        return Response(
+            content=out_bytes,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"',
+                "X-Total-Count": str(len(ordered_barcodes))
+            }
+        )
+
+    # Format B: ZIP Archive containing individual PDF files
+    import zipfile
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+        for idx, bcode in enumerate(ordered_barcodes, 1):
+            item = pdf_map.get(bcode)
+            if not item:
+                continue
+            rec_clean = "".join(c for c in item.get("receiver", "") if c.isalnum() or c in (" ", "-", "_")).strip()
+            if rec_clean:
+                fname = f"{idx:02d}_e-AR_{bcode}_{rec_clean[:25]}.pdf"
+            else:
+                fname = f"{idx:02d}_e-AR_{bcode}.pdf"
+            zf.writestr(fname, item["bytes"])
+
+    zip_bytes = zip_buffer.getvalue()
+    filename = f"e-AR_Delivered_Archive_{timestamp}.zip"
+    return Response(
+        content=zip_bytes,
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "X-Total-Count": str(len(ordered_barcodes))
+        }
+    )
 
 
 @app.post("/api/reports/tracking")

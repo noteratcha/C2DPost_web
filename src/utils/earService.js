@@ -119,3 +119,188 @@ export async function fetchEarDetailsClient(barcode, force = false) {
     return null;
   }
 }
+
+/**
+ * Downloads e-AR receipts in batch for delivered items.
+ * Supports "pdf" (merged multi-page document) or "zip" (archive of individual PDFs).
+ * 
+ * @param {Object} options
+ * @param {Array} options.records - Array of items with barcode, receiver_name/receiver, inv_no, etc.
+ * @param {string} options.format - "pdf" | "zip"
+ * @param {Function} options.onProgress - Optional callback(current, total, currentBarcode)
+ * @returns {Promise<{success: boolean, count: number, filename?: string, error?: string}>}
+ */
+export async function downloadBatchEar({ records, format = 'pdf', onProgress }) {
+  if (!records || records.length === 0) {
+    throw new Error('ไม่พบรายการพัสดุสำหรับดาวน์โหลด e-AR');
+  }
+
+  // 1. Filter and clean barcodes
+  const validItems = [];
+  const seenBarcodes = new Set();
+  for (const r of records) {
+    const bcode = String(r.barcode || r.BARCODE_NO || r.item_barcode || '').trim().toUpperCase();
+    if (bcode && !seenBarcodes.has(bcode)) {
+      seenBarcodes.add(bcode);
+      validItems.push({
+        barcode: bcode,
+        receiver: r.receiver_name || r.receiver || r.RECEIVER || r.FULL_NAME || '',
+        inv_no: r.inv_no || r.INV_NO || r.item_no || ''
+      });
+    }
+  }
+
+  if (validItems.length === 0) {
+    throw new Error('ไม่พบบาร์โค้ดที่ถูกต้องสำหรับดาวน์โหลด e-AR');
+  }
+
+  const total = validItems.length;
+  const clientBlobs = [];
+  let completed = 0;
+
+  // Helper to convert blob to base64
+  const blobToBase64 = (blob) => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64data = reader.result ? reader.result.split(',')[1] : null;
+        resolve(base64data);
+      };
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
+    });
+  };
+
+  // Helper to fetch individual e-AR PDF (extension first, then direct fetch)
+  const fetchSinglePdfBlob = async (item) => {
+    const bcode = item.barcode;
+    try {
+      // Strategy 1: Extension Bridge (Domestic Thai IP)
+      try {
+        const extRes = await fetchEarPdfFromExtension(bcode);
+        if (extRes && extRes.success && extRes.pdfBase64) {
+          return {
+            barcode: bcode,
+            receiver: item.receiver,
+            inv_no: item.inv_no,
+            base64: extRes.pdfBase64
+          };
+        }
+      } catch (extErr) {
+        // Continue to strategy 2
+      }
+
+      // Strategy 2: Direct browser fetch
+      try {
+        const res = await fetch('https://e-ar.thailandpost.com/ear-api/print/e-ar', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify([bcode])
+        });
+        if (res.ok) {
+          const contentType = res.headers.get('content-type') || '';
+          if (contentType.includes('application/pdf')) {
+            const blob = await res.blob();
+            if (blob.size >= 500) {
+              const b64 = await blobToBase64(blob);
+              if (b64) {
+                return {
+                  barcode: bcode,
+                  receiver: item.receiver,
+                  inv_no: item.inv_no,
+                  base64: b64
+                };
+              }
+            }
+          }
+        }
+      } catch (directErr) {
+        // Direct fetch failed
+      }
+    } catch (err) {
+      console.warn(`[downloadBatchEar] Failed fetching ${bcode}:`, err);
+    }
+
+    // Return item with no base64, backend will attempt fallback
+    return {
+      barcode: bcode,
+      receiver: item.receiver,
+      inv_no: item.inv_no,
+      base64: null
+    };
+  };
+
+  // 2. Fetch in concurrency batches (4 concurrent requests)
+  const CONCURRENCY = 4;
+  for (let i = 0; i < validItems.length; i += CONCURRENCY) {
+    const chunk = validItems.slice(i, i + CONCURRENCY);
+    const chunkResults = await Promise.all(
+      chunk.map(async (item) => {
+        const res = await fetchSinglePdfBlob(item);
+        completed++;
+        if (onProgress) {
+          onProgress(completed, total, item.barcode);
+        }
+        return res;
+      })
+    );
+    clientBlobs.push(...chunkResults);
+  }
+
+  // Filter out items that have valid base64
+  const validBlobs = clientBlobs.filter((b) => b && b.base64);
+
+  // 3. Call backend /api/reports/batch-ear-pdf
+  const barcodesList = validItems.map((v) => v.barcode);
+  const response = await fetch(`${API_BASE}/reports/batch-ear-pdf`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      barcodes: barcodesList,
+      format: format,
+      client_blobs: validBlobs
+    })
+  });
+
+  if (!response.ok) {
+    let errorDetail = 'ไม่สามารถดาวน์โหลดไฟล์ e-AR จากเซิร์ฟเวอร์ได้';
+    try {
+      const errJson = await response.json();
+      if (errJson.detail) errorDetail = errJson.detail;
+    } catch (e) {
+      // Non-JSON error
+    }
+    throw new Error(errorDetail);
+  }
+
+  // 4. Download file
+  const blob = await response.blob();
+  const disposition = response.headers.get('content-disposition') || '';
+  let filename = '';
+  const match = disposition.match(/filename="?([^";]+)"?/);
+  if (match && match[1]) {
+    filename = match[1];
+  } else {
+    const timestamp = new Date().toISOString().replace(/[-:T.]/g, '').slice(0, 14);
+    filename = format === 'zip' ? `e-AR_Delivered_Archive_${timestamp}.zip` : `e-AR_Delivered_Combined_${timestamp}.pdf`;
+  }
+
+  const countHeader = response.headers.get('x-total-count');
+  const actualCount = countHeader ? parseInt(countHeader, 10) : validBlobs.length || total;
+
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => window.URL.revokeObjectURL(url), 2000);
+
+  return {
+    success: true,
+    count: actualCount,
+    filename: filename
+  };
+}
+
