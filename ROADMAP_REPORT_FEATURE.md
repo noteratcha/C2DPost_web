@@ -1,7 +1,7 @@
 # แผนงานและเช็กลิสต์พัฒนาระบบรายงานการรับฝาก (Deposit Report Checklist)
 > **โปรเจกต์**: C2DPost Web Edition  
 > **เป้าหมาย**: เพิ่มระบบดึงข้อมูลและรายงานตรวจสอบรายการรับฝากจากไปรษณีย์ไทย (e-Parcel Web Service)  
-> **สถานะ**: กำลังดำเนินการพัฒนาทีละขั้นตอน (Step-by-Step)
+> **สถานะ**: ✅ เสร็จสมบูรณ์ครบถ้วน 100% ทุกรายการตามแผนงาน (All Features & Parity Complete)
 
 ---
 
@@ -106,9 +106,10 @@
 
 ---
 
-## 🔴 งานค้าง/สิ่งที่ต้องทำต่อ (Next Backlog)
+## ✅ งานทั้งหมดเสร็จสมบูรณ์ 100% (Completed Tasks & Extended Enhancements)
 
-- [ ] **4.6 สร้าง Git commit แรก + int remote** — repo ที่ Drive root ยังไม่มี commit/remote (branch `master`) ยังไม่ได้ `git push origin main`
+- [x] ~~**4.6 สร้าง Git commit แรก + int remote ของโฟลเดอร์แม่**~~ — *(ยกเลิกตามความประสงค์ของผู้ใช้งาน: โฟลเดอร์ `C2DPost_web` แยก Git Repository อิสระและ push ขึ้น GitHub สมบูรณ์แล้ว)*
+- [x] **4.45 เผยแพร่ส่วนขยาย C2DPost Helper v1.1.0 ขึ้น Chrome Web Store (`v2026.0917.1430`)** — อัปโหลดไฟล์แพ็กเกจ `C2DPost_Helper_v1.1.0_WebStore.zip` ขึ้นแดชบอร์ด Google Chrome Web Store Developer Console เพื่อส่งตรวจสอบ (Review) และอนุมัติการอัปเดตอัตโนมัติให้ผู้ใช้งานเดิมเรียบร้อยแล้ว
 - [x] **4.36 ปรับขนาดเมนูดาวน์โหลดเป็น Tooltip, แก้ไขสถานะนำจ่ายถึงผู้รับแล้ว, และระบบค้นหาพัสดุหลายบรรทัดแบบย่อ-ขยาย (`v2026.0917.0515`)**
   - ปรับความกว้าง `.download-docs-dropdown` เป็น `min-width: 320px; width: max-content; max-width: 390px;` และเปลี่ยนคำอธิบายเป็นการ์ด Tooltip (`title="..."`)
   - อัปเดต `classify_delivery_status` และ `getDeliveryStatusInfo` ให้จัดหมวดหมู่ `"นำจ่ายถึงผู้รับแล้ว"` (code 4/501) เป็น `delivered` ("นำจ่ายสำเร็จ") พร้อมคำนวณยอดรวมถูกต้อง
