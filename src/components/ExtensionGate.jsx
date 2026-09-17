@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { checkExtensionInstalled, subscribeExtensionReady } from '../utils/extensionBridge';
+import { checkExtensionInstalled, subscribeExtensionReady, getExtensionVersion } from '../utils/extensionBridge';
 import './ExtensionGate.css';
 
 export default function ExtensionGate({ onUnlocked, theme = 'light', onToggleTheme }) {
@@ -13,7 +13,7 @@ export default function ExtensionGate({ onUnlocked, theme = 'light', onToggleThe
     checkExtensionInstalled(1200).then((isOk) => {
       setInstalled(isOk);
       setChecking(false);
-      if (isOk && onUnlocked) onUnlocked();
+      if (isOk && onUnlocked) onUnlocked(getExtensionVersion());
 
       // Check if user previously triggered a refresh check and still not detected
       try {
@@ -27,9 +27,9 @@ export default function ExtensionGate({ onUnlocked, theme = 'light', onToggleThe
     });
 
     // 2. Continuous subscription (fires when extension is installed while page is open)
-    const unsubscribe = subscribeExtensionReady(() => {
+    const unsubscribe = subscribeExtensionReady((detail) => {
       setInstalled(true);
-      if (onUnlocked) onUnlocked();
+      if (onUnlocked) onUnlocked(detail?.version || getExtensionVersion());
     });
 
     // 3. Periodic polling every 2 seconds
@@ -38,7 +38,7 @@ export default function ExtensionGate({ onUnlocked, theme = 'light', onToggleThe
         checkExtensionInstalled(500).then((isOk) => {
           if (isOk) {
             setInstalled(true);
-            if (onUnlocked) onUnlocked();
+            if (onUnlocked) onUnlocked(getExtensionVersion());
           }
         });
       }
@@ -57,7 +57,7 @@ export default function ExtensionGate({ onUnlocked, theme = 'light', onToggleThe
     if (isOk) {
       setInstalled(true);
       setManualCheckLoading(false);
-      if (onUnlocked) onUnlocked();
+      if (onUnlocked) onUnlocked(getExtensionVersion());
       return;
     }
 

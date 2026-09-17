@@ -11,7 +11,7 @@ import DepositReportModal from './components/DepositReportModal';
 import TrackingTimelineModal from './components/TrackingTimelineModal';
 import { parseCsv } from './utils/parseCsv';
 import { convertPdfs, exportAllFiles, exportExcel, exportPdf, reconcileRecords, logBarcodesToUseBarcode, updateEparcelStatusInSheet } from './utils/api';
-import { fetchBarcodesFromExtension, syncCredentialsToExtension } from './utils/extensionBridge';
+import { fetchBarcodesFromExtension, syncCredentialsToExtension, getExtensionVersion, subscribeExtensionReady, checkExtensionInstalled } from './utils/extensionBridge';
 import { SPREADSHEET_ID } from './config';
 import './App.css';
 
@@ -41,6 +41,10 @@ export default function App() {
   };
 
   const [extensionUnlocked, setExtensionUnlocked] = useState(() => isDemo || false);
+  const [extensionVersion, setExtensionVersion] = useState(() => {
+    if (isDemo) return '1.1.0';
+    return getExtensionVersion() || '';
+  });
   const [user, setUser] = useState(() => {
     if (isDemoAdmin) return 'admin';
     if (isDemo) return 'renu_officer';
@@ -70,6 +74,50 @@ export default function App() {
     return () => {
       window.removeEventListener('dragover', handleDragOver);
       window.removeEventListener('drop', handleDrop);
+    };
+  }, []);
+
+  // Continuous listener & check for Extension presence and version
+  useEffect(() => {
+    // 1. Initial check
+    const currentVer = getExtensionVersion();
+    if (currentVer) {
+      setExtensionVersion(currentVer);
+      setExtensionUnlocked(true);
+    } else {
+      checkExtensionInstalled(800).then((isOk) => {
+        if (isOk) {
+          setExtensionUnlocked(true);
+          const v = getExtensionVersion();
+          if (v) setExtensionVersion(v);
+        }
+      });
+    }
+
+    // 2. Event listener for C2DPOST_EXTENSION_READY
+    const unsub = subscribeExtensionReady((detail) => {
+      setExtensionUnlocked(true);
+      const v = detail?.version || getExtensionVersion();
+      if (v) setExtensionVersion(v);
+    });
+
+    // 3. Listener for C2DPOST_PONG
+    const handlePong = (e) => {
+      if (e.data && e.data.type === 'C2DPOST_PONG') {
+        setExtensionUnlocked(true);
+        if (e.data.version) {
+          setExtensionVersion(e.data.version);
+        } else {
+          const v = getExtensionVersion();
+          if (v) setExtensionVersion(v);
+        }
+      }
+    };
+    window.addEventListener('message', handlePong);
+
+    return () => {
+      unsub();
+      window.removeEventListener('message', handlePong);
     };
   }, []);
 
@@ -995,7 +1043,10 @@ export default function App() {
       {/* 1. Chrome Extension Gatekeeper */}
       {!extensionUnlocked && (
         <ExtensionGate 
-          onUnlocked={() => setExtensionUnlocked(true)} 
+          onUnlocked={(ver) => {
+            setExtensionUnlocked(true);
+            if (ver) setExtensionVersion(ver);
+          }} 
           theme={theme}
           onToggleTheme={toggleTheme}
         />
@@ -1007,6 +1058,7 @@ export default function App() {
         currentPerson={currentPerson} 
         onLogout={handleLogout} 
         extensionInstalled={extensionUnlocked} 
+        extensionVersion={extensionVersion}
         theme={theme}
         onToggleTheme={toggleTheme}
         isAdmin={isAdmin}

@@ -3,6 +3,26 @@
  */
 
 let isInstalledCache = false;
+let installedVersionCache = '';
+
+/**
+ * Get the currently installed extension version
+ * @returns {string} e.g. "1.1.0", "1.0.0", or ""
+ */
+export function getExtensionVersion() {
+  if (typeof document !== 'undefined' && document.documentElement) {
+    const domVer = document.documentElement.getAttribute('data-c2dpost-version');
+    if (domVer) {
+      installedVersionCache = domVer;
+      return domVer;
+    }
+    if (document.documentElement.getAttribute('data-c2dpost-extension-installed') === 'true') {
+      installedVersionCache = installedVersionCache || '1.0.0';
+      return installedVersionCache;
+    }
+  }
+  return installedVersionCache || '';
+}
 
 /**
  * Check if the C2DPost Helper Extension is installed
@@ -14,6 +34,7 @@ export function checkExtensionInstalled(timeoutMs = 1000) {
     // 1. Quick check via DOM attribute injected by content.js
     if (document.documentElement.getAttribute('data-c2dpost-extension-installed') === 'true') {
       isInstalledCache = true;
+      installedVersionCache = document.documentElement.getAttribute('data-c2dpost-version') || '1.0.0';
       return resolve(true);
     }
 
@@ -25,6 +46,7 @@ export function checkExtensionInstalled(timeoutMs = 1000) {
         if (!resolved) {
           resolved = true;
           isInstalledCache = true;
+          installedVersionCache = event.data.version || document.documentElement.getAttribute('data-c2dpost-version') || '1.0.0';
           window.removeEventListener('message', handleMessage);
           resolve(true);
         }
@@ -44,6 +66,9 @@ export function checkExtensionInstalled(timeoutMs = 1000) {
         // Final DOM check in case attribute was set slightly after
         const isSet = document.documentElement.getAttribute('data-c2dpost-extension-installed') === 'true';
         isInstalledCache = isSet;
+        if (isSet) {
+          installedVersionCache = document.documentElement.getAttribute('data-c2dpost-version') || '1.0.0';
+        }
         resolve(isSet);
       }
     }, timeoutMs);
@@ -56,7 +81,12 @@ export function checkExtensionInstalled(timeoutMs = 1000) {
 export function subscribeExtensionReady(callback) {
   const handler = (e) => {
     isInstalledCache = true;
-    callback(e.detail);
+    if (e.detail && e.detail.version) {
+      installedVersionCache = e.detail.version;
+    } else if (typeof document !== 'undefined' && document.documentElement) {
+      installedVersionCache = document.documentElement.getAttribute('data-c2dpost-version') || '1.0.0';
+    }
+    callback(e.detail || { version: installedVersionCache });
   };
   window.addEventListener('C2DPOST_EXTENSION_READY', handler);
   return () => window.removeEventListener('C2DPOST_EXTENSION_READY', handler);

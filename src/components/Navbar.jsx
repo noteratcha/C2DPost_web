@@ -8,6 +8,7 @@ export default function Navbar({
   currentPerson, 
   onLogout, 
   extensionInstalled, 
+  extensionVersion = '',
   theme = 'light', 
   onToggleTheme,
   isAdmin = false,
@@ -453,8 +454,18 @@ export default function Navbar({
                           </svg>
                           <span>Extension Helper</span>
                         </div>
-                        <span className={`status-badge-chip ${extensionInstalled ? 'success' : 'danger'}`}>
-                          {extensionInstalled ? <><span className="chip-dot"></span> ติดตั้งแล้ว</> : 'ไม่พบ'}
+                        <span 
+                          className={`status-badge-chip ${extensionInstalled ? 'success' : 'danger'}`}
+                          title={extensionInstalled ? `C2DPost Helper ติดตั้งแล้ว${extensionVersion ? ` (เวอร์ชัน ${extensionVersion})` : ''}` : 'ไม่พบส่วนขยาย C2DPost Helper'}
+                        >
+                          {extensionInstalled ? (
+                            <>
+                              <span className="chip-dot"></span>
+                              <span>ติดตั้งแล้ว{extensionVersion ? ` (v${extensionVersion})` : ''}</span>
+                            </>
+                          ) : (
+                            'ไม่พบ'
+                          )}
                         </span>
                       </div>
                     </div>
