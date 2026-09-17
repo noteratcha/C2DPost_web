@@ -709,10 +709,10 @@ export default function DepositReportModal({ isOpen, onClose, currentPerson, onS
                 <th style={{ width: '130px' }}>เลขที่คำขอ</th>
                 <th style={{ width: '160px' }}>ชื่อผู้รับ</th>
                 <th style={{ minWidth: '180px' }}>ที่อยู่ปลายทาง</th>
-                <th style={{ width: '150px' }} title="วันและเวลาของสถานะล่าสุด">วัน-เวลาล่าสุด</th>
-                <th style={{ width: '130px' }} title="ที่ทำการไปรษณีย์หรือสถานที่ของสถานะล่าสุด">ปณ./สถานที่ล่าสุด</th>
                 <th className="th-right" style={{ width: '85px' }}>น้ำหนัก</th>
                 <th className="th-right" style={{ width: '85px' }}>ค่าบริการ</th>
+                <th style={{ width: '150px' }} title="วันและเวลาของสถานะล่าสุด">วัน-เวลาล่าสุด</th>
+                <th style={{ width: '130px' }} title="ที่ทำการไปรษณีย์หรือสถานที่ของสถานะล่าสุด">ปณ./สถานที่ล่าสุด</th>
                 <th className="th-center" style={{ width: '125px' }}>สถานะ</th>
               </tr>
             </thead>
@@ -778,6 +778,10 @@ export default function DepositReportModal({ isOpen, onClose, currentPerson, onS
                       <td className="receiver-address text-muted" title={rec.receiver_address}>
                         {rec.receiver_address} {rec.receiver_amphur} {rec.receiver_province} {rec.receiver_zipcode}
                       </td>
+                      <td className="td-right">{rec.weight ? `${rec.weight}g` : '-'}</td>
+                      <td className="td-right font-medium">
+                        {rec.fee ? `${Number(rec.fee).toFixed(2)}` : '-'}
+                      </td>
                       <td className="received-date text-emerald-dark">
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" className="inline-clock-icon">
                           <circle cx="12" cy="12" r="10"></circle>
@@ -794,10 +798,6 @@ export default function DepositReportModal({ isOpen, onClose, currentPerson, onS
                         >
                           {rec.latest_station || rec.received_postoffice || '-'}
                         </span>
-                      </td>
-                      <td className="td-right">{rec.weight ? `${rec.weight}g` : '-'}</td>
-                      <td className="td-right font-medium">
-                        {rec.fee ? `${Number(rec.fee).toFixed(2)}` : '-'}
                       </td>
                       <td className="td-center cell-status-wrapper">
                         <div className="status-cell-container">

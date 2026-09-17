@@ -1416,8 +1416,8 @@ def generate_deposit_report_excel(records, summary, meta, output_excel_path):
     # Headers
     headers = [
         "ลำดับ", "หมายเลข Barcode", "เลขที่คำขอ", "ชื่อผู้รับ",
-        "ที่อยู่ปลายทาง", "วัน-เวลาล่าสุด", "ปณ./สถานที่ล่าสุด", "น้ำหนัก (g)",
-        "ค่าบริการ", "สถานะ"
+        "ที่อยู่ปลายทาง", "น้ำหนัก (g)", "ค่าบริการ", "วัน-เวลาล่าสุด",
+        "ปณ./สถานที่ล่าสุด", "สถานะ"
     ]
     header_row = 4
     ws.row_dimensions[header_row].height = 24
@@ -1454,10 +1454,10 @@ def generate_deposit_report_excel(records, summary, meta, output_excel_path):
             r.get("inv_no", ""),
             r.get("receiver_name", ""),
             full_addr,
-            latest_d,
-            latest_s,
             weight,
             fee,
+            latest_d,
+            latest_s,
             full_status_display
         ]
         
@@ -1471,12 +1471,12 @@ def generate_deposit_report_excel(records, summary, meta, output_excel_path):
             elif col_idx in (2, 3):
                 cell.alignment = Alignment(horizontal="center", vertical="center")
                 cell.font = BOLD_DATA_FONT
-            elif col_idx in (6, 7, 10):
+            elif col_idx in (8, 9, 10):
                 cell.alignment = Alignment(horizontal="center", vertical="center")
-            elif col_idx == 8:
+            elif col_idx == 6:
                 cell.alignment = Alignment(horizontal="right", vertical="center")
                 cell.number_format = '#,##0.0'
-            elif col_idx == 9:
+            elif col_idx == 7:
                 cell.alignment = Alignment(horizontal="right", vertical="center")
                 cell.number_format = '#,##0.00'
             else:
@@ -1487,17 +1487,17 @@ def generate_deposit_report_excel(records, summary, meta, output_excel_path):
     total_row_idx = end_data_row + 1 if records else start_data_row + 1
     ws.row_dimensions[total_row_idx].height = 24
     
-    ws.merge_cells(start_row=total_row_idx, start_column=1, end_row=total_row_idx, end_column=7)
+    ws.merge_cells(start_row=total_row_idx, start_column=1, end_row=total_row_idx, end_column=5)
     tot_label = ws.cell(row=total_row_idx, column=1, value=f"รวมทั้งสิ้น ({len(records)} รายการ)")
     tot_label.font = TOTAL_FONT
     tot_label.alignment = Alignment(horizontal="right", vertical="center")
     
-    for c in range(1, 8):
+    for c in range(1, 6):
         ws.cell(row=total_row_idx, column=c).border = TOTAL_BORDER
 
-    w_cell = ws.cell(row=total_row_idx, column=8)
+    w_cell = ws.cell(row=total_row_idx, column=6)
     if records:
-        w_cell.value = f"=SUM(H{start_data_row}:H{end_data_row})"
+        w_cell.value = f"=SUM(F{start_data_row}:F{end_data_row})"
     else:
         w_cell.value = 0.0
     w_cell.font = TOTAL_FONT
@@ -1505,9 +1505,9 @@ def generate_deposit_report_excel(records, summary, meta, output_excel_path):
     w_cell.number_format = '#,##0.0'
     w_cell.border = TOTAL_BORDER
 
-    f_cell = ws.cell(row=total_row_idx, column=9)
+    f_cell = ws.cell(row=total_row_idx, column=7)
     if records:
-        f_cell.value = f"=SUM(I{start_data_row}:I{end_data_row})"
+        f_cell.value = f"=SUM(G{start_data_row}:G{end_data_row})"
     else:
         f_cell.value = 0.0
     f_cell.font = TOTAL_FONT
@@ -1515,8 +1515,8 @@ def generate_deposit_report_excel(records, summary, meta, output_excel_path):
     f_cell.number_format = '#,##0.00'
     f_cell.border = TOTAL_BORDER
 
-    st_cell = ws.cell(row=total_row_idx, column=10, value="")
-    st_cell.border = TOTAL_BORDER
+    for c in range(8, 11):
+        ws.cell(row=total_row_idx, column=c, value="").border = TOTAL_BORDER
 
     # Column Auto-fit
     for col in ws.columns:
@@ -1575,8 +1575,8 @@ def generate_deposit_report_pdf(records, summary, meta, output_pdf_path):
     elements.append(Spacer(1, 0.4*cm))
 
     # Table Header
-    th_headers = ["ลำดับ", "หมายเลข Barcode", "เลขที่คำขอ", "ชื่อผู้รับ", "ที่อยู่ปลายทาง", "วัน-เวลาล่าสุด", "ปณ./สถานที่ล่าสุด", "น้ำหนัก (g)", "ค่าบริการ", "สถานะ"]
-    col_widths = [0.8*cm, 3.2*cm, 2.5*cm, 3.4*cm, 5.0*cm, 3.0*cm, 2.4*cm, 1.7*cm, 1.8*cm, 3.5*cm]
+    th_headers = ["ลำดับ", "หมายเลข Barcode", "เลขที่คำขอ", "ชื่อผู้รับ", "ที่อยู่ปลายทาง", "น้ำหนัก (g)", "ค่าบริการ", "วัน-เวลาล่าสุด", "ปณ./สถานที่ล่าสุด", "สถานะ"]
+    col_widths = [0.8*cm, 3.2*cm, 2.5*cm, 3.4*cm, 5.0*cm, 1.7*cm, 1.8*cm, 3.0*cm, 2.4*cm, 3.5*cm]
 
     table_data = [[Paragraph(apply_thai_pua(h), style_th) for h in th_headers]]
 
@@ -1602,10 +1602,10 @@ def generate_deposit_report_pdf(records, summary, meta, output_pdf_path):
             Paragraph(r.get("inv_no", "-"), style_td_c),
             Paragraph(apply_thai_pua(r.get("receiver_name", "")), style_td_l),
             Paragraph(apply_thai_pua(full_addr), style_td_l),
-            Paragraph(latest_d, style_td_c),
-            Paragraph(apply_thai_pua(latest_s), style_td_c),
             Paragraph(f"{weight:,.1f}", style_td_r),
             Paragraph(f"{fee:,.2f}", style_td_r),
+            Paragraph(latest_d, style_td_c),
+            Paragraph(apply_thai_pua(latest_s), style_td_c),
             status_p
         ]
         table_data.append(row)
@@ -1613,10 +1613,10 @@ def generate_deposit_report_pdf(records, summary, meta, output_pdf_path):
     # Summary Row
     summary_row = [
         Paragraph(apply_thai_pua(f"<b>รวมทั้งสิ้น ({len(records)} รายการ)</b>"), style_td_bold_r),
-        "", "", "", "", "", "",
+        "", "", "", "",
         Paragraph(f"<b>{total_weight:,.1f}</b>", style_td_bold_r),
         Paragraph(f"<b>{total_fee:,.2f}</b>", style_td_bold_r),
-        ""
+        "", "", ""
     ]
     table_data.append(summary_row)
 
@@ -1629,7 +1629,7 @@ def generate_deposit_report_pdf(records, summary, meta, output_pdf_path):
         ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CBD5E1')),
         ('TOPPADDING', (0, 0), (-1, -1), 4),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
-        ('SPAN', (0, len(table_data) - 1), (6, len(table_data) - 1)),
+        ('SPAN', (0, len(table_data) - 1), (4, len(table_data) - 1)),
         ('BACKGROUND', (0, len(table_data) - 1), (-1, len(table_data) - 1), colors.HexColor('#F1F5F9'))
     ]
     

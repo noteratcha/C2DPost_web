@@ -814,10 +814,10 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
                   <th style={{ width: '130px' }}>เลขที่คำขอ</th>
                   <th style={{ width: '160px' }}>ชื่อผู้รับ</th>
                   <th>ที่อยู่ปลายทาง</th>
-                  <th style={{ width: '140px', textAlign: 'center' }} title="วันและเวลาของสถานะล่าสุด">วัน-เวลาล่าสุด</th>
-                  <th style={{ width: '120px', textAlign: 'center' }} title="ที่ทำการไปรษณีย์หรือสถานที่ของสถานะล่าสุด">ปณ./สถานที่ล่าสุด</th>
                   <th style={{ width: '80px', textAlign: 'right' }}>น้ำหนัก</th>
                   <th style={{ width: '90px', textAlign: 'right' }}>ค่าบริการ</th>
+                  <th style={{ width: '140px', textAlign: 'center' }} title="วันและเวลาของสถานะล่าสุด">วัน-เวลาล่าสุด</th>
+                  <th style={{ width: '120px', textAlign: 'center' }} title="ที่ทำการไปรษณีย์หรือสถานที่ของสถานะล่าสุด">ปณ./สถานที่ล่าสุด</th>
                   <th style={{ width: '100px', textAlign: 'center' }}>สถานะ</th>
                 </tr>
               </thead>
@@ -888,6 +888,12 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
                           {item.receiver_province ? `จ.${item.receiver_province}` : ''}{' '}
                           {item.receiver_zipcode || ''}
                         </td>
+                        <td style={{ textAlign: 'right' }}>
+                          {item.weight ? `${item.weight}g` : '-'}
+                        </td>
+                        <td style={{ textAlign: 'right' }} className="cell-fee">
+                          {item.fee !== undefined ? `${Number(item.fee).toFixed(2)}` : '-'}
+                        </td>
                         <td style={{ textAlign: 'center' }} className="cell-timestamp">
                           {item.latest_date || item.received_date ? (
                             <div 
@@ -909,12 +915,6 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
                           title={`สถานที่ล่าสุด: ${item.latest_station || item.received_postoffice || '-'}${item.received_postoffice ? `\n(ปณ.รับฝาก: ${item.received_postoffice})` : ''}`}
                         >
                           {item.latest_station || item.received_postoffice || '-'}
-                        </td>
-                        <td style={{ textAlign: 'right' }}>
-                          {item.weight ? `${item.weight}g` : '-'}
-                        </td>
-                        <td style={{ textAlign: 'right' }} className="cell-fee">
-                          {item.fee !== undefined ? `${Number(item.fee).toFixed(2)}` : '-'}
                         </td>
                         <td style={{ textAlign: 'center' }} className="cell-status-wrapper">
                           <div className="status-cell-container">
