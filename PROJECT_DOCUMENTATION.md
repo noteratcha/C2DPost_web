@@ -900,3 +900,69 @@ node C2DPost_web/capture_screenshot.cjs
    - **การ์ดสถานะการทำงาน**: แจ้งให้ผู้ใช้งานทราบว่าระบบ C2DPost Helper ได้ส่งข้อมูลไปกรอกให้อัตโนมัติในแท็บที่เปิดใหม่แล้ว
 2. **การล้างข้อมูลเมื่อออกจากระบบ (Security Cleansing)**:
    - เมื่อผู้ใช้กด "ออกจากระบบ" (Logout) ใน C2DPost Web ระบบจะสั่งล้างข้อมูล Credentials ใน Extension Storage ให้ว่างเปล่าทันที เพื่อความปลอดภัยของบัญชีผู้ใช้งาน
+
+---
+
+## 48. การปรับระบบเป็น 1-Click เปิดเว็บปลายทางพร้อมกรอกข้อมูลอัตโนมัติ 100% โดยไม่ต้องผ่านป๊อปอัป (Zero-Modal Direct Seamless Autofill) (v2026.0917.0925)
+
+### 48.1 ความต้องการของผู้ใช้งาน (UX Paradigm Shift)
+1. **การลด Cognitive Friction**: การแสดงหน้าต่างป๊อปอัป `CredentialAssistantModal` เพื่อให้ผู้ใช้กดคัดลอกหรือคลิกซ้ำ สร้างความขัดจังหวะในการทำงาน (Interruption) และทำให้รู้สึกว่าระบบไม่ทำงานแบบอัตโนมัติจริง
+2. **ประสบการณ์ 1-คลิกที่แท้จริง**:
+   - ผู้ใช้งานต้องการให้การคลิกปุ่ม **`DPost`** หรือ **`e-AR`** บน Navbar เปิดแท็บใหม่ไปยังเว็บไซต์ปลายทางทันที โดยไม่มีหน้าต่าง Modal ใดๆ มาคั่น
+   - ข้อมูลชื่อผู้ใช้และรหัสผ่านต้องถูกส่งผ่าน Extension ในเบื้องหลัง และนำไปกรอกลงช่องแบบอัตโนมัติ 100%
+
+### 48.2 สถาปัตยกรรมการทำงาน
+1. **การนำหน้าต่างป๊อปอัปออก (`Navbar.jsx`)**:
+   - ลบ State `credentialModalTarget` และการแสดงผล `<CredentialAssistantModal />` ออกจากหน้าเว็บทั้งหมด
+   - ปรับฟังก์ชัน `handleOpenExternalService`:
+     ```javascript
+     const handleOpenExternalService = (url) => {
+       const uname = currentPerson?.UserName || user || '';
+       const pass = currentPerson?.Password || '';
+       const org = currentPerson?.Organization || '';
+       syncCredentialsToExtension(uname, pass, org);
+     };
+     ```
+   - แท็ก `<a>` มีคุณลักษณะ `target="_blank"` และ `rel="noopener noreferrer"` ตามมาตรฐานความปลอดภัยสากล เปิดแท็บใหม่ทันทีโดยไม่ถูกบล็อกโดย Popup Blocker
+2. **กลไกการกรอกข้อมูลแบบ Dual-Trigger (`external_autofill.js`)**:
+   - **Trigger 1: Initial Load (`chrome.storage.local.get`)**: เมื่อหน้าเว็บปลายทางโหลดเสร็จ จะดึงข้อมูลจาก storage มากรอกลงในฟิลด์ `#txtUsername`/`#txtPassword` หรือ `input[name="username"]`/`input[name="password"]` ทันที
+   - **Trigger 2: Storage Change Listener (`chrome.storage.onChanged`)**: ดักฟังเหตุการณ์กรณีหน้าเว็บปลายทางเปิดขึ้นมาก่อนที่ background worker จะบันทึกข้อมูลเสร็จ เมื่อข้อมูลมาถึงจะสั่งกรอกข้อมูลทันทีโดยอัตโนมัติ
+   - แสดงป้ายแจ้งเตือนสีเขียวมรกต `⚡ C2DPost Helper • กรอกข้อมูลสำเร็จ` ที่มุมขวาล่าง 7 วินาที แล้วค่อยๆ จางหายไป
+
+---
+
+## 49. สถาปัตยกรรม Chrome Web Store Deployment Pipeline และวงจรอัปเดตส่วนขยายอัตโนมัติ (v2026.0917.1050)
+
+### 49.1 ความแตกต่างระหว่าง Web Store (`location: 1`) และ Unpacked (`location: 4`)
+1. **กับดักของการกดปุ่ม 🔄 รีโหลด**:
+   - ส่วนเสริมที่ติดตั้งมาจาก Chrome Web Store จะถูกบันทึกไว้ใน `AppData\Local\Google\Chrome\User Data\Default\Extensions\<id>\<version>` และมีค่าแฟล็ก `from_webstore: true`
+   - เมื่อผู้ใช้กดปุ่ม 🔄 รีโหลดในการ์ดส่วนเสริมนั้น เบราว์เซอร์จะ **โหลดไฟล์แพ็กเกจเดิมที่บันทึกไว้ในเครื่องซ้ำอีกครั้ง** โดยไม่ได้ดึงการเปลี่ยนแปลงจากโฟลเดอร์พัฒนาของโปรเจกต์ และไม่สามารถอัปเกรดเป็นเวอร์ชันใหม่ได้จนกว่า Google จะอนุมัติบน Web Store
+2. **การคงค่า Extension ID ด้วย Public Key**:
+   - เพื่อให้ส่วนเสริมที่โหลดแบบ Unpacked ในเครื่องของนักพัฒนามี ID ตรงกับเวอร์ชันบน Chrome Web Store (`cdkmibacceaacdiopcekkmfifaocapgk`) แบบ 100% จึงต้องนำ Public Key อย่างเป็นทางการมากำหนดลงใน `manifest.json` ฟิลด์ `"key"`:
+     ```json
+     "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAsUd2ChCjv0kmG3lut7krR4eDX3psq4qufzI/6Xf19oRqpvECuBV3M+oDUn22xywRl5BXOu7vDDQbqHt5rVBq1LTp7PfQia4NLsfkKyRSZEjSxVlOLvV7be8eqGNJ0Ck7WsoYjzVecdQmd+8o4MGp0/WB5omKtQyl1vBfzg7UyAjFlLjPUIh/nFfrRFe5j3t2d7XqVcHwESc6p+RXR09aI5yPqONH3LYfm89ZsUzisIbF43jY8154L5SyQeawZk+Bv7BS2JFonpfyS+eMhEG1bMj3UsT9sPWoKLHYpnrrn0sylVzpFxQ4AWgocgyKkdukshylPSb77zAkxZU2CgZ6xQIDAQAB"
+     ```
+
+### 49.2 ข้อกำหนดการแพ็กเกจสำหรับอัปโหลดขึ้น Chrome Web Store
+1. **ข้อห้ามเรื่องฟิลด์ `"key"`**:
+   - ระบบ Google Chrome Web Store Developer Console กำหนดเงื่อนไขอย่างเคร่งครัดว่า **ห้ามมีฟิลด์ `"key"` ในไฟล์ manifest.json ในไฟล์ ZIP ที่อัปโหลดเด็ดขาด** (หากมี ระบบจะปฏิเสธการอัปโหลดทันทีด้วยข้อความ `'key' is not allowed in the manifest`)
+2. **ไปป์ไลน์การแพ็กเกจไฟล์ ZIP อัตโนมัติ (`pack_webstore_zip.py`)**:
+   - สคริปต์จะทำการตัดฟิลด์ `"key"` ออกก่อนทำการบีบอัด สร้างเป็นไฟล์แพ็กเกจที่สะอาดบริสุทธิ์:
+     `C2DPost_Helper_v1.1.0_WebStore.zip`
+   - กรองไฟล์ขยะของระบบปฏิบัติการ (`desktop.ini`, `.DS_Store`, ฯลฯ) ออกทั้งหมด 100%
+
+### 49.3 วงจรการอัปเดตอัตโนมัติ (Omaha Background Auto-Update Lifecycle)
+1. **การอัปเดตอัตโนมัติสำหรับผู้ใช้งานทั่วไป**:
+   - ผู้ใช้งานที่เคยติดตั้งผ่าน Chrome Web Store ไปแล้ว **ไม่ต้องดำเนินการใดๆ ทั้งสิ้น**
+   - กลไก Omaha ของ Chrome จะทำการตรวจเช็กการอัปเดตจาก Google Web Store ในเบื้องหลังทุก 4–5 ชั่วโมง หรือเมื่อปิด-เปิดเบราว์เซอร์ใหม่
+   - เมื่อเวอร์ชัน 1.1.0 ผ่านการอนุมัติ ส่วนขยายในเครื่องของผู้ใช้ทุกคนจะได้รับการอัปเดตอัตโนมัติ
+2. **การแจ้งเตือนสิทธิ์ใหม่ (Host Permissions Escalation)**:
+   - เนื่องจากเวอร์ชัน 1.1.0 มีการขอสิทธิ์โดเมนเพิ่ม (`dpost.thailandpost.com/*` และ `e-ar.thailandpost.com/*`) Chrome อาจแสดงป้ายเตือนที่ไอคอนส่วนเสริมเพื่อให้ผู้ใช้กด "ยอมรับสิทธิ์" (Accept permissions)
+3. **การบังคับอัปเดตทันทีสำหรับผู้ทดสอบ**:
+   - เข้าไปที่ `chrome://extensions` ➔ เปิด Developer mode ➔ กดปุ่ม **"อัปเดต" (Update)** ระบบจะดึงเวอร์ชันล่าสุดจาก Store มาติดตั้งทันที
+
+### 49.4 สถาปัตยกรรมการกระจายไฟล์แบบหลายระดับ (Multi-Tier Distribution)
+- **Master Root Package**: `C2DPost_web/C2DPost_Helper_v1.1.0_WebStore.zip`
+- **Public Downloads**: `public/C2DPost_Helper_v1.1.0_WebStore.zip` และ `public/c2dpost-extension.zip`
+- **Local Development Hub**: `C:\c2dpost-extension` และ `Desktop\c2dpost-extension`
+
