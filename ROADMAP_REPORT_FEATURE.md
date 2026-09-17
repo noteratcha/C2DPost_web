@@ -249,3 +249,15 @@
     - แสดงชื่อเจ้าหน้าที่นำจ่ายของไปรษณีย์ไทย
     - ปุ่ม **`📄 ดูใบตอบรับ e-AR (PDF) ↗`**: คลิกเปิดดูไฟล์ใบตอบรับตัวจริงแบบ PDF ในแท็บใหม่ได้ทันที
   - คอมไพล์โปรเจกต์ `npm run build` สำเร็จ 100% และ Deploy ขึ้น Production บน Vercel
+
+### 4.45 การแก้ไขปัญหาภาพลายเซ็นและความสัมพันธ์ e-AR ไม่แสดงผล (e-AR Signature & Metadata Bridge Fix)
+- **ปัญหาที่พบ**: เมื่อพัสดุนำจ่ายสำเร็จแล้ว ในไทม์ไลน์ระบบแสดงข้อความเตือน `ชื่อผู้รับจริง: (ไม่พบข้อมูล signature ในระบบ e-Parcel / ตรวจสอบลายเซ็นใน e-AR)` และมีปุ่มเปิด e-AR แต่ไม่แสดงภาพลายเซ็นและความสัมพันธ์บนหน้าระบบโดยตรง
+- **สาเหตุทางเทคนิค**:
+  1. เซิร์ฟเวอร์ `https://e-ar.thailandpost.com/ear-api/print/e-ar` บล็อก IP ต่างประเทศ (Vercel Serverless ได้ HTTP 403 Forbidden จาก Akamai Edge)
+  2. เมื่อเว็บเบราว์เซอร์ในประเทศไทยพยายาม `fetch()` ตรงไปยังเซิร์ฟเวอร์ e-AR จะเกิดข้อผิดพลาด CORS Preflight (OPTIONS Request ขาด Header `Access-Control-Allow-Origin`) ทำให้เบราว์เซอร์ระงับคำขอ
+  3. ฟังก์ชัน `earService.js` มีบั๊กตัวแปร `body: blob` (แก้ไขเป็น `body: pdfBlob`)
+- **แนวทางแก้ไขเบ็ดเสร็จ (C2DPost Helper Extension Bridge v1.3.0)**:
+  1. เพิ่มความสามารถ `FETCH_EAR_PDF` ใน Extension Service Worker (`background.js`) และ Content Script (`content.js`) ซึ่งได้รับสิทธิ์ `host_permissions: ["https://e-ar.thailandpost.com/*"]` ทำให้ส่งคำขอด้วย IP ไทยของผู้ใช้โดยไม่มีข้อจำกัด CORS
+  2. ส่งไฟล์ PDF ผ่าน Base64 ไปประมวลผลที่ `/api/reports/parse-ear-pdf` บน Vercel เพื่อตัดแยกรูปภาพลายเซ็น (Composite พื้นหลังขาวคมชัด) พร้อมดึงข้อมูล `ความสัมพันธ์` และ `จนท.นำจ่าย`
+  3. ปรับปรุง `TrackingTimelineModal.jsx` เพิ่มสถานะ Loading แสดงอนิเมชั่นขณะกำลังโหลด พร้อมปุ่ม "🔄 ลองดึงภาพลายเซ็น e-AR อีกครั้ง"
+  4. อัปเดตและแพ็กไฟล์ `c2dpost-extension.zip` เป็นเวอร์ชัน 1.3.0
