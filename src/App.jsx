@@ -11,7 +11,7 @@ import DepositReportModal from './components/DepositReportModal';
 import TrackingTimelineModal from './components/TrackingTimelineModal';
 import { parseCsv } from './utils/parseCsv';
 import { convertPdfs, exportAllFiles, exportExcel, exportPdf, reconcileRecords, logBarcodesToUseBarcode, updateEparcelStatusInSheet } from './utils/api';
-import { fetchBarcodesFromExtension } from './utils/extensionBridge';
+import { fetchBarcodesFromExtension, syncCredentialsToExtension } from './utils/extensionBridge';
 import { SPREADSHEET_ID } from './config';
 import './App.css';
 
@@ -210,9 +210,25 @@ export default function App() {
     return status === 'ADMIN' || status === 'ADMINISTRATOR';
   }, [user, currentPerson]);
 
+  // Synchronize credentials to Chrome extension whenever currentPerson is resolved
+  useEffect(() => {
+    if (user && currentPerson?.UserName) {
+      syncCredentialsToExtension(
+        currentPerson.UserName,
+        currentPerson.Password || '',
+        currentPerson.Organization || ''
+      );
+    }
+  }, [user, currentPerson]);
+
   const handleLogin = (username, personData) => {
     localStorage.setItem(STORAGE_USER_KEY, username);
     setUser(username);
+    syncCredentialsToExtension(
+      username,
+      personData?.Password || '',
+      personData?.Organization || ''
+    );
     const status = (personData?.Status || '').trim().toUpperCase();
     if (username.toLowerCase() === 'admin' || status === 'ADMIN' || status === 'ADMINISTRATOR') {
       setActivePage('admin');
@@ -224,6 +240,7 @@ export default function App() {
   const handleLogout = () => {
     localStorage.removeItem(STORAGE_USER_KEY);
     sessionStorage.removeItem('c2dpost_deposit_report_cache');
+    syncCredentialsToExtension('', '', '');
     setUser('');
     setActivePage('workspace');
     setSelectedFiles([]);

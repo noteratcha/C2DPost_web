@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import AboutModal from './AboutModal';
+import CredentialAssistantModal from './CredentialAssistantModal';
+import { syncCredentialsToExtension } from '../utils/extensionBridge';
 import './Navbar.css';
 
 export default function Navbar({ 
@@ -18,12 +20,35 @@ export default function Navbar({
   const [showAboutModal, setShowAboutModal] = useState(false);
   const [isNavMenuOpen, setIsNavMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [credentialModalTarget, setCredentialModalTarget] = useState(null); // 'dpost' | 'ear' | null
   const [isChecking, setIsChecking] = useState(false);
   const [lastCheckTime, setLastCheckTime] = useState('');
   const [apiOldStatus, setApiOldStatus] = useState('loading'); // 'loading' | 'success' | 'danger'
   const [apiNewStatus, setApiNewStatus] = useState('loading'); // 'loading' | 'success' | 'danger'
   const navMenuRef = useRef(null);
   const userMenuRef = useRef(null);
+
+  // Proactively synchronize credentials to Chrome extension when user logs in or switches
+  useEffect(() => {
+    if (user && currentPerson?.UserName) {
+      syncCredentialsToExtension(
+        currentPerson.UserName,
+        currentPerson.Password || '',
+        currentPerson.Organization || ''
+      );
+    }
+  }, [user, currentPerson]);
+
+  const handleOpenExternalService = (service, url, e) => {
+    if (e) e.preventDefault();
+    const uname = currentPerson?.UserName || user || '';
+    const pass = currentPerson?.Password || '';
+    const org = currentPerson?.Organization || '';
+    syncCredentialsToExtension(uname, pass, org);
+
+    window.open(url, '_blank', 'noopener,noreferrer');
+    setCredentialModalTarget(service);
+  };
 
   const checkApis = useCallback(async () => {
     setIsChecking(true);
@@ -167,7 +192,8 @@ export default function Navbar({
                 target="_blank"
                 rel="noreferrer"
                 className="nav-tab-btn nav-tab-ext"
-                title="DPost (Thailand Post) - เว็บอัปโหลดข้อมูลฝากส่งไปรษณีย์ (เปิดแท็บใหม่)"
+                onClick={(e) => handleOpenExternalService('dpost', 'https://dpost.thailandpost.com', e)}
+                title="DPost (Thailand Post) - เข้าสู่ระบบพร้อมส่งข้อมูล Username & Password อัตโนมัติ"
               >
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                   <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
@@ -181,11 +207,12 @@ export default function Navbar({
               </a>
 
               <a
-                href="https://e-ar.thailandpost.com/"
+                href="https://e-ar.thailandpost.com/sign-in"
                 target="_blank"
                 rel="noreferrer"
                 className="nav-tab-btn nav-tab-ext"
-                title="e-AR (Electronic Advice) - ตรวจใบตอบรับอิเล็กทรอนิกส์ (เปิดแท็บใหม่)"
+                onClick={(e) => handleOpenExternalService('ear', 'https://e-ar.thailandpost.com/sign-in', e)}
+                title="e-AR (Electronic Advice) - เข้าสู่ระบบพร้อมส่งข้อมูล Username & Password อัตโนมัติ"
               >
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
@@ -630,6 +657,20 @@ export default function Navbar({
       <AboutModal 
         isOpen={showAboutModal} 
         onClose={() => setShowAboutModal(false)} 
+      />
+
+      <CredentialAssistantModal
+        isOpen={Boolean(credentialModalTarget)}
+        onClose={() => setCredentialModalTarget(null)}
+        service={credentialModalTarget || 'dpost'}
+        currentPerson={currentPerson}
+        extensionInstalled={extensionInstalled}
+        onReopen={() => {
+          const url = credentialModalTarget === 'dpost' 
+            ? 'https://dpost.thailandpost.com' 
+            : 'https://e-ar.thailandpost.com/sign-in';
+          window.open(url, '_blank', 'noopener,noreferrer');
+        }}
       />
     </>
   );

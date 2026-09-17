@@ -835,7 +835,8 @@ node C2DPost_web/capture_screenshot.cjs
 
 ### 46.3 เทคนิคการสืบค้นสถานะพัสดุแบบ Multiline Batch ด้วย Promise.allSettled และการ์ดแบบ Accordion
 1. **การแยกวิเคราะห์ข้อมูลนำเข้าหลายบรรทัด**:
-   - ใช้ Regular Expression `input.split(/[
+   - ใช้ Regular Expression `input.split(/[
+
 ,;]+/)` ในการตัดคำ รองรับทั้งการเว้นบรรทัด, การคั่นด้วยเครื่องหมายจุลภาค, หรืออัฒภาค พร้อมทั้งตัดช่องว่างและแปลงเป็นตัวพิมพ์ใหญ่อัตโนมัติ
 2. **การประมวลผลแบบขนานที่ไม่บล็อกการทำงาน (Non-blocking Parallel Fetching)**:
    - ใช้ `Promise.allSettled` ในการส่งคำร้องขอข้อมูลสถานะทุกหมายเลขพร้อมกัน เพื่อให้ระบบตอบสนองอย่างรวดเร็วที่สุด และหากมีหมายเลขใดหมายเลขหนึ่งค้นหาไม่พบ หรือเชื่อมต่อขัดข้อง จะไม่กระทบต่อการแสดงผลของหมายเลขอื่น
@@ -855,3 +856,47 @@ node C2DPost_web/capture_screenshot.cjs
      ```bash
      npx vercel --prod --yes
      ```
+
+## 47. ระบบส่งผ่านข้อมูลและกรอกอัตโนมัติสำหรับบริการภายนอก DPost และ e-AR (Cross-Origin Credential Bridge & Auto-fill Assistant) (v2026.0917.0910)
+
+### 47.1 ที่มาและโจทย์ความต้องการ
+1. **ความต้องการของผู้ใช้งาน**:
+   - เมื่อผู้ใช้งานเข้าสู่ระบบ C2DPost Web ด้วยบัญชีของไปรษณีย์ไทย (e-Parcel) แล้ว และทำการคลิกที่ลิงก์บริการภายนอก 2 ลิงก์บน Navbar ได้แก่ **DPost** (`https://dpost.thailandpost.com`) เพื่ออัปโหลดไฟล์ Excel นำเข้า และ **e-AR** (`https://e-ar.thailandpost.com`) เพื่อตรวจใบตอบรับอิเล็กทรอนิกส์ ผู้ใช้งานต้องการให้ระบบนำข้อมูล Username และ Password ที่เข้าสู่ระบบไว้ ไปแสดงและกรอกลงในส่วนของช่อง Username / Password ของแต่ละหน้าเว็บโดยอัตโนมัติ เพื่อความสะดวกรวดเร็วและไม่ต้องพิมพ์ข้อมูลซ้ำ
+2. **ความท้าทายเชิงวิศวกรรมความปลอดภัย (Cross-Origin Security Policy)**:
+   - เบราว์เซอร์มาตรฐานสากลบังคับใช้นโยบาย **Same-Origin Policy** และ **Cross-Origin Isolation** ทำให้หน้าเว็บที่ทำงานอยู่บนโดเมนหนึ่ง (เช่น `c2dpost-web.vercel.app`) ไม่สามารถเข้าถึงหรือควบคุม DOM Input Elements ของอีกโดเมนหนึ่ง (เช่น `dpost.thailandpost.com` หรือ `e-ar.thailandpost.com`) ข้ามแท็บได้โดยตรง
+   - การส่งรหัสผ่านผ่าน URL Query Parameter (เช่น `?password=...`) ถือเป็นช่องโหว่ความปลอดภัยร้ายแรงที่ไม่สามารถยอมรับได้ เนื่องจากรหัสผ่านจะถูกบันทึกค้างใน Browser History, Server Access Logs และ Referer Headers
+
+### 47.2 สถาปัตยกรรม Dual-Engine Cross-Origin Credential Bridge
+ระบบได้รับการออกแบบทางวิศวกรรมให้ทำงานผสานกันอย่างลงตัวใน 2 ระดับ:
+
+#### ระดับที่ 1: ส่วนขยายเบราว์เซอร์อัตโนมัติ (C2DPost Helper Extension Auto-fill Engine)
+1. **การอัปเกรด Manifest สู่เวอร์ชัน 1.1.0**:
+   - เพิ่มการขอสิทธิ์ `host_permissions` ครอบคลุมทั้ง `https://postone.thailandpost.com/*`, `https://dpost.thailandpost.com/*`, และ `https://e-ar.thailandpost.com/*`
+   - ลงทะเบียน Content Script `external_autofill.js` ให้ทำงานบนหน้าเว็บ `https://dpost.thailandpost.com/*` และ `https://e-ar.thailandpost.com/*`
+2. **การซิงก์ข้อมูลเข้าสู่ Extension Storage**:
+   - เมื่อผู้ใช้ล็อกอินใน C2DPost Web หรือคลิกเปิดลิงก์ภายนอก หน้าเว็บจะส่งข้อความ `window.postMessage({ type: 'C2DPOST_SET_CREDENTIALS', ... })`
+   - `content.js` ของ Extension จะส่งต่อข้อความไปยัง Background Service Worker เพื่อบันทึกลงใน `chrome.storage.local`
+3. **การตรวจจับและกรอกข้อมูลบนหน้าเว็บปลายทาง (`external_autofill.js`)**:
+   - **บนระบบ DPost (ASP.NET Web Forms)**:
+     - ตรวจจับฟิลด์ `#txtUsername` และ `#txtPassword`
+     - ทำการกำหนดค่า (Value Injection) พร้อมยิง Custom Events `input` และ `change`
+   - **บนระบบ e-AR (Next.js + MUI Joy UI)**:
+     - นำทางตรงสู่หน้า `/sign-in` และเฝ้าตรวจจับ Input ด้วย `MutationObserver`
+     - เนื่องจาก React Controlled Components ทำการ Override ตัวแปร `value` ทำให้การกำหนด `element.value = ...` แบบเดิมไม่สามารถอัปเดต State ภายในของ React ได้ ระบบจึงใช้เทคนิค **Native Property Descriptor Setter**:
+       ```javascript
+       const prototypeValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
+       prototypeValueSetter.call(element, value);
+       element.dispatchEvent(new Event('input', { bubbles: true }));
+       element.dispatchEvent(new Event('change', { bubbles: true }));
+       ```
+   - **ป้ายยืนยันผลลัพธ์ลอยมุมจอ (Floating Confirmation Toast)**:
+     - แสดงป้ายแจ้งเตือน Glassmorphism สีเขียวมรกตที่มุมล่างขวาของหน้าต่าง: `⚡ C2DPost Helper • กรอกข้อมูลสำเร็จ` เพื่อให้ผู้ใช้งานมั่นใจได้ 100% ว่าข้อมูลถูกกรอกแล้ว
+
+#### ระดับที่ 2: หน้าต่างผู้ช่วยเข้าสู่ระบบ (Credential Assistant Modal) ใน C2DPost Web
+1. **คอมโพเนนต์ `CredentialAssistantModal.jsx`**:
+   - เมื่อผู้ใช้งานคลิกปุ่ม "DPost" หรือ "e-AR" บน Navbar ระบบจะเปิดแท็บใหม่ไปยังหน้าเข้าสู่ระบบ พร้อมทั้งแสดงหน้าต่างผู้ช่วยเข้าสู่ระบบสไตล์ Glassmorphism
+   - **การ์ด Username**: แสดงชื่อผู้ใช้พร้อมปุ่มกดคัดลอก (Copy) ที่มี Visual Feedback สีเขียวเมื่อคัดลอกสำเร็จ
+   - **การ์ด Password**: ซ่อนรหัสผ่านในรูปจุดกลมเพื่อความปลอดภัย พร้อมปุ่มดวงตาสำหรับกดแสดง/ซ่อนรหัสผ่าน และปุ่มกดคัดลอก
+   - **การ์ดสถานะการทำงาน**: แจ้งให้ผู้ใช้งานทราบว่าระบบ C2DPost Helper ได้ส่งข้อมูลไปกรอกให้อัตโนมัติในแท็บที่เปิดใหม่แล้ว
+2. **การล้างข้อมูลเมื่อออกจากระบบ (Security Cleansing)**:
+   - เมื่อผู้ใช้กด "ออกจากระบบ" (Logout) ใน C2DPost Web ระบบจะสั่งล้างข้อมูล Credentials ใน Extension Storage ให้ว่างเปล่าทันที เพื่อความปลอดภัยของบัญชีผู้ใช้งาน

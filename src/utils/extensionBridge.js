@@ -107,3 +107,28 @@ export function fetchBarcodesFromExtension(count, typ = 2) {
     );
   });
 }
+
+/**
+ * Synchronize user credentials to C2DPost Helper Extension for automatic auto-fill on external sites (DPost, e-AR)
+ * @param {string} username
+ * @param {string} password
+ * @param {string} organization
+ */
+export function syncCredentialsToExtension(username, password, organization = '') {
+  if (!username) return;
+  try {
+    window.postMessage(
+      {
+        type: 'C2DPOST_SET_CREDENTIALS',
+        username: username,
+        password: password || '',
+        organization: organization || '',
+        timestamp: Date.now()
+      },
+      '*'
+    );
+  } catch (err) {
+    console.error('[C2DPost Bridge] Failed to sync credentials to extension:', err);
+  }
+}
+

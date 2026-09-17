@@ -123,3 +123,11 @@
   - บันทึกมาตรการจัดการ Unicode สระอำของภาษาไทย และลำดับความสำคัญของสถานะไปรษณีย์
   - บันทึกสถาปัตยกรรม Multiline Batch Tracking ด้วย `Promise.allSettled` และ Accordion Stepper Cards
   - บันทึกคู่มือการผูกโปรเจกต์และการดีพลอย Vercel CLI อย่างเป็นทางการ
+
+- [x] **4.39 ส่งข้อมูล Username และ Password ไปแสดงและกรอกอัตโนมัติในบริการภายนอก DPost และ e-AR (Cross-Origin Credential Bridge & Auto-fill Assistant) (`v2026.0917.0910`)**
+  - พัฒนาระบบส่งผ่านข้อมูล Username และ Password ของผู้ใช้งานที่เข้าสู่ระบบ ไปยังหน้าเข้าสู่ระบบของบริการภายนอก 2 ลิงก์บน Navbar (DPost และ e-AR)
+  - อัปเกรด Chrome Extension `C2DPost Helper` สู่เวอร์ชัน `1.1.0` เพิ่ม Content Script `external_autofill.js` และ `host_permissions` สำหรับ `https://dpost.thailandpost.com/*` และ `https://e-ar.thailandpost.com/*`
+  - รองรับการกรอกข้อมูลอัตโนมัติบน DOM ของ DPost (`#txtUsername`, `#txtPassword`) และ React Controlled Inputs ของ e-AR (`input[name="username"]`, `input[name="password"]`) ผ่าน Native Property Setter เพื่ออัปเดต React State ได้อย่างสมบูรณ์แบบ
+  - เพิ่มหน้าต่างผู้ช่วยเข้าสู่ระบบ `CredentialAssistantModal` สไตล์ Glassmorphism บนเว็บ C2DPost พร้อมปุ่มคัดลอก (Copy) Username และ Password ในคลิกเดียว, ปุ่มสลับดูรหัสผ่าน, และแจ้งสถานะการทำงานของ Extension อย่างชัดเจน
+  - ซิงก์ข้อมูลเข้าสู่ระบบอัตโนมัติเมื่อผู้ใช้ล็อกอิน สลับผู้ใช้ หรือคลิกลิงก์บริการภายนอก และล้างข้อมูลเมื่อออกจากระบบ
+  - อัปเดตและบีบอัดไฟล์ส่วนเสริม `c2dpost-extension.zip` สำหรับให้ผู้ใช้งานดาวน์โหลดและติดตั้ง

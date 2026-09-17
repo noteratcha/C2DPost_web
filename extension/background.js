@@ -94,7 +94,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === "PING") {
     sendResponse({
       success: true,
-      version: "1.0.0",
+      version: "1.1.0",
       status: "connected"
     });
     return true;
@@ -108,5 +108,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       sendResponse(result);
     });
     return true; // Keep message channel open for async response
+  }
+
+  if (message.action === "SET_CREDENTIALS") {
+    chrome.storage.local.set({ c2dpost_credentials: message.credentials }, () => {
+      sendResponse({ success: true });
+    });
+    return true;
+  }
+
+  if (message.action === "GET_CREDENTIALS") {
+    chrome.storage.local.get(["c2dpost_credentials"], (res) => {
+      sendResponse({ success: true, credentials: res.c2dpost_credentials || null });
+    });
+    return true;
   }
 });

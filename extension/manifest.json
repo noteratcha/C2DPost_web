@@ -1,11 +1,13 @@
 {
   "manifest_version": 3,
   "name": "C2DPost Helper - Thailand Post API Bridge",
-  "version": "1.0.0",
-  "description": "ส่วนเสริมช่วยดึงหมายเลขบาร์โค้ดจากระบบไปรษณีย์ไทย (PostOne) สำหรับ C2DPost Web",
+  "version": "1.1.0",
+  "description": "ส่วนเสริมช่วยดึงหมายเลขบาร์โค้ด (PostOne) และช่วยกรอกข้อมูลเข้าสู่ระบบ DPost / e-AR สำหรับ C2DPost Web",
   "permissions": ["storage"],
   "host_permissions": [
-    "https://postone.thailandpost.com/*"
+    "https://postone.thailandpost.com/*",
+    "https://dpost.thailandpost.com/*",
+    "https://e-ar.thailandpost.com/*"
   ],
   "background": {
     "service_worker": "background.js"
@@ -19,6 +21,14 @@
       ],
       "js": ["content.js"],
       "run_at": "document_start"
+    },
+    {
+      "matches": [
+        "https://dpost.thailandpost.com/*",
+        "https://e-ar.thailandpost.com/*"
+      ],
+      "js": ["external_autofill.js"],
+      "run_at": "document_idle"
     }
   ],
   "action": {

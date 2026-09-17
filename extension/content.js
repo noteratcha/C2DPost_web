@@ -2,7 +2,7 @@
 // Injected into web pages (Vercel & Localhost)
 
 (function () {
-  const VERSION = "1.0.0";
+  const VERSION = "1.1.0";
 
   // Mark HTML element so the web page can detect immediately via DOM
   function markExtensionInstalled() {
@@ -65,6 +65,34 @@
           );
         }
       );
+      return;
+    }
+
+    // 3. Set Credentials request (for DPost and e-AR auto-fill)
+    if (event.data.type === "C2DPOST_SET_CREDENTIALS") {
+      const { username, password, organization } = event.data;
+
+      chrome.runtime.sendMessage(
+        {
+          action: "SET_CREDENTIALS",
+          credentials: {
+            username: username || "",
+            password: password || "",
+            organization: organization || "",
+            updatedAt: Date.now()
+          }
+        },
+        (response) => {
+          window.postMessage(
+            {
+              type: "C2DPOST_CREDENTIALS_SET_RESULT",
+              ...(response || { success: true })
+            },
+            "*"
+          );
+        }
+      );
+      return;
     }
   });
 
