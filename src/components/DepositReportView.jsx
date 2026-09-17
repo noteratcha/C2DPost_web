@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { fetchReceivedReport, exportDepositReportExcel, exportDepositReportPdf, batchFetchTracking } from '../utils/api';
+import { formatStationWithZipcode } from '../utils/postalUtils';
 import TrackingTimelineModal from './TrackingTimelineModal';
 import './DepositReportView.css';
 
@@ -912,9 +913,9 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
                         </td>
                         <td 
                           style={{ textAlign: 'center' }}
-                          title={`สถานที่ล่าสุด: ${item.latest_station || item.received_postoffice || '-'}${item.received_postoffice ? `\n(ปณ.รับฝาก: ${item.received_postoffice})` : ''}`}
+                          title={`สถานที่ล่าสุด: ${formatStationWithZipcode(item.latest_station || item.received_postoffice, item)}${item.received_postoffice ? `\n(ปณ.รับฝาก: ${formatStationWithZipcode(item.received_postoffice, item)})` : ''}`}
                         >
-                          {item.latest_station || item.received_postoffice || '-'}
+                          {formatStationWithZipcode(item.latest_station || item.received_postoffice, item)}
                         </td>
                         <td style={{ textAlign: 'center' }} className="cell-status-wrapper">
                           <div className="status-cell-container">

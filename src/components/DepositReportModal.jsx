@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { fetchReceivedReport, exportDepositReportExcel, exportDepositReportPdf } from '../utils/api';
 import { getDeliveryStatusInfo } from './DepositReportView';
+import { formatStationWithZipcode } from '../utils/postalUtils';
 import TrackingTimelineModal from './TrackingTimelineModal';
 import './DepositReportModal.css';
 
@@ -794,9 +795,9 @@ export default function DepositReportModal({ isOpen, onClose, currentPerson, onS
                       <td>
                         <span 
                           className="po-badge"
-                          title={`สถานที่ล่าสุด: ${rec.latest_station || rec.received_postoffice || '-'}${rec.received_postoffice ? ` (ปณ.รับฝาก: ${rec.received_postoffice})` : ''}`}
+                          title={`สถานที่ล่าสุด: ${formatStationWithZipcode(rec.latest_station || rec.received_postoffice, rec)}${rec.received_postoffice ? ` (ปณ.รับฝาก: ${formatStationWithZipcode(rec.received_postoffice, rec)})` : ''}`}
                         >
-                          {rec.latest_station || rec.received_postoffice || '-'}
+                          {formatStationWithZipcode(rec.latest_station || rec.received_postoffice, rec)}
                         </span>
                       </td>
                       <td className="td-center cell-status-wrapper">

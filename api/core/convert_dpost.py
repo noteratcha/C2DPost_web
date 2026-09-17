@@ -1358,6 +1358,140 @@ def generate_custom_envelopes_pdf(dataframe, output_pdf_path):
     with open(output_pdf_path, "wb") as f_out:
         writer.write(f_out)
 
+MAIL_CENTERS_ZIP = {
+    "หาดใหญ่": "90110",
+    "นครพนม": "48000",
+    "ขอนแก่น": "40000",
+    "นครราชสีมา": "30000",
+    "โคราช": "30000",
+    "อุดรธานี": "41000",
+    "อุบลราชธานี": "34000",
+    "นครสวรรค์": "60000",
+    "พิษณุโลก": "65000",
+    "เด่นชัย": "54110",
+    "ลำพูน": "51000",
+    "เชียงใหม่": "50000",
+    "สุราษฎร์ธานี": "84000",
+    "ทุ่งสง": "80110",
+    "ชุมพร": "86000",
+    "ภูเก็ต": "83000",
+    "ศรีราชา": "20110",
+    "กบินทร์บุรี": "25110",
+    "อยุธยา": "13000",
+    "พระนครศรีอยุธยา": "13000",
+    "ราชบุรี": "70000",
+    "สุวรรณภูมิ": "10540",
+    "กรุงเทพ": "10210",
+    "หลักสี่": "10210",
+    "ด่วนพิเศษ": "10210",
+    "ems": "10210",
+}
+
+KNOWN_DISTRICT_ZIP = {
+    "เรณูนคร": "48170",
+    "นาแก": "48130",
+    "ปลาปาก": "48160",
+    "ธาตุพนม": "48110",
+    "ท่าอุเทน": "48120",
+    "ศรีสงคราม": "48150",
+    "บ้านแพง": "48140",
+    "นาหว้า": "48180",
+    "โพนสวรรค์": "48190",
+    "นาทม": "48140",
+    "วังยาง": "48130",
+    "เมืองนครพนม": "48000",
+    "นครพนม": "48000",
+    "เมืองมุกดาหาร": "49000",
+    "มุกดาหาร": "49000",
+    "นิคมคำสร้อย": "49130",
+    "ดอนตาล": "49120",
+    "ดงหลวง": "49140",
+    "คำชะอี": "49110",
+    "หว้านใหญ่": "49150",
+    "หนองสูง": "49160",
+    "เมืองสกลนคร": "47000",
+    "สกลนคร": "47000",
+    "กุสุมาลย์": "47210",
+    "กุดบาก": "47180",
+    "พรรณานิคม": "47130",
+    "พังโคน": "47160",
+    "วาริชภูมิ": "47150",
+    "อากาศอำนวย": "47170",
+    "สว่างแดนดิน": "47110",
+    "คำตากล้า": "47250",
+    "บ้านม่วง": "47140",
+    "โพนนาแก้ว": "47230",
+    "ภูพาน": "47180",
+    "เต่างอย": "47260",
+    "โคกศรีสุพรรณ": "47280",
+    "เจริญศิลป์": "47290",
+    "บัวใหญ่": "30120",
+    "ปากช่อง": "30130",
+    "วารินชำราบ": "34190",
+    "ชุมแพ": "40130",
+    "บ้านไผ่": "40110",
+    "บางพลี": "10540",
+    "คลองจั่น": "10240",
+    "จตุจักร": "10900",
+    "ลาดพร้าว": "10230",
+    "มีนบุรี": "10510",
+    "บางซื่อ": "10800",
+    "นนทบุรี": "11000",
+    "ปากเกร็ด": "11120",
+}
+
+def format_station_with_zipcode(station, record=None):
+    if not station or str(station).strip() in ("", "-"):
+        return "-"
+    st = str(station).strip()
+    if re.search(r'\b\d{5}\b', st):
+        return st
+
+    clean = re.sub(r'^(ศปฝ\.|ศป\.|ปณศ\.|ปณร\.|ปณ\.|ที่ทำการไปรษณีย์)\s*', '', st).strip().lower()
+    is_mail_center = any(p in st for p in ["ศป.", "ศปฝ.", "ศูนย์ไปรษณีย์"])
+
+    for mc_name, zcode in MAIL_CENTERS_ZIP.items():
+        mc_lower = mc_name.lower()
+        if mc_lower in st.lower() or clean == mc_lower:
+            if is_mail_center or mc_name in ["หาดใหญ่", "เด่นชัย", "ทุ่งสง", "กบินทร์บุรี", "ศรีราชา", "สุวรรณภูมิ", "หลักสี่", "ด่วนพิเศษ", "ems"]:
+                return f"{st} {zcode}"
+            elif clean == mc_lower and is_mail_center:
+                return f"{st} {zcode}"
+
+    shipper_zc = (record.get("shipper_zipcode") if record else "") or "48170"
+    received_po = (record.get("received_postoffice") if record else "") or ""
+    if "เรณูนคร" in st:
+        return f"{st} 48170"
+    if received_po:
+        clean_po = re.sub(r'^(ศปฝ\.|ศป\.|ปณศ\.|ปณร\.|ปณ\.|ที่ทำการไปรษณีย์)\s*', '', str(received_po)).strip().lower()
+        if clean == clean_po:
+            return f"{st} {shipper_zc}"
+
+    if record:
+        rcv_zc = str(record.get("receiver_zipcode") or "").strip()
+        rcv_amp = str(record.get("receiver_amphur") or "").strip().lower()
+        rcv_prov = str(record.get("receiver_province") or "").strip().lower()
+        rcv_addr = str(record.get("receiver_address") or "").strip().lower()
+        if len(rcv_zc) == 5:
+            if clean and (clean in rcv_amp or clean in rcv_addr or (clean in rcv_prov and not is_mail_center)):
+                return f"{st} {rcv_zc}"
+            status_desc = str(record.get("status_description") or record.get("status_label") or "")
+            raw_desc = str(record.get("status_description_raw") or "")
+            combined_desc = f"{status_desc} {raw_desc}"
+            delivery_keywords = ["นำจ่าย", "สำเร็จ", "ผู้รับได้รับ", "บ้านปิด", "ออกใบแจ้ง", "รอจ่าย"]
+            if not is_mail_center and any(kw in combined_desc for kw in delivery_keywords):
+                return f"{st} {rcv_zc}"
+
+    for d_name, zcode in KNOWN_DISTRICT_ZIP.items():
+        if clean == d_name or d_name in clean:
+            return f"{st} {zcode}"
+
+    for mc_name, zcode in MAIL_CENTERS_ZIP.items():
+        if clean == mc_name.lower():
+            return f"{st} {zcode}"
+
+    return st
+
 def generate_deposit_report_excel(records, summary, meta, output_excel_path):
     """
     Generates styled Excel report for Thailand Post deposit reconciliation using openpyxl.
@@ -1438,7 +1572,7 @@ def generate_deposit_report_excel(records, summary, meta, output_excel_path):
         weight = float(r.get("weight") or 0.0)
         fee = float(r.get("fee") or 0.0)
         latest_d = r.get("latest_date") or r.get("received_date") or ""
-        latest_s = r.get("latest_station") or r.get("received_postoffice") or ""
+        latest_s = format_station_with_zipcode(r.get("latest_station") or r.get("received_postoffice") or "", r)
 
         # Status formatting: If raw description gives more detail than the label, include it in parentheses
         status_lbl = r.get("status_label") or r.get("status_description") or "รับฝากเข้าระบบแล้ว"
@@ -1585,7 +1719,7 @@ def generate_deposit_report_pdf(records, summary, meta, output_pdf_path):
         weight = float(r.get("weight") or 0.0)
         fee = float(r.get("fee") or 0.0)
         latest_d = r.get("latest_date") or r.get("received_date") or "-"
-        latest_s = r.get("latest_station") or r.get("received_postoffice") or "-"
+        latest_s = format_station_with_zipcode(r.get("latest_station") or r.get("received_postoffice") or "-", r)
         
         status_lbl = r.get("status_label") or r.get("status_description") or "รับฝากเข้าระบบแล้ว"
         raw_desc = (r.get("status_description_raw") or "").strip()
