@@ -213,4 +213,17 @@
     2. **บรรทัดที่ 2: `✍️ ผู้เซ็นรับจริง: [ชื่อจาก signature]`** (หาก ปณ. มีส่งชื่อมา) หรือหาก ปณ. ไม่ได้ส่งชื่อพิมพ์มา จะแสดงข้อความระบุชัดเจนว่า **`(ไม่พบชื่อพิมพ์ในระบบ e-Parcel / ลายเซ็นอยู่ในระบบ e-AR)`** พร้อมลิงก์สีน้ำเงินไฮไลต์ **`ดูภาพลายเซ็นใน e-AR ↗`** ให้คลิกเปิดระบบ e-AR เพื่อตรวจสอบภาพลายเซ็นจริงได้ทันที
   - ปรับแต่งการแสดงผลทั้งในโมดอล `TrackingTimelineModal` และหน้าสืบค้นพัสดุ `TrackingInquiryView` ให้มีดีไซน์สวยงาม รองรับทั้ง Light Theme และ Dark Theme
   - ผ่านการทดสอบ `npm run build` สำเร็จ 100% และ Deploy ขึ้น Production บน Vercel
-
+- [x] **4.51 ระบบคลิกลิงก์ e-AR แล้วสลับเงื่อนไขเป็น "หมายเลขบาร์โค้ด" และค้นหาอัตโนมัติ (Automated e-AR Condition Switching & Barcode Search Engine) (`v2026.0917.1630` / Extension `v1.2.0`)**
+  - พัฒนาฟังก์ชันการทำงานเชื่อมโยงระหว่าง C2DPost Web และระบบ e-AR (`https://e-ar.thailandpost.com/ear`) ตามภาพตัวอย่างของผู้ใช้งาน:
+    1. เมื่อคลิกลิงก์ **"ดูภาพลายเซ็นใน e-AR ↗"** ในหน้าประวัติสถานะพัสดุ (`TrackingTimelineModal`) หรือหน้าสืบค้นพัสดุ (`TrackingInquiryView`):
+       - ระบบจะคัดลอกหมายเลขบาร์โค้ด (เช่น `BC414111081TH`) ลงใน Clipboard อัตโนมัติ เพื่อความสะดวกสูงสุด
+       - ส่งสัญญาณ `C2DPOST_SET_EAR_SEARCH` พร้อมหมายเลขพัสดุไปยังส่วนขยาย C2DPost Helper บันทึกลงใน `chrome.storage.local`
+       - เปิดหน้าเว็บ `https://e-ar.thailandpost.com/ear#barcode=...` ในแท็บใหม่อัตโนมัติ
+    2. ส่วนขยายเบราว์เซอร์ **C2DPost Helper (`v1.2.0`)**:
+       - สคริปต์ `external_autofill.js` ที่ทำงานบน `e-ar.thailandpost.com` จะตรวจจับหมายเลขพัสดุที่ส่งมาจาก C2DPost Web (ทั้งผ่าน URL Hash และ Extension Storage)
+       - ตรวจจับคอมโพเนนต์ Joy UI Select ของเมนู "เงื่อนไขการค้นหา" (`#select-field-demo-button`) และสั่งเปิดเมนูเลือก `li[role="option"][data-value="barcode"]` ("หมายเลขบาร์โค้ด") อัตโนมัติ
+       - รอรับการ Render ช่องกรอก `<input name="barcode">` แล้วกรอกหมายเลขพัสดุลงในช่องด้วย Native Property Descriptor Setter
+       - สั่งกดปุ่ม `button[type="submit"]` ("ค้นหา") ให้โดยอัตโนมัติ แสดงผลแถวข้อมูลรายการพัสดุและป้าย "มีลายเซ็น" ทันทีโดยที่ผู้ใช้ไม่ต้องกดค้นหาเอง
+       - แสดงป้ายแจ้งเตือนสีเขียวมรกตลอยมุมจอ: `⚡ C2DPost Helper • ค้นหาพัสดุสำเร็จ`
+    3. อัปเกรดไฟล์แพ็กเกจส่วนขยาย `c2dpost-extension.zip` และ `C2DPost_Helper_v1.2.0_WebStore.zip` สู่เวอร์ชัน 1.2.0 พร้อมใช้งาน
+  - คอมไพล์โปรเจกต์ `npm run build` และ Deploy ขึ้นสู่ Vercel Production สำเร็จ 100%

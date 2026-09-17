@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { fetchTrackingHistory } from '../utils/api';
 import { formatStationWithZipcode } from '../utils/postalUtils';
+import { openEarWithBarcode } from '../utils/extensionBridge';
 import './TrackingTimelineModal.css';
 
 export default function TrackingTimelineModal({ isOpen, barcode, recInfo, currentPerson, onClose, onOpenTrackingPage, onTrackingUpdated }) {
@@ -305,11 +306,15 @@ export default function TrackingTimelineModal({ isOpen, barcode, recInfo, curren
                               <strong className="step-field-label">ผู้เซ็นรับจริง:</strong>{' '}
                               <span className="sig-hint">(ไม่พบชื่อพิมพ์ในระบบ e-Parcel / ลายเซ็นอยู่ในระบบ e-AR)</span>{' '}
                               <a
-                                href="https://e-ar.thailandpost.com"
+                                href={`https://e-ar.thailandpost.com/ear#barcode=${encodeURIComponent(barcode)}`}
                                 target="_blank"
                                 rel="noreferrer"
                                 className="sig-ear-link"
-                                title="คลิกเพื่อเปิดระบบ e-AR ดูภาพลายเซ็นใบตอบรับ"
+                                title="คลิกเพื่อเปิดระบบ e-AR และค้นหาภาพลายเซ็นอัตโนมัติ"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  openEarWithBarcode(barcode);
+                                }}
                               >
                                 ดูภาพลายเซ็นใน e-AR ↗
                               </a>

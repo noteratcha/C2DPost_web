@@ -94,7 +94,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === "PING") {
     sendResponse({
       success: true,
-      version: "1.1.0",
+      version: "1.2.0",
       status: "connected"
     });
     return true;
@@ -120,6 +120,25 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === "GET_CREDENTIALS") {
     chrome.storage.local.get(["c2dpost_credentials"], (res) => {
       sendResponse({ success: true, credentials: res.c2dpost_credentials || null });
+    });
+    return true;
+  }
+
+  if (message.action === "SET_EAR_SEARCH") {
+    chrome.storage.local.set({
+      c2dpost_ear_search: {
+        barcode: message.barcode,
+        timestamp: Date.now()
+      }
+    }, () => {
+      sendResponse({ success: true });
+    });
+    return true;
+  }
+
+  if (message.action === "GET_EAR_SEARCH") {
+    chrome.storage.local.get(["c2dpost_ear_search"], (res) => {
+      sendResponse({ success: true, search: res.c2dpost_ear_search || null });
     });
     return true;
   }

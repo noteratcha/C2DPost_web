@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { fetchTrackingHistory } from '../utils/api';
 import { formatStationWithZipcode } from '../utils/postalUtils';
+import { openEarWithBarcode } from '../utils/extensionBridge';
 import './TrackingInquiryView.css';
 
 /**
@@ -674,11 +675,15 @@ export default function TrackingInquiryView({ currentPerson, records = [], initi
                                             <strong>ผู้เซ็นรับจริง:</strong>{' '}
                                             <span className="sig-hint">(ไม่พบชื่อพิมพ์ในระบบ e-Parcel / ลายเซ็นอยู่ในระบบ e-AR)</span>{' '}
                                             <a
-                                              href="https://e-ar.thailandpost.com"
+                                              href={`https://e-ar.thailandpost.com/ear#barcode=${encodeURIComponent(result.barcode)}`}
                                               target="_blank"
                                               rel="noreferrer"
                                               className="sig-ear-link"
-                                              title="คลิกเพื่อเปิดระบบ e-AR ดูภาพลายเซ็นใบตอบรับ"
+                                              title="คลิกเพื่อเปิดระบบ e-AR และค้นหาภาพลายเซ็นอัตโนมัติ"
+                                              onClick={(e) => {
+                                                e.preventDefault();
+                                                openEarWithBarcode(result.barcode);
+                                              }}
                                             >
                                               ดูภาพลายเซ็นใน e-AR ↗
                                             </a>

@@ -2,7 +2,7 @@
 // Injected into web pages (Vercel & Localhost)
 
 (function () {
-  const VERSION = "1.1.0";
+  const VERSION = "1.2.0";
 
   // Mark HTML element so the web page can detect immediately via DOM
   function markExtensionInstalled() {
@@ -86,6 +86,29 @@
           window.postMessage(
             {
               type: "C2DPOST_CREDENTIALS_SET_RESULT",
+              ...(response || { success: true })
+            },
+            "*"
+          );
+        }
+      );
+      return;
+    }
+
+    // 4. Set e-AR Search Barcode
+    if (event.data.type === "C2DPOST_SET_EAR_SEARCH") {
+      const { barcode } = event.data;
+      if (!barcode) return;
+
+      chrome.runtime.sendMessage(
+        {
+          action: "SET_EAR_SEARCH",
+          barcode: barcode
+        },
+        (response) => {
+          window.postMessage(
+            {
+              type: "C2DPOST_EAR_SEARCH_SET_RESULT",
               ...(response || { success: true })
             },
             "*"

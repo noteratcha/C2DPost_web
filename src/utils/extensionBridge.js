@@ -162,3 +162,43 @@ export function syncCredentialsToExtension(username, password, organization = ''
   }
 }
 
+/**
+ * Open e-AR with target barcode, sync to extension, copy to clipboard, and navigate
+ * @param {string} barcode Barcode string e.g. "BC414111081TH"
+ */
+export function openEarWithBarcode(barcode) {
+  if (!barcode) return;
+  const cleanBarcode = String(barcode).trim().toUpperCase();
+
+  // 1. Copy barcode to clipboard for user convenience
+  try {
+    if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(cleanBarcode);
+    }
+  } catch (e) {
+    console.warn('[C2DPost Bridge] Clipboard copy error:', e);
+  }
+
+  // 2. Dispatch message to C2DPost Helper Chrome Extension
+  try {
+    if (typeof window !== 'undefined') {
+      window.postMessage(
+        {
+          type: 'C2DPOST_SET_EAR_SEARCH',
+          barcode: cleanBarcode,
+          timestamp: Date.now()
+        },
+        '*'
+      );
+    }
+  } catch (err) {
+    console.warn('[C2DPost Bridge] Failed to send ear search message:', err);
+  }
+
+  // 3. Open e-AR page with barcode in URL hash
+  const earUrl = `https://e-ar.thailandpost.com/ear#barcode=${encodeURIComponent(cleanBarcode)}`;
+  if (typeof window !== 'undefined') {
+    window.open(earUrl, '_blank', 'noopener,noreferrer');
+  }
+}
+
