@@ -128,6 +128,11 @@
   - พัฒนาระบบส่งผ่านข้อมูล Username และ Password ของผู้ใช้งานที่เข้าสู่ระบบ ไปยังหน้าเข้าสู่ระบบของบริการภายนอก 2 ลิงก์บน Navbar (DPost และ e-AR)
   - อัปเกรด Chrome Extension `C2DPost Helper` สู่เวอร์ชัน `1.1.0` เพิ่ม Content Script `external_autofill.js` และ `host_permissions` สำหรับ `https://dpost.thailandpost.com/*` และ `https://e-ar.thailandpost.com/*`
   - รองรับการกรอกข้อมูลอัตโนมัติบน DOM ของ DPost (`#txtUsername`, `#txtPassword`) และ React Controlled Inputs ของ e-AR (`input[name="username"]`, `input[name="password"]`) ผ่าน Native Property Setter เพื่ออัปเดต React State ได้อย่างสมบูรณ์แบบ
-  - เพิ่มหน้าต่างผู้ช่วยเข้าสู่ระบบ `CredentialAssistantModal` สไตล์ Glassmorphism บนเว็บ C2DPost พร้อมปุ่มคัดลอก (Copy) Username และ Password ในคลิกเดียว, ปุ่มสลับดูรหัสผ่าน, และแจ้งสถานะการทำงานของ Extension อย่างชัดเจน
   - ซิงก์ข้อมูลเข้าสู่ระบบอัตโนมัติเมื่อผู้ใช้ล็อกอิน สลับผู้ใช้ หรือคลิกลิงก์บริการภายนอก และล้างข้อมูลเมื่อออกจากระบบ
   - อัปเดตและบีบอัดไฟล์ส่วนเสริม `c2dpost-extension.zip` สำหรับให้ผู้ใช้งานดาวน์โหลดและติดตั้ง
+
+- [x] **4.40 ปรับเป็นระบบ 1-คลิกเปิดเว็บปลายทางพร้อมกรอกข้อมูลอัตโนมัติ 100% โดยไม่ต้องกดผ่านป๊อปอัป (Zero-Modal Direct Seamless Autofill) (`v2026.0917.0925`)**
+  - นำหน้าต่าง `CredentialAssistantModal` ออกจาก Flow การคลิกลิงก์ DPost และ e-AR บนแถบนำทาง (Navbar) ทั้งหมด 100% เพื่อประสบการณ์ใช้งานที่ลื่นไหลไร้รอยต่อ
+  - เมื่อผู้ใช้งานคลิกปุ่ม DPost หรือ e-AR ระบบจะซิงก์ข้อมูล Username และ Password ไปยัง Extension ทันที และเปิดแท็บใหม่ไปยังเว็บไซต์ปลายทางทันทีแบบ 1-คลิก ไม่มีการเปิดหน้าต่าง Modal มาขัดจังหวะ
+  - ปรับปรุง `external_autofill.js` ในส่วนเสริมให้ตรวจจับ `chrome.storage.onChanged` ดักจับข้อมูลที่อัปเดตล่าสุด และกรอกข้อมูลลงช่องอินพุตบน DPost และ e-AR ทันที พร้อมแสดงป้ายยืนยันสีเขียว "⚡ C2DPost Helper • กรอกข้อมูลสำเร็จ" ที่มุมขวาล่างของเว็บปลายทาง
+
