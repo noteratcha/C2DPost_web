@@ -105,6 +105,7 @@ export async function fetchEarDetailsClient(barcode, force = false) {
     const finalResult = {
       has_ear: true,
       barcode: cleanBarcode,
+      pdfBlob: pdfBlob,
       blob_url: blobUrl,
       relationship: parsedData.relationship || '',
       delivery_officer: parsedData.delivery_officer || '',
@@ -117,6 +118,102 @@ export async function fetchEarDetailsClient(barcode, force = false) {
   } catch (err) {
     console.warn(`e-AR client fetch error for ${cleanBarcode}:`, err);
     return null;
+  }
+}
+
+/**
+ * Converts a Blob into raw Base64 string (without Data URL prefix)
+ */
+function blobToBase64(blob) {
+  return new Promise((resolve) => {
+    if (!blob) return resolve(null);
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const base64data = reader.result ? reader.result.split(',')[1] : null;
+      resolve(base64data);
+    };
+    reader.onerror = () => resolve(null);
+    reader.readAsDataURL(blob);
+  });
+}
+
+/**
+ * Opens official e-AR PDF (Page 1) with complete tracking history and delivery evidence (Page 2).
+ */
+export async function openEarWithTrackingPdf({
+  barcode,
+  events = [],
+  matchedRecord = null,
+  clientEar = null,
+  trackData = null,
+  downloadedAt = ''
+}) {
+  const cleanBarcode = String(barcode || '').trim().toUpperCase();
+  if (!cleanBarcode) return;
+
+  // 1. Get clientEar if not provided or missing blob
+  let earObj = clientEar;
+  if (!earObj || !earObj.pdfBlob) {
+    try {
+      const fetched = await fetchEarDetailsClient(cleanBarcode);
+      if (fetched) earObj = fetched;
+    } catch (e) {
+      console.warn('e-AR fetch notice:', e);
+    }
+  }
+
+  // 2. Format downloaded_at Thai timestamp string
+  let dlStr = downloadedAt;
+  if (!dlStr) {
+    const now = new Date();
+    const day = String(now.getDate()).padStart(2, '0');
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const yearBe = now.getFullYear() + 543;
+    const time = now.toTimeString().split(' ')[0];
+    dlStr = `${day}/${month}/${yearBe} ${time} น.`;
+  }
+
+  // 3. Prepare client_pdf_base64 if available
+  let clientPdfBase64 = null;
+  if (earObj?.pdfBlob) {
+    try {
+      clientPdfBase64 = await blobToBase64(earObj.pdfBlob);
+    } catch (bErr) {
+      console.warn('blobToBase64 notice:', bErr);
+    }
+  }
+
+  const payload = {
+    barcode: cleanBarcode,
+    client_pdf_base64: clientPdfBase64,
+    receiver_name: matchedRecord?.name || matchedRecord?.receiver_name || matchedRecord?.receiver || '',
+    inv_no: matchedRecord?.invNo || matchedRecord?.inv_no || '',
+    relationship: earObj?.relationship || trackData?.relationship || '',
+    delivery_officer: earObj?.delivery_officer || trackData?.delivery_officer || '',
+    signature_image: earObj?.signature_image || '',
+    latest_datetime: trackData?.latest_datetime || (events.length > 0 ? events[events.length - 1]?.datetime : ''),
+    latest_location: trackData?.latest_location || (events.length > 0 ? events[events.length - 1]?.location : ''),
+    events: events,
+    downloaded_at: dlStr
+  };
+
+  try {
+    const response = await fetch(`${API_BASE}/reports/ear-with-tracking-pdf`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      throw new Error(`Server returned HTTP ${response.status}`);
+    }
+
+    const blob = await response.blob();
+    const fileUrl = URL.createObjectURL(blob);
+    window.open(fileUrl, '_blank');
+  } catch (err) {
+    console.warn('Error fetching 2-page e-AR PDF, falling back to direct URL:', err);
+    window.open(`${API_BASE}/reports/ear-pdf?barcode=${encodeURIComponent(cleanBarcode)}`, '_blank');
   }
 }
 

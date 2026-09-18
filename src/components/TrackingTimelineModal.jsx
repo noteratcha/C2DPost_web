@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { fetchTrackingHistory } from '../utils/api';
 import { formatStationWithZipcode } from '../utils/postalUtils';
 import { openEarWithBarcode } from '../utils/extensionBridge';
-import { fetchEarDetailsClient } from '../utils/earService';
+import { fetchEarDetailsClient, openEarWithTrackingPdf } from '../utils/earService';
 import './TrackingTimelineModal.css';
 
 export default function TrackingTimelineModal({ isOpen, barcode, recInfo, currentPerson, onClose, onOpenTrackingPage, onTrackingUpdated }) {
@@ -11,6 +11,7 @@ export default function TrackingTimelineModal({ isOpen, barcode, recInfo, curren
   const [trackData, setTrackData] = useState(null);
   const [clientEarData, setClientEarData] = useState(null);
   const [earLoading, setEarLoading] = useState(false);
+  const [openingEarPdf, setOpeningEarPdf] = useState(false);
   const [selectedSigModal, setSelectedSigModal] = useState(null);
 
   const timelineBodyRef = useRef(null);
@@ -119,6 +120,27 @@ export default function TrackingTimelineModal({ isOpen, barcode, recInfo, curren
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }, [barcode]);
+
+  const handleOpenEarPdf = async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    if (openingEarPdf || !barcode) return;
+    setOpeningEarPdf(true);
+    try {
+      await openEarWithTrackingPdf({
+        barcode,
+        events: sortedEvents,
+        matchedRecord: recInfo,
+        clientEar: clientEarData,
+        trackData: trackData,
+        downloadedAt: ''
+      });
+    } catch (err) {
+      console.error('Failed to open e-AR with tracking:', err);
+      window.open(`/api/reports/ear-pdf?barcode=${encodeURIComponent(barcode)}`, '_blank');
+    } finally {
+      setOpeningEarPdf(false);
+    }
+  };
 
   const statusInfo = useMemo(() => {
     // Check if description represents a delivery exception/issue
@@ -573,15 +595,22 @@ export default function TrackingTimelineModal({ isOpen, barcode, recInfo, curren
                                     หลักฐานการลงนาม (ระบบ e-AR)
                                   </span>
                                   {earInfo?.has_ear && (
-                                    <a
-                                      href={earPdfUrl}
-                                      target="_blank"
-                                      rel="noreferrer"
+                                    <button
+                                      type="button"
                                       className="ear-box-pdf-btn"
-                                      title="เปิดดูใบตอบรับ e-AR ฉบับจริง (PDF)"
+                                      title="เปิดดูใบตอบรับ e-AR พร้อมประวัติสถานะการนำส่ง (PDF 2 หน้า)"
+                                      disabled={openingEarPdf}
+                                      onClick={handleOpenEarPdf}
                                     >
-                                      📄 ดูใบตอบรับ e-AR (PDF) ↗
-                                    </a>
+                                      {openingEarPdf ? (
+                                        <>
+                                          <span className="track-spinner small" style={{ width: '12px', height: '12px', borderWidth: '2px', display: 'inline-block' }}></span>
+                                          <span>กำลังสร้าง PDF 2 หน้า...</span>
+                                        </>
+                                      ) : (
+                                        <>📄 ดูใบตอบรับ e-AR (PDF) ↗</>
+                                      )}
+                                    </button>
                                   )}
                                 </div>
 

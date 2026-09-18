@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { fetchTrackingHistory } from '../utils/api';
 import { formatStationWithZipcode } from '../utils/postalUtils';
 import { openEarWithBarcode } from '../utils/extensionBridge';
-import { fetchEarDetailsClient, downloadBatchEar } from '../utils/earService';
+import { fetchEarDetailsClient, downloadBatchEar, openEarWithTrackingPdf } from '../utils/earService';
 import './TrackingInquiryView.css';
 
 /**
@@ -208,6 +208,29 @@ export default function TrackingInquiryView({ currentPerson, records = [], initi
   // Batch e-AR download states
   const [isDownloadingEar, setIsDownloadingEar] = useState(false);
   const [earProgressText, setEarProgressText] = useState('');
+  const [openingEarBarcode, setOpeningEarBarcode] = useState(null);
+
+  const handleOpenEarPdf = async (e, bcode, item) => {
+    if (e && e.preventDefault) e.preventDefault();
+    if (openingEarBarcode) return;
+    setOpeningEarBarcode(bcode);
+    try {
+      const clientEar = clientEarMap[bcode];
+      await openEarWithTrackingPdf({
+        barcode: bcode,
+        events: item?.events || [],
+        matchedRecord: item?.matchedRecord,
+        clientEar: clientEar,
+        trackData: item?.trackData,
+        downloadedAt: ''
+      });
+    } catch (err) {
+      console.error('Failed to open e-AR with tracking:', err);
+      window.open(`/api/reports/ear-pdf?barcode=${encodeURIComponent(bcode)}`, '_blank');
+    } finally {
+      setOpeningEarBarcode(null);
+    }
+  };
 
   // Available barcodes from current session workspace
   const availableBarcodes = useMemo(() => {
@@ -928,15 +951,22 @@ export default function TrackingInquiryView({ currentPerson, records = [], initi
                                                   หลักฐานการลงนาม (ระบบ e-AR)
                                                 </span>
                                                 {earInfo?.has_ear && (
-                                                  <a
-                                                    href={earPdfUrl}
-                                                    target="_blank"
-                                                    rel="noreferrer"
+                                                  <button
+                                                    type="button"
                                                     className="ear-box-pdf-btn"
-                                                    title="เปิดดูใบตอบรับ e-AR ฉบับจริง (PDF)"
+                                                    title="เปิดดูใบตอบรับ e-AR พร้อมประวัติสถานะการนำส่ง (PDF 2 หน้า)"
+                                                    disabled={openingEarBarcode === barcode}
+                                                    onClick={(e) => handleOpenEarPdf(e, barcode, item)}
                                                   >
-                                                    📄 ดูใบตอบรับ e-AR (PDF) ↗
-                                                  </a>
+                                                    {openingEarBarcode === barcode ? (
+                                                      <>
+                                                        <span className="spinner-small" style={{ width: '12px', height: '12px', borderWidth: '2px', display: 'inline-block' }}></span>
+                                                        <span>กำลังสร้าง PDF 2 หน้า...</span>
+                                                      </>
+                                                    ) : (
+                                                      <>📄 ดูใบตอบรับ e-AR (PDF) ↗</>
+                                                    )}
+                                                  </button>
                                                 )}
                                               </div>
 
