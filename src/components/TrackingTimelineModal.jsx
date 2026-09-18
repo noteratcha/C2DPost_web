@@ -136,7 +136,7 @@ export default function TrackingTimelineModal({ isOpen, barcode, recInfo, curren
       });
     } catch (err) {
       console.error('Failed to open e-AR with tracking:', err);
-      window.open(`/api/reports/ear-pdf?barcode=${encodeURIComponent(barcode)}`, '_blank');
+      alert(`ไม่สามารถเปิดเอกสาร e-AR ได้: ${err.message || 'เกิดข้อผิดพลาด'}`);
     } finally {
       setOpeningEarPdf(false);
     }

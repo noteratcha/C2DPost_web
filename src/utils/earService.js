@@ -22,16 +22,21 @@ export async function fetchEarDetailsClient(barcode, force = false) {
   if (!cleanBarcode) return null;
 
   if (!force && earCache.has(cleanBarcode)) {
-    return earCache.get(cleanBarcode);
+    const cached = earCache.get(cleanBarcode);
+    if (cached && (cached.pdfBlob || cached.pdfBase64)) {
+      return cached;
+    }
   }
 
   try {
     let pdfBlob = null;
+    let pdfBase64 = null;
 
     // 1. Primary Strategy: Request PDF via C2DPost Helper Extension (Domestic Thai IP + No CORS restrictions)
     try {
       const extRes = await fetchEarPdfFromExtension(cleanBarcode);
       if (extRes && extRes.success && extRes.pdfBase64) {
+        pdfBase64 = extRes.pdfBase64;
         const binaryString = atob(extRes.pdfBase64);
         const len = binaryString.length;
         const bytes = new Uint8Array(len);
@@ -61,6 +66,7 @@ export async function fetchEarDetailsClient(barcode, force = false) {
             const blob = await res.blob();
             if (blob.size >= 500) {
               pdfBlob = blob;
+              pdfBase64 = await blobToBase64(blob);
             }
           }
         }
@@ -106,6 +112,7 @@ export async function fetchEarDetailsClient(barcode, force = false) {
       has_ear: true,
       barcode: cleanBarcode,
       pdfBlob: pdfBlob,
+      pdfBase64: pdfBase64,
       blob_url: blobUrl,
       relationship: parsedData.relationship || '',
       delivery_officer: parsedData.delivery_officer || '',
@@ -151,9 +158,9 @@ export async function openEarWithTrackingPdf({
   const cleanBarcode = String(barcode || '').trim().toUpperCase();
   if (!cleanBarcode) return;
 
-  // 1. Get clientEar if not provided or missing blob
+  // 1. Get clientEar if not provided or missing blob/base64
   let earObj = clientEar;
-  if (!earObj || !earObj.pdfBlob) {
+  if (!earObj || (!earObj.pdfBlob && !earObj.pdfBase64 && !earObj.blob_url)) {
     try {
       const fetched = await fetchEarDetailsClient(cleanBarcode);
       if (fetched) earObj = fetched;
@@ -173,14 +180,67 @@ export async function openEarWithTrackingPdf({
     dlStr = `${day}/${month}/${yearBe} ${time} น.`;
   }
 
-  // 3. Prepare client_pdf_base64 if available
-  let clientPdfBase64 = null;
-  if (earObj?.pdfBlob) {
+  // 3. Resolve authentic client_pdf_base64 through multiple priority channels
+  let clientPdfBase64 = earObj?.pdfBase64 || null;
+
+  if (!clientPdfBase64 && earObj?.pdfBlob) {
     try {
       clientPdfBase64 = await blobToBase64(earObj.pdfBlob);
     } catch (bErr) {
       console.warn('blobToBase64 notice:', bErr);
     }
+  }
+
+  if (!clientPdfBase64 && earObj?.blob_url) {
+    try {
+      const resp = await fetch(earObj.blob_url);
+      if (resp.ok) {
+        const b = await resp.blob();
+        clientPdfBase64 = await blobToBase64(b);
+      }
+    } catch (uErr) {
+      console.warn('blob_url fetch notice:', uErr);
+    }
+  }
+
+  // Priority 4: Direct fetch from Chrome extension if still missing
+  if (!clientPdfBase64) {
+    try {
+      const extRes = await fetchEarPdfFromExtension(cleanBarcode);
+      if (extRes && extRes.success && extRes.pdfBase64) {
+        clientPdfBase64 = extRes.pdfBase64;
+      }
+    } catch (extErr) {
+      console.warn('Direct extension fetch in openEar notice:', extErr);
+    }
+  }
+
+  // Priority 5: Force fetch through fetchEarDetailsClient
+  if (!clientPdfBase64) {
+    try {
+      const fresh = await fetchEarDetailsClient(cleanBarcode, true);
+      if (fresh?.pdfBase64) {
+        clientPdfBase64 = fresh.pdfBase64;
+      } else if (fresh?.pdfBlob) {
+        clientPdfBase64 = await blobToBase64(fresh.pdfBlob);
+      }
+    } catch (frErr) {
+      console.warn('Force fetchEarDetailsClient notice:', frErr);
+    }
+  }
+
+  // Safeguard: If authentic e-AR PDF could not be obtained from browser/extension,
+  // DO NOT send empty PDF to server (which would generate a broken placeholder or fail).
+  if (!clientPdfBase64) {
+    alert(
+      '⚠️ ไม่สามารถเปิดใบตอบรับ e-AR ฉบับจริงได้ในขณะนี้\n\n' +
+      'ระบบไม่สามารถดึงไฟล์ PDF ใบตอบรับจากระบบไปรษณีย์ไทยได้\n\n' +
+      'กรุณาตรวจสอบว่า:\n' +
+      '1. มีการติดตั้งและเปิดใช้งานส่วนขยาย "C2DPost Helper" ในเบราว์เซอร์ Chrome แล้ว\n' +
+      '2. หากเพิ่งติดตั้งหรือเปิดใช้งาน ให้กดปุ่ม Refresh (F5) หน้านี้อีกครั้ง\n' +
+      '3. ตรวจสอบการเชื่อมต่ออินเทอร์เน็ต'
+    );
+    return;
   }
 
   const payload = {
@@ -212,8 +272,22 @@ export async function openEarWithTrackingPdf({
     const fileUrl = URL.createObjectURL(blob);
     window.open(fileUrl, '_blank');
   } catch (err) {
-    console.warn('Error fetching 2-page e-AR PDF, falling back to direct URL:', err);
-    window.open(`${API_BASE}/reports/ear-pdf?barcode=${encodeURIComponent(cleanBarcode)}`, '_blank');
+    console.warn('Error creating 2-page e-AR PDF, opening authentic 1-page e-AR directly:', err);
+    if (earObj?.blob_url) {
+      window.open(earObj.blob_url, '_blank');
+    } else if (clientPdfBase64) {
+      try {
+        const binStr = atob(clientPdfBase64);
+        const bytes = new Uint8Array(binStr.length);
+        for (let i = 0; i < binStr.length; i++) bytes[i] = binStr.charCodeAt(i);
+        const singleBlob = new Blob([bytes], { type: 'application/pdf' });
+        window.open(URL.createObjectURL(singleBlob), '_blank');
+      } catch (e) {
+        alert('เกิดข้อผิดพลาดในการเปิดไฟล์ใบตอบรับ e-AR');
+      }
+    } else {
+      alert(`ไม่สามารถเปิดไฟล์ใบตอบรับ e-AR ได้: ${err.message || 'เกิดข้อผิดพลาด'}`);
+    }
   }
 }
 

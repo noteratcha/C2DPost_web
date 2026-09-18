@@ -1119,14 +1119,11 @@ def get_ear_pdf(barcode: str):
         if r.status_code == 200 and "application/pdf" in r.headers.get("Content-Type", ""):
             ear_bytes = r.content
 
-        if not ear_bytes:
-            # Create fallback single page document
-            import fitz
-            fallback_doc = fitz.open()
-            p = fallback_doc.new_page(width=595.28, height=841.89)
-            p.insert_text((50, 100), f"e-AR Certificate: {barcode}", fontsize=14)
-            p.insert_text((50, 130), "ไม่สามารถดึงภาพใบตอบรับอิเล็กทรอนิกส์จากระบบไปรษณีย์ไทยได้โดยตรง", fontname="helv", fontsize=11)
-            ear_bytes = fallback_doc.tobytes()
+        if not ear_bytes or len(ear_bytes) < 300:
+            raise HTTPException(
+                status_code=404,
+                detail=f"ไม่พบข้อมูลไฟล์ใบตอบรับ e-AR ฉบับจริงสำหรับพัสดุ {barcode} กรุณาตรวจสอบว่าเปิดใช้งานส่วนขยาย C2DPost Helper ใน Chrome แล้วรีเฟรชหน้าเว็บ"
+            )
 
         # Parse e-AR details
         parsed_ear = _parse_ear_pdf_content(ear_bytes)
@@ -1194,14 +1191,12 @@ def create_ear_with_tracking_pdf(req: EarWithTrackingPdfRequest):
         except Exception as ex:
             print(f"[ear-with-tracking] Server fetch error for {barcode}: {ex}")
 
-    # If still no ear_bytes, create fallback single page e-AR placeholder
+    # If still no ear_bytes, do not create a fake plain text placeholder. Raise 404.
     if not ear_bytes or len(ear_bytes) < 300:
-        import fitz
-        fallback_doc = fitz.open()
-        p = fallback_doc.new_page(width=595.28, height=841.89)
-        p.insert_text((50, 100), f"e-AR Certificate: {barcode}", fontsize=14)
-        p.insert_text((50, 130), "ไม่สามารถดึงภาพใบตอบรับอิเล็กทรอนิกส์จากระบบไปรษณีย์ไทยได้โดยตรง", fontname="helv", fontsize=11)
-        ear_bytes = fallback_doc.tobytes()
+        raise HTTPException(
+            status_code=404,
+            detail=f"ไม่พบข้อมูลไฟล์ใบตอบรับ e-AR ฉบับจริงสำหรับพัสดุ {barcode} กรุณาตรวจสอบว่าเปิดใช้งานส่วนขยาย C2DPost Helper ใน Chrome แล้วรีเฟรชหน้าเว็บ"
+        )
 
     # Parse metadata from e-AR if missing in request
     if not req.signature_image or not req.relationship or not req.delivery_officer:

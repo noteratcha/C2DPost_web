@@ -226,7 +226,7 @@ export default function TrackingInquiryView({ currentPerson, records = [], initi
       });
     } catch (err) {
       console.error('Failed to open e-AR with tracking:', err);
-      window.open(`/api/reports/ear-pdf?barcode=${encodeURIComponent(bcode)}`, '_blank');
+      alert(`ไม่สามารถเปิดเอกสาร e-AR ได้: ${err.message || 'เกิดข้อผิดพลาด'}`);
     } finally {
       setOpeningEarBarcode(null);
     }

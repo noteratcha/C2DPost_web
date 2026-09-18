@@ -290,7 +290,7 @@ export function fetchEarPdfFromExtension(barcode) {
     const timeout = setTimeout(() => {
       window.removeEventListener('message', handleResult);
       resolve({ success: false, error: 'Extension e-AR request timeout' });
-    }, 5000);
+    }, 15000);
 
     const handleResult = (event) => {
       if (event.data && event.data.type === 'C2DPOST_EAR_PDF_RESULT' && event.data.requestId === requestId) {
