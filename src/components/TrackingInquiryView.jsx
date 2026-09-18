@@ -568,8 +568,8 @@ export default function TrackingInquiryView({ currentPerson, records = [], initi
                       >
                         <span className="menu-item-icon">📄</span>
                         <div className="menu-item-text">
-                          <span className="menu-item-title">ไฟล์ PDF รวม 1 ฉบับ (Multi-Page)</span>
-                          <span className="menu-item-desc">รวมทุกใบตอบรับในเอกสารเดียว เหมาะสำหรับดูหรือสั่งพิมพ์</span>
+                          <span className="menu-item-title">ไฟล์ PDF รวม (สูงสุด 3 รายการ/หน้า A4)</span>
+                          <span className="menu-item-desc">รวมทุกใบตอบรับในเอกสารเดียว จัดเรียงสูงสุด 3 ฉบับต่อหน้า A4 พร้อมเส้นประสำหรับตัด</span>
                         </div>
                       </button>
                       <button

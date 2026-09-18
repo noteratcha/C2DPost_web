@@ -1211,20 +1211,50 @@ async def batch_ear_pdf(req: BatchEarPdfRequest):
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
-    # Format A: Combined Multi-Page PDF
+    # Format A: Combined Multi-Page PDF (Up to 3 items per A4 page layout)
     if (req.format or "pdf").lower() == "pdf":
         import fitz
         merged_doc = fitz.open()
+
+        PAGE_WIDTH = 595.28
+        PAGE_HEIGHT = 841.89
+        SLOT_HEIGHT = PAGE_HEIGHT / 3.0  # ~280.63 pt
+
+        valid_sub_docs = []
         for bcode in ordered_barcodes:
             item = pdf_map.get(bcode)
             if item and item.get("bytes"):
                 try:
                     sub_doc = fitz.open(stream=item["bytes"], filetype="pdf")
-                    merged_doc.insert_pdf(sub_doc)
+                    if len(sub_doc) > 0:
+                        valid_sub_docs.append((bcode, sub_doc))
                 except Exception as ex:
-                    print(f"[batch-ear-pdf] Error merging PDF for {bcode}: {ex}")
+                    print(f"[batch-ear-pdf] Error opening PDF for {bcode}: {ex}")
 
-        # Fallback if none merged yet
+        target_page = None
+        for idx, (bcode, sub_doc) in enumerate(valid_sub_docs):
+            slot = idx % 3
+            if slot == 0:
+                target_page = merged_doc.new_page(width=PAGE_WIDTH, height=PAGE_HEIGHT)
+
+            try:
+                src_page = sub_doc[0]
+                src_slot_h = src_page.rect.height / 3.0
+                clip_box = fitz.Rect(0, 0, src_page.rect.width, src_slot_h)
+                slot_rect = fitz.Rect(0, slot * SLOT_HEIGHT, PAGE_WIDTH, (slot + 1) * SLOT_HEIGHT)
+
+                target_page.show_pdf_page(slot_rect, sub_doc, 0, clip=clip_box)
+            except Exception as ex:
+                print(f"[batch-ear-pdf] Error placing PDF page for {bcode}: {ex}")
+
+            # Draw subtle dashed cutting guide line between slots
+            if slot > 0 and target_page:
+                y = slot * SLOT_HEIGHT
+                p1 = fitz.Point(15, y)
+                p2 = fitz.Point(PAGE_WIDTH - 15, y)
+                target_page.draw_line(p1, p2, color=(0.78, 0.78, 0.78), dashes="[3 5] 0", width=0.75)
+
+        # Fallback if none placed yet
         if len(merged_doc) == 0:
             for bcode, item in pdf_map.items():
                 try:
@@ -1240,7 +1270,7 @@ async def batch_ear_pdf(req: BatchEarPdfRequest):
             media_type="application/pdf",
             headers={
                 "Content-Disposition": f'attachment; filename="{filename}"',
-                "X-Total-Count": str(len(ordered_barcodes))
+                "X-Total-Count": str(len(valid_sub_docs or ordered_barcodes))
             }
         )
 
