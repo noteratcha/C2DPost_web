@@ -21,12 +21,45 @@ export default function Navbar({
   const [showAboutModal, setShowAboutModal] = useState(false);
   const [isNavMenuOpen, setIsNavMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [isExtLinksExpanded, setIsExtLinksExpanded] = useState(false);
+  const extLinksTimerRef = useRef(null);
   const [isChecking, setIsChecking] = useState(false);
   const [lastCheckTime, setLastCheckTime] = useState('');
   const [apiOldStatus, setApiOldStatus] = useState('loading'); // 'loading' | 'success' | 'danger'
   const [apiNewStatus, setApiNewStatus] = useState('loading'); // 'loading' | 'success' | 'danger'
   const navMenuRef = useRef(null);
   const userMenuRef = useRef(null);
+
+  const startExtLinksTimer = useCallback(() => {
+    if (extLinksTimerRef.current) {
+      clearTimeout(extLinksTimerRef.current);
+    }
+    extLinksTimerRef.current = setTimeout(() => {
+      setIsExtLinksExpanded(false);
+      extLinksTimerRef.current = null;
+    }, 30000);
+  }, []);
+
+  const handleToggleExtLinks = () => {
+    if (isExtLinksExpanded) {
+      if (extLinksTimerRef.current) {
+        clearTimeout(extLinksTimerRef.current);
+        extLinksTimerRef.current = null;
+      }
+      setIsExtLinksExpanded(false);
+    } else {
+      setIsExtLinksExpanded(true);
+      startExtLinksTimer();
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      if (extLinksTimerRef.current) {
+        clearTimeout(extLinksTimerRef.current);
+      }
+    };
+  }, []);
 
   // Proactively synchronize credentials to Chrome extension when user logs in or switches
   useEffect(() => {
@@ -185,43 +218,70 @@ export default function Navbar({
 
                   <div className="nav-tab-divider" role="separator" aria-orientation="vertical"></div>
 
-                  <a
-                    href="https://dpost.thailandpost.com"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="nav-tab-btn nav-tab-ext"
-                    onClick={() => handleOpenExternalService('https://dpost.thailandpost.com')}
-                    title="DPost (Thailand Post) - เข้าสู่ระบบพร้อมส่งข้อมูล Username & Password อัตโนมัติ"
-                  >
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                      <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
-                      <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
-                    </svg>
-                    <span>DPost</span>
-                    <svg className="nav-tab-ext-icon" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <line x1="7" y1="17" x2="17" y2="7"></line>
-                      <polyline points="7 7 17 7 17 17"></polyline>
-                    </svg>
-                  </a>
+                  {/* Expandable Internet Services Group (DPost & e-AR) */}
+                  <div className="nav-ext-group">
+                    <button
+                      type="button"
+                      className={`nav-tab-btn nav-internet-toggle-btn ${isExtLinksExpanded ? 'expanded' : ''}`}
+                      onClick={handleToggleExtLinks}
+                      title={isExtLinksExpanded ? 'บริการออนไลน์ไปรษณีย์ไทย (คลิกเพื่อย่อ หรือจะย่อเองใน 30 วิ)' : 'บริการออนไลน์ไปรษณีย์ไทย (DPost & e-AR) - คลิกเพื่อเปิด'}
+                      aria-expanded={isExtLinksExpanded}
+                      aria-label="บริการออนไลน์ไปรษณีย์ไทย"
+                    >
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="nav-globe-icon">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="2" y1="12" x2="22" y2="12"></line>
+                        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                      </svg>
+                      <span className={`nav-globe-chevron ${isExtLinksExpanded ? 'open' : ''}`}>▾</span>
+                    </button>
 
-                  <a
-                    href="https://e-ar.thailandpost.com/sign-in"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="nav-tab-btn nav-tab-ext"
-                    onClick={() => handleOpenExternalService('https://e-ar.thailandpost.com/sign-in')}
-                    title="e-AR (Electronic Advice) - เข้าสู่ระบบพร้อมส่งข้อมูล Username & Password อัตโนมัติ"
-                  >
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
-                      <polyline points="22,6 12,13 2,6"></polyline>
-                    </svg>
-                    <span>e-AR</span>
-                    <svg className="nav-tab-ext-icon" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <line x1="7" y1="17" x2="17" y2="7"></line>
-                      <polyline points="7 7 17 7 17 17"></polyline>
-                    </svg>
-                  </a>
+                    <div className={`nav-ext-links-wrapper ${isExtLinksExpanded ? 'expanded' : ''}`}>
+                      <a
+                        href="https://dpost.thailandpost.com"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="nav-tab-btn nav-tab-ext"
+                        onClick={() => {
+                          handleOpenExternalService('https://dpost.thailandpost.com');
+                          startExtLinksTimer();
+                        }}
+                        title="DPost (Thailand Post) - เข้าสู่ระบบพร้อมส่งข้อมูล Username & Password อัตโนมัติ"
+                      >
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                          <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
+                          <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
+                        </svg>
+                        <span>DPost</span>
+                        <svg className="nav-tab-ext-icon" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <line x1="7" y1="17" x2="17" y2="7"></line>
+                          <polyline points="7 7 17 7 17 17"></polyline>
+                        </svg>
+                      </a>
+
+                      <a
+                        href="https://e-ar.thailandpost.com/sign-in"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="nav-tab-btn nav-tab-ext"
+                        onClick={() => {
+                          handleOpenExternalService('https://e-ar.thailandpost.com/sign-in');
+                          startExtLinksTimer();
+                        }}
+                        title="e-AR (Electronic Advice) - เข้าสู่ระบบพร้อมส่งข้อมูล Username & Password อัตโนมัติ"
+                      >
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                          <polyline points="22,6 12,13 2,6"></polyline>
+                        </svg>
+                        <span>e-AR</span>
+                        <svg className="nav-tab-ext-icon" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <line x1="7" y1="17" x2="17" y2="7"></line>
+                          <polyline points="7 7 17 7 17 17"></polyline>
+                        </svg>
+                      </a>
+                    </div>
+                  </div>
                 </>
               )}
 

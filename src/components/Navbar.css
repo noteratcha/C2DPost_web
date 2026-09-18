@@ -1684,5 +1684,95 @@
   transform: translate(1px, -1px);
 }
 
+/* ─── Expandable Internet Services Toggle (DPost & e-AR) ─── */
+.nav-ext-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  position: relative;
+}
+
+.nav-internet-toggle-btn {
+  padding: 6px 9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.9);
+  border-radius: 8px;
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  cursor: pointer;
+  position: relative;
+}
+
+.nav-internet-toggle-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+.nav-internet-toggle-btn.expanded {
+  background: rgba(255, 255, 255, 0.22);
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+.nav-globe-icon {
+  flex-shrink: 0;
+  transition: transform 0.3s ease;
+}
+
+.nav-internet-toggle-btn:hover .nav-globe-icon {
+  transform: rotate(20deg);
+}
+
+.nav-globe-chevron {
+  font-size: 0.65rem;
+  line-height: 1;
+  opacity: 0.8;
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease;
+  display: inline-block;
+}
+
+.nav-globe-chevron.open {
+  transform: rotate(180deg);
+  opacity: 1;
+}
+
+/* Horizontal slide & fade wrapper for external service links */
+.nav-ext-links-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 0;
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
+  visibility: hidden;
+  white-space: nowrap;
+  transition: max-width 0.38s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.25s ease, visibility 0.38s ease;
+}
+
+.nav-ext-links-wrapper.expanded {
+  max-width: 280px;
+  opacity: 1;
+  pointer-events: auto;
+  visibility: visible;
+  overflow: visible;
+}
+
+:root[data-theme="dark"] .nav-internet-toggle-btn {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.85);
+}
+
+:root[data-theme="dark"] .nav-internet-toggle-btn:hover,
+:root[data-theme="dark"] .nav-internet-toggle-btn.expanded {
+  background: rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+}
+
 
 
