@@ -1140,6 +1140,53 @@ async def parse_ear_pdf(request: Request):
         return JSONResponse(status_code=500, content={"success": False, "error": str(e)})
 
 
+def _render_thai_footer(page, pos, text, tahoma_font, fontsize=8.0, color=(0.42, 0.42, 0.42)):
+    """
+    Renders Thai text accurately with PyMuPDF TextWriter.
+    Corrects vertical tone mark positioning (่ ้ ๊ ๋ ์) when following upper vowels
+    (ิ ี ึ ื ั ํ) by lifting the tone mark to Level 3, preventing it from being
+    submerged or obscured by the vowel glyph.
+    Falls back to simple insert_text if custom font object is unavailable.
+    """
+    if not tahoma_font:
+        try:
+            page.insert_text(pos, text, fontname="helv", fontsize=fontsize, color=color)
+        except Exception:
+            pass
+        return
+
+    import unicodedata
+    import fitz
+    norm_text = unicodedata.normalize('NFC', text)
+    UPPER_VOWELS = {'\u0e31', '\u0e34', '\u0e35', '\u0e36', '\u0e37', '\u0e4d'}
+    TONE_MARKS = {'\u0e48', '\u0e49', '\u0e4a', '\u0e4b', '\u0e4c'}
+
+    try:
+        tw = fitz.TextWriter(page.rect)
+        x0, y0 = pos
+        curr_x = x0
+        prev_char = ''
+        lift_y = fontsize * 0.28
+
+        for c in norm_text:
+            if c in TONE_MARKS and prev_char in UPPER_VOWELS:
+                tw.append((curr_x, y0 - lift_y), c, font=tahoma_font, fontsize=fontsize)
+            else:
+                tw.append((curr_x, y0), c, font=tahoma_font, fontsize=fontsize)
+                lengths = tahoma_font.char_lengths(c, fontsize)
+                w = lengths[0] if lengths else fontsize * 0.5
+                curr_x += w
+            prev_char = c
+
+        tw.write_text(page, color=color)
+    except Exception as e:
+        print(f"[_render_thai_footer] error: {e}")
+        try:
+            page.insert_text(pos, text, fontname="helv", fontsize=fontsize, color=color)
+        except Exception:
+            pass
+
+
 @app.post("/api/reports/batch-ear-pdf")
 async def batch_ear_pdf(req: BatchEarPdfRequest):
     """
@@ -1274,25 +1321,23 @@ async def batch_ear_pdf(req: BatchEarPdfRequest):
             downloaded_str = f"{now_th.day:02d}/{now_th.month:02d}/{year_be} {now_th.strftime('%H:%M:%S')} น."
 
         font_path = os.path.join(os.path.dirname(__file__), "fonts", "tahoma.ttf")
-        has_tahoma = os.path.exists(font_path)
+        tahoma_font = None
+        if os.path.exists(font_path):
+            try:
+                tahoma_font = fitz.Font(fontfile=font_path)
+            except Exception as fe:
+                print(f"[batch-ear-pdf] Error loading tahoma font: {fe}")
+
         total_pages = len(merged_doc)
 
         for pno in range(total_pages):
             p = merged_doc[pno]
-            fontname = "helv"
-            if has_tahoma:
-                try:
-                    p.insert_font(fontname="tahoma", fontfile=font_path)
-                    fontname = "tahoma"
-                except Exception:
-                    fontname = "helv"
-
             footer_left = f"ดาวน์โหลดเมื่อ: {downloaded_str}"
             footer_right = f"หน้า {pno + 1} จาก {total_pages}"
 
             try:
-                p.insert_text((20, 832), footer_left, fontname=fontname, fontsize=7.5, color=(0.42, 0.42, 0.42))
-                p.insert_text((PAGE_WIDTH - 85, 832), footer_right, fontname=fontname, fontsize=7.5, color=(0.42, 0.42, 0.42))
+                _render_thai_footer(p, (20, 832), footer_left, tahoma_font, fontsize=8.0, color=(0.42, 0.42, 0.42))
+                _render_thai_footer(p, (PAGE_WIDTH - 85, 832), footer_right, tahoma_font, fontsize=8.0, color=(0.42, 0.42, 0.42))
             except Exception as ex:
                 print(f"[batch-ear-pdf] Error inserting footer on page {pno + 1}: {ex}")
 
@@ -1318,7 +1363,12 @@ async def batch_ear_pdf(req: BatchEarPdfRequest):
         downloaded_str = f"{now_th.day:02d}/{now_th.month:02d}/{year_be} {now_th.strftime('%H:%M:%S')} น."
 
     font_path = os.path.join(os.path.dirname(__file__), "fonts", "tahoma.ttf")
-    has_tahoma = os.path.exists(font_path)
+    tahoma_font = None
+    if os.path.exists(font_path):
+        try:
+            tahoma_font = fitz.Font(fontfile=font_path)
+        except Exception as fe:
+            print(f"[batch-ear-pdf] Error loading tahoma font for ZIP: {fe}")
 
     zip_buffer = io.BytesIO()
     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
@@ -1333,14 +1383,11 @@ async def batch_ear_pdf(req: BatchEarPdfRequest):
                 ind_doc = fitz.open(stream=raw_pdf_bytes, filetype="pdf")
                 if len(ind_doc) > 0:
                     p = ind_doc[0]
-                    fontname = "helv"
-                    if has_tahoma:
-                        try:
-                            p.insert_font(fontname="tahoma", fontfile=font_path)
-                            fontname = "tahoma"
-                        except Exception:
-                            fontname = "helv"
-                    p.insert_text((20, 832), f"ดาวน์โหลดเมื่อ: {downloaded_str}", fontname=fontname, fontsize=7.5, color=(0.42, 0.42, 0.42))
+                    pw = p.rect.width
+                    ph = p.rect.height
+                    y_pos = ph - 10 if ph > 100 else 832
+                    _render_thai_footer(p, (20, y_pos), f"ดาวน์โหลดเมื่อ: {downloaded_str}", tahoma_font, fontsize=8.0, color=(0.42, 0.42, 0.42))
+                    _render_thai_footer(p, (pw - 85, y_pos), "หน้า 1 จาก 1", tahoma_font, fontsize=8.0, color=(0.42, 0.42, 0.42))
                     raw_pdf_bytes = ind_doc.tobytes()
             except Exception as ex:
                 print(f"[batch-ear-pdf] Error stamping footer on ZIP item {bcode}: {ex}")
