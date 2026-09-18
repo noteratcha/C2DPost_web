@@ -103,6 +103,7 @@ class BatchEarPdfRequest(BaseModel):
     barcodes: List[str]
     format: Optional[str] = "pdf" # "pdf" (merged single document) or "zip" (archive of individual files)
     client_blobs: Optional[List[dict]] = [] # [{barcode, receiver, inv_no, base64}]
+    downloaded_at: Optional[str] = "" # Timestamp string e.g. "18/09/2569 07:08:15 น."
 
 def _normalize_payload_list(raw):
     """Defensively extract a list from various e-Parcel API response shapes."""
@@ -1263,6 +1264,38 @@ async def batch_ear_pdf(req: BatchEarPdfRequest):
                 except Exception:
                     pass
 
+        # Add footer to every page: Download Date/Time and Page number
+        downloaded_str = (req.downloaded_at or "").strip()
+        if not downloaded_str:
+            from datetime import timezone, timedelta
+            tz_th = timezone(timedelta(hours=7))
+            now_th = datetime.now(tz_th)
+            year_be = now_th.year + 543
+            downloaded_str = f"{now_th.day:02d}/{now_th.month:02d}/{year_be} {now_th.strftime('%H:%M:%S')} น."
+
+        font_path = os.path.join(os.path.dirname(__file__), "fonts", "tahoma.ttf")
+        has_tahoma = os.path.exists(font_path)
+        total_pages = len(merged_doc)
+
+        for pno in range(total_pages):
+            p = merged_doc[pno]
+            fontname = "helv"
+            if has_tahoma:
+                try:
+                    p.insert_font(fontname="tahoma", fontfile=font_path)
+                    fontname = "tahoma"
+                except Exception:
+                    fontname = "helv"
+
+            footer_left = f"ดาวน์โหลดเมื่อ: {downloaded_str}"
+            footer_right = f"หน้า {pno + 1} จาก {total_pages}"
+
+            try:
+                p.insert_text((20, 832), footer_left, fontname=fontname, fontsize=7.5, color=(0.42, 0.42, 0.42))
+                p.insert_text((PAGE_WIDTH - 85, 832), footer_right, fontname=fontname, fontsize=7.5, color=(0.42, 0.42, 0.42))
+            except Exception as ex:
+                print(f"[batch-ear-pdf] Error inserting footer on page {pno + 1}: {ex}")
+
         out_bytes = merged_doc.tobytes()
         filename = f"e-AR_Delivered_Combined_{timestamp}.pdf"
         return Response(
@@ -1276,18 +1309,48 @@ async def batch_ear_pdf(req: BatchEarPdfRequest):
 
     # Format B: ZIP Archive containing individual PDF files
     import zipfile
+    downloaded_str = (req.downloaded_at or "").strip()
+    if not downloaded_str:
+        from datetime import timezone, timedelta
+        tz_th = timezone(timedelta(hours=7))
+        now_th = datetime.now(tz_th)
+        year_be = now_th.year + 543
+        downloaded_str = f"{now_th.day:02d}/{now_th.month:02d}/{year_be} {now_th.strftime('%H:%M:%S')} น."
+
+    font_path = os.path.join(os.path.dirname(__file__), "fonts", "tahoma.ttf")
+    has_tahoma = os.path.exists(font_path)
+
     zip_buffer = io.BytesIO()
     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
         for idx, bcode in enumerate(ordered_barcodes, 1):
             item = pdf_map.get(bcode)
             if not item:
                 continue
+
+            raw_pdf_bytes = item["bytes"]
+            try:
+                import fitz
+                ind_doc = fitz.open(stream=raw_pdf_bytes, filetype="pdf")
+                if len(ind_doc) > 0:
+                    p = ind_doc[0]
+                    fontname = "helv"
+                    if has_tahoma:
+                        try:
+                            p.insert_font(fontname="tahoma", fontfile=font_path)
+                            fontname = "tahoma"
+                        except Exception:
+                            fontname = "helv"
+                    p.insert_text((20, 832), f"ดาวน์โหลดเมื่อ: {downloaded_str}", fontname=fontname, fontsize=7.5, color=(0.42, 0.42, 0.42))
+                    raw_pdf_bytes = ind_doc.tobytes()
+            except Exception as ex:
+                print(f"[batch-ear-pdf] Error stamping footer on ZIP item {bcode}: {ex}")
+
             rec_clean = "".join(c for c in item.get("receiver", "") if c.isalnum() or c in (" ", "-", "_")).strip()
             if rec_clean:
                 fname = f"{idx:02d}_e-AR_{bcode}_{rec_clean[:25]}.pdf"
             else:
                 fname = f"{idx:02d}_e-AR_{bcode}.pdf"
-            zf.writestr(fname, item["bytes"])
+            zf.writestr(fname, raw_pdf_bytes)
 
     zip_bytes = zip_buffer.getvalue()
     filename = f"e-AR_Delivered_Archive_{timestamp}.zip"

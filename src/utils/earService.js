@@ -266,7 +266,15 @@ export async function downloadBatchEar({ records, format = 'pdf', onProgress }) 
     throw new Error('ไม่พบข้อมูลเอกสาร e-AR จากไปรษณีย์ไทยสำหรับรายการที่เลือก (ไปรษณีย์ไทยอาจยังไม่ได้สแกนอัปโหลดภาพใบตอบรับเข้าระบบ หรือเพิ่งนำจ่ายสำเร็จวันนี้)');
   }
 
-  // 3. Call backend /api/reports/batch-ear-pdf
+  // 3. Format Thai timestamp for page footer
+  const now = new Date();
+  const d = String(now.getDate()).padStart(2, '0');
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const yBe = now.getFullYear() + 543;
+  const timeStr = now.toTimeString().split(' ')[0]; // "HH:MM:SS"
+  const downloadedAtStr = `${d}/${m}/${yBe} ${timeStr} น.`;
+
+  // 4. Call backend /api/reports/batch-ear-pdf
   const barcodesList = validItems.map((v) => v.barcode);
   const response = await fetch(`${API_BASE}/reports/batch-ear-pdf`, {
     method: 'POST',
@@ -274,7 +282,8 @@ export async function downloadBatchEar({ records, format = 'pdf', onProgress }) 
     body: JSON.stringify({
       barcodes: barcodesList,
       format: format,
-      client_blobs: validBlobs
+      client_blobs: validBlobs,
+      downloaded_at: downloadedAtStr
     })
   });
 
