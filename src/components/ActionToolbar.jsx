@@ -200,6 +200,21 @@ export default function ActionToolbar({
             </button>
           </div>
 
+          {/* ส่งข้อมูล e-Parcel */}
+          <div 
+            className="btn-tooltip-wrapper"
+            data-tooltip={"ต้องดึงหมายเลขบาร์โค้ดก่อน\nจึงจะส่งข้อมูล e-Parcel ได้"}
+          >
+            <button
+              type="button"
+              className="btn-card-action btn-send-api"
+              disabled={!canSendApi}
+              onClick={onSendEparcel}
+            >
+              {isSendingApi ? 'กำลังส่งข้อมูล...' : 'ส่งข้อมูล e-Parcel'}
+            </button>
+          </div>
+
           {/* ดาวน์โหลดเอกสาร (รวม บันทึกไฟล์ + สร้างจ่าหน้าซอง เข้าเป็นปุ่มเดียว) */}
           <div 
             className={`btn-tooltip-wrapper download-docs-wrapper ${isDownloadMenuOpen ? 'dropdown-active' : ''}`}
@@ -404,21 +419,6 @@ export default function ActionToolbar({
                 </div>
               </div>
             )}
-          </div>
-
-          {/* ส่งข้อมูล e-Parcel */}
-          <div 
-            className="btn-tooltip-wrapper"
-            data-tooltip={"ต้องดึงหมายเลขบาร์โค้ดก่อน\nจึงจะส่งข้อมูล e-Parcel ได้"}
-          >
-            <button
-              type="button"
-              className="btn-card-action btn-send-api"
-              disabled={!canSendApi}
-              onClick={onSendEparcel}
-            >
-              {isSendingApi ? 'กำลังส่งข้อมูล...' : 'ส่งข้อมูล e-Parcel'}
-            </button>
           </div>
         </div>
       </div>
