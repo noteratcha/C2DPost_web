@@ -137,25 +137,12 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
   const [selectedBarcodes, setSelectedBarcodes] = useState(new Set());
   const [isDownloadingEar, setIsDownloadingEar] = useState(false);
   const [earProgressText, setEarProgressText] = useState('');
-  const [showEarDropdown, setShowEarDropdown] = useState(false);
   const [earHelpModal, setEarHelpModal] = useState({
     isOpen: false,
     reason: 'installed_old',
     currentVersion: '',
     message: ''
   });
-  const earDropdownRef = useRef(null);
-
-  // Close e-AR dropdown when clicking outside
-  useEffect(() => {
-    function handleClickOutside(e) {
-      if (earDropdownRef.current && !earDropdownRef.current.contains(e.target)) {
-        setShowEarDropdown(false);
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
 
   // Handle live tracking update from modal when viewed
   const handleTrackingUpdated = useCallback((bcode, trackResult) => {
@@ -1178,86 +1165,40 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
             )}
 
             <div className="deposit-footer-actions">
-              {/* Batch e-AR Download Split Button */}
-              <div className="ear-download-split-wrap" ref={earDropdownRef}>
-                <button
-                  type="button"
-                  className={`btn-footer-ear-main ${selectedBarcodes.size > 0 ? 'has-selection' : ''}`}
-                  onClick={() => handleBatchDownloadEar('pdf')}
-                  disabled={isDownloadingEar || deliveredCount === 0}
-                  title={
-                    deliveredCount === 0
-                      ? 'ไม่มีรายการที่นำจ่ายสำเร็จสำหรับดาวน์โหลด e-AR'
-                      : selectedBarcodes.size > 0
-                      ? `คลิกดาวน์โหลด PDF รวม e-AR ที่เลือก (${selectedDeliveredRecords.length} รายการ) ทันที`
-                      : `คลิกดาวน์โหลด PDF รวม e-AR นำจ่ายสำเร็จ (${filteredDeliveredRecords.length} รายการ) ทันที`
-                  }
-                >
-                  {isDownloadingEar ? (
-                    <>
-                      <span className="spinner-small"></span>
-                      <span>{earProgressText || 'กำลังโหลด e-AR...'}</span>
-                    </>
-                  ) : (
-                    <>
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                        <polyline points="7 10 12 15 17 10"></polyline>
-                        <line x1="12" y1="15" x2="12" y2="3"></line>
-                      </svg>
-                      <span>
-                        {selectedBarcodes.size > 0
-                          ? `โหลด e-AR ที่เลือก (${selectedDeliveredRecords.length})`
-                          : `โหลด e-AR (${filteredDeliveredRecords.length})`}
-                      </span>
-                    </>
-                  )}
-                </button>
-                <button
-                  type="button"
-                  className={`btn-footer-ear-arrow ${selectedBarcodes.size > 0 ? 'has-selection' : ''}`}
-                  onClick={() => setShowEarDropdown((prev) => !prev)}
-                  disabled={isDownloadingEar || deliveredCount === 0}
-                  title="เลือกรูปแบบอื่น (PDF รวม หรือไฟล์ ZIP บีบอัด)"
-                >
-                  ▾
-                </button>
-
-                {showEarDropdown && !isDownloadingEar && (
-                  <div className="ear-download-menu">
-                    <div className="ear-menu-header">
-                      <strong>เลือกรูปแบบดาวน์โหลด e-AR</strong>
-                      <span>
-                        ({selectedBarcodes.size > 0
-                          ? `ที่เลือก ${selectedDeliveredRecords.length} รายการ`
-                          : `นำจ่ายสำเร็จ ${filteredDeliveredRecords.length} รายการ`})
-                      </span>
-                    </div>
-                    <button
-                      type="button"
-                      className="ear-menu-item"
-                      onClick={() => handleBatchDownloadEar('pdf')}
-                    >
-                      <span className="menu-item-icon">📄</span>
-                      <div className="menu-item-text">
-                        <span className="menu-item-title">ไฟล์ PDF รวม (สูงสุด 3 รายการ/หน้า A4)</span>
-                        <span className="menu-item-desc">รวมทุกใบตอบรับในเอกสารเดียว จัดเรียงสูงสุด 3 ฉบับต่อหน้า A4 พร้อมเส้นประสำหรับตัด</span>
-                      </div>
-                    </button>
-                    <button
-                      type="button"
-                      className="ear-menu-item"
-                      onClick={() => handleBatchDownloadEar('zip')}
-                    >
-                      <span className="menu-item-icon">📦</span>
-                      <div className="menu-item-text">
-                        <span className="menu-item-title">ไฟล์ ZIP บีบอัด (แยกรายพัสดุ)</span>
-                        <span className="menu-item-desc">แยกไฟล์ PDF แยกตามลำดับ, บาร์โค้ด และชื่อผู้รับ</span>
-                      </div>
-                    </button>
-                  </div>
+              {/* Batch e-AR Download Button (PDF Direct) */}
+              <button
+                type="button"
+                className={`btn-footer-ear ${selectedBarcodes.size > 0 ? 'has-selection' : ''}`}
+                onClick={() => handleBatchDownloadEar('pdf')}
+                disabled={isDownloadingEar || deliveredCount === 0}
+                title={
+                  deliveredCount === 0
+                    ? 'ไม่มีรายการที่นำจ่ายสำเร็จสำหรับดาวน์โหลด e-AR'
+                    : selectedBarcodes.size > 0
+                    ? `คลิกดาวน์โหลด PDF รวม e-AR ที่เลือก (${selectedDeliveredRecords.length} รายการ)`
+                    : `คลิกดาวน์โหลด PDF รวม e-AR นำจ่ายสำเร็จ (${filteredDeliveredRecords.length} รายการ)`
+                }
+              >
+                {isDownloadingEar ? (
+                  <>
+                    <span className="spinner-small"></span>
+                    <span>{earProgressText || 'กำลังโหลด e-AR...'}</span>
+                  </>
+                ) : (
+                  <>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                      <polyline points="7 10 12 15 17 10"></polyline>
+                      <line x1="12" y1="15" x2="12" y2="3"></line>
+                    </svg>
+                    <span>
+                      {selectedBarcodes.size > 0
+                        ? `โหลด e-AR ที่เลือก (${selectedDeliveredRecords.length})`
+                        : `โหลด e-AR (${filteredDeliveredRecords.length})`}
+                    </span>
+                  </>
                 )}
-              </div>
+              </button>
 
               <button
                 type="button"

@@ -85,18 +85,6 @@ export default function TrackingInquiryView({ currentPerson, records = [], initi
   // Batch e-AR download states
   const [isDownloadingEar, setIsDownloadingEar] = useState(false);
   const [earProgressText, setEarProgressText] = useState('');
-  const [showEarDropdown, setShowEarDropdown] = useState(false);
-  const earDropdownRef = useRef(null);
-
-  useEffect(() => {
-    function handleClickOutside(e) {
-      if (earDropdownRef.current && !earDropdownRef.current.contains(e.target)) {
-        setShowEarDropdown(false);
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
 
   // Available barcodes from current session workspace
   const availableBarcodes = useMemo(() => {
@@ -521,71 +509,29 @@ export default function TrackingInquiryView({ currentPerson, records = [], initi
 
             <div className="results-expand-actions">
               {summary.delivered > 0 && (
-                <div className="ear-download-split-wrap" ref={earDropdownRef}>
-                  <button
-                    type="button"
-                    className="btn-footer-ear-main"
-                    onClick={() => handleBatchDownloadEar('pdf')}
-                    disabled={isDownloadingEar}
-                    title={`คลิกดาวน์โหลด PDF รวม e-AR (${summary.delivered} รายการ) ทันที`}
-                  >
-                    {isDownloadingEar ? (
-                      <>
-                        <span className="spinner-small"></span>
-                        <span>กำลังโหลด e-AR...</span>
-                      </>
-                    ) : (
-                      <>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                          <polyline points="7 10 12 15 17 10"></polyline>
-                          <line x1="12" y1="15" x2="12" y2="3"></line>
-                        </svg>
-                        <span>โหลด e-AR ({summary.delivered})</span>
-                      </>
-                    )}
-                  </button>
-                  <button
-                    type="button"
-                    className="btn-footer-ear-arrow"
-                    onClick={() => setShowEarDropdown((prev) => !prev)}
-                    disabled={isDownloadingEar}
-                    title="เลือกรูปแบบอื่น (PDF รวม หรือไฟล์ ZIP แยกรายพัสดุ)"
-                  >
-                    ▾
-                  </button>
-
-                  {showEarDropdown && !isDownloadingEar && (
-                    <div className="ear-download-menu">
-                      <div className="ear-menu-header">
-                        <strong>เลือกรูปแบบดาวน์โหลด e-AR</strong>
-                        <span>(นำจ่ายสำเร็จ {summary.delivered} รายการ)</span>
-                      </div>
-                      <button
-                        type="button"
-                        className="ear-menu-item"
-                        onClick={() => handleBatchDownloadEar('pdf')}
-                      >
-                        <span className="menu-item-icon">📄</span>
-                        <div className="menu-item-text">
-                          <span className="menu-item-title">ไฟล์ PDF รวม (สูงสุด 3 รายการ/หน้า A4)</span>
-                          <span className="menu-item-desc">รวมทุกใบตอบรับในเอกสารเดียว จัดเรียงสูงสุด 3 ฉบับต่อหน้า A4 พร้อมเส้นประสำหรับตัด</span>
-                        </div>
-                      </button>
-                      <button
-                        type="button"
-                        className="ear-menu-item"
-                        onClick={() => handleBatchDownloadEar('zip')}
-                      >
-                        <span className="menu-item-icon">📦</span>
-                        <div className="menu-item-text">
-                          <span className="menu-item-title">ไฟล์ ZIP บีบอัด (แยกรายพัสดุ)</span>
-                          <span className="menu-item-desc">แยกไฟล์ PDF แยกตามลำดับ, บาร์โค้ด และชื่อผู้รับ</span>
-                        </div>
-                      </button>
-                    </div>
+                <button
+                  type="button"
+                  className="btn-footer-ear"
+                  onClick={() => handleBatchDownloadEar('pdf')}
+                  disabled={isDownloadingEar}
+                  title={`คลิกดาวน์โหลด PDF รวม e-AR (${summary.delivered} รายการ)`}
+                >
+                  {isDownloadingEar ? (
+                    <>
+                      <span className="spinner-small"></span>
+                      <span>กำลังโหลด e-AR...</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="7 10 12 15 17 10"></polyline>
+                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                      </svg>
+                      <span>โหลด e-AR ({summary.delivered})</span>
+                    </>
                   )}
-                </div>
+                </button>
               )}
 
               <button

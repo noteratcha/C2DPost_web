@@ -69,18 +69,6 @@ export default function DepositReportModal({ isOpen, onClose, currentPerson, onS
   // Batch e-AR download states
   const [isDownloadingEar, setIsDownloadingEar] = useState(false);
   const [earProgressText, setEarProgressText] = useState('');
-  const [showEarDropdown, setShowEarDropdown] = useState(false);
-  const earDropdownRef = useRef(null);
-
-  useEffect(() => {
-    function handleClickOutside(e) {
-      if (earDropdownRef.current && !earDropdownRef.current.contains(e.target)) {
-        setShowEarDropdown(false);
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
 
   // Fetch report function (accepts start & end dates)
   const handleFetchReport = useCallback(async (startToFetch, endToFetch) => {
@@ -966,76 +954,34 @@ export default function DepositReportModal({ isOpen, onClose, currentPerson, onS
           )}
 
           <div className="footer-action-buttons">
-            {/* Batch e-AR Download Split Button */}
-            <div className="ear-download-split-wrap" ref={earDropdownRef}>
-              <button
-                type="button"
-                className="btn-footer-ear-main"
-                onClick={() => handleBatchDownloadEar('pdf')}
-                disabled={loading || isDownloadingEar || deliveredCount === 0}
-                title={
-                  deliveredCount === 0
-                    ? 'ไม่มีรายการที่นำจ่ายสำเร็จสำหรับดาวน์โหลด e-AR'
-                    : `คลิกดาวน์โหลด PDF รวม e-AR (${deliveredCount} รายการ) ทันที`
-                }
-              >
-                {isDownloadingEar ? (
-                  <>
-                    <span className="deposit-spinner small"></span>
-                    <span>{earProgressText || 'กำลังโหลด e-AR...'}</span>
-                  </>
-                ) : (
-                  <>
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                      <polyline points="7 10 12 15 17 10"></polyline>
-                      <line x1="12" y1="15" x2="12" y2="3"></line>
-                    </svg>
-                    <span>โหลด e-AR ({deliveredCount})</span>
-                  </>
-                )}
-              </button>
-              <button
-                type="button"
-                className="btn-footer-ear-arrow"
-                onClick={() => setShowEarDropdown((prev) => !prev)}
-                disabled={loading || isDownloadingEar || deliveredCount === 0}
-                title="เลือกรูปแบบอื่น (PDF รวม หรือไฟล์ ZIP แยกรายพัสดุ)"
-              >
-                ▾
-              </button>
-
-              {showEarDropdown && !isDownloadingEar && (
-                <div className="ear-download-menu">
-                  <div className="ear-menu-header">
-                    <strong>เลือกรูปแบบดาวน์โหลด e-AR</strong>
-                    <span>(นำจ่ายสำเร็จ {deliveredCount} รายการ)</span>
-                  </div>
-                  <button
-                    type="button"
-                    className="ear-menu-item"
-                    onClick={() => handleBatchDownloadEar('pdf')}
-                  >
-                    <span className="menu-item-icon">📄</span>
-                    <div className="menu-item-text">
-                      <span className="menu-item-title">ไฟล์ PDF รวม (สูงสุด 3 รายการ/หน้า A4)</span>
-                      <span className="menu-item-desc">รวมทุกใบตอบรับในเอกสารเดียว จัดเรียงสูงสุด 3 ฉบับต่อหน้า A4 พร้อมเส้นประสำหรับตัด</span>
-                    </div>
-                  </button>
-                  <button
-                    type="button"
-                    className="ear-menu-item"
-                    onClick={() => handleBatchDownloadEar('zip')}
-                  >
-                    <span className="menu-item-icon">📦</span>
-                    <div className="menu-item-text">
-                      <span className="menu-item-title">ไฟล์ ZIP บีบอัด (แยกรายพัสดุ)</span>
-                      <span className="menu-item-desc">แยกไฟล์ PDF แยกตามลำดับ, บาร์โค้ด และชื่อผู้รับ</span>
-                    </div>
-                  </button>
-                </div>
+            {/* Batch e-AR Download Button (PDF Direct) */}
+            <button
+              type="button"
+              className="btn-footer-ear"
+              onClick={() => handleBatchDownloadEar('pdf')}
+              disabled={loading || isDownloadingEar || deliveredCount === 0}
+              title={
+                deliveredCount === 0
+                  ? 'ไม่มีรายการที่นำจ่ายสำเร็จสำหรับดาวน์โหลด e-AR'
+                  : `คลิกดาวน์โหลด PDF รวม e-AR (${deliveredCount} รายการ)`
+              }
+            >
+              {isDownloadingEar ? (
+                <>
+                  <span className="deposit-spinner small"></span>
+                  <span>{earProgressText || 'กำลังโหลด e-AR...'}</span>
+                </>
+              ) : (
+                <>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="7 10 12 15 17 10"></polyline>
+                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                  </svg>
+                  <span>โหลด e-AR ({deliveredCount})</span>
+                </>
               )}
-            </div>
+            </button>
 
             <button
               type="button"
