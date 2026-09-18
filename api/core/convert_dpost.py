@@ -37,7 +37,7 @@ except Exception as e:
     print(f"Error registering fonts: {e}")
     FONT_REGISTERED = False
 
-__version__ = "2026.0918.0725"
+__version__ = "2026.0918.1345"
 
 # Thailand Post API Credentials
 API_KEY = "V9JN25IFH5hdZYc1k8NNRVgnLYXyQLzc"
@@ -175,9 +175,19 @@ def normalize_pdf_text(text):
     """Normalize decomposed Thai vowels and spacing from PDF text stream."""
     if not text:
         return ""
+    # Normalize consonant + space + ำ (U+0E33) -> consonant + ำ
+    text = re.sub(r'([ก-ฮ])\s+ำ', r'\1ำ', text)
     # Normalize decomposed Sara Am (U+0E33): consonant + space + า -> consonant + ำ
     text = re.sub(r'([ก-ฮ])\s+า', r'\1ำ', text)
-    text = text.replace('ส านักงาน', 'สำนักงาน') \
+    # Normalize font-specific corruptions where า was misencoded as ำ or separated
+    text = text.replace('สำนักงำน', 'สำนักงาน') \
+               .replace('สำขำ', 'สาขา') \
+               .replace('ชำระค่ำ', 'ชำระค่า') \
+               .replace('ค่ำฝำกส่ง', 'ค่าฝากส่ง') \
+               .replace('ฝำกส่ง', 'ฝากส่ง') \
+               .replace('รำยเดือน', 'รายเดือน') \
+               .replace('ใบอนุญำต', 'ใบอนุญาต') \
+               .replace('ส านักงาน', 'สำนักงาน') \
                .replace('ต าบล', 'ตำบล') \
                .replace('อ าเภอ', 'อำเภอ') \
                .replace('ช าระ', 'ชำระ') \
@@ -246,6 +256,11 @@ def parse_receiver_label(text):
         return None
         
     receiver_name = re.sub(r'^เรียน\s*', '', lines[start_idx]).strip()
+    if not receiver_name and start_idx + 1 < len(lines):
+        next_line = lines[start_idx + 1].strip()
+        if not any(k in next_line for k in ['โฉนด', 'ที่ดิน', 'หน้าสำรวจ', 'ระวาง', 'คำขอ', 'ตำบล', 'อำเภอ', 'จังหวัด', 'หมู่ที่']):
+            receiver_name = next_line
+            start_idx += 1
     
     # Collect subsequent lines until a zipcode is found
     # IMPORTANT: Ignore lines mentioning land title deed/survey numbers (e.g. โฉนดที่ดินเลขที่ 19583)
@@ -374,9 +389,13 @@ def parse_envelope_label(text):
     shipper_addr = ""
     for i, line in enumerate(raw_lines):
         if "สำนักงานที่ดิน" in line:
-            shipper_name = line
+            shipper_name = line[line.find("สำนักงานที่ดิน"):]
+            if re.search(r'\s{3,}(?:ชำระ|ใบอนุญาต|ไปรษณีย์|ปณ\.)', shipper_name):
+                shipper_name = re.split(r'\s{3,}(?:ชำระ|ใบอนุญาต|ไปรษณีย์|ปณ\.)', shipper_name)[0].strip()
             if i + 1 < len(raw_lines):
                 next_l = raw_lines[i+1]
+                if re.search(r'\s{3,}(?:ชำระ|ใบอนุญาต|ไปรษณีย์|ปณ\.)', next_l):
+                    next_l = re.split(r'\s{3,}(?:ชำระ|ใบอนุญาต|ไปรษณีย์|ปณ\.)', next_l)[0].strip()
                 if any(c.isdigit() for c in clean_thai_digits(next_l)) and any(k in next_l for k in ['หมู่', 'ตำบล', 'ต.', 'อำเภอ', 'อ.']):
                     shipper_addr = next_l
             break
@@ -529,6 +548,10 @@ def parse_shipper_label(text):
         else:
             shipper_name = raw_name
             
+        # Clean up right-aligned postage permit block if present in 2D layout
+        if re.search(r'\s{3,}(?:ชำระ|ใบอนุญาต|ไปรษณีย์|ปณ\.)', shipper_name):
+            shipper_name = re.split(r'\s{3,}(?:ชำระ|ใบอนุญาต|ไปรษณีย์|ปณ\.)', shipper_name)[0].strip()
+            
         # Attempt to extract ref_no if it was merged into the shipper_name line
         ref_match = re.search(r'ที่\s*([ก-ฮa-zA-Z\.]+\s*[๐-๙0-9\.\/]+)', raw_name)
         if ref_match:
@@ -539,6 +562,9 @@ def parse_shipper_label(text):
         addr_parts = []
         for j in range(shipper_idx + 1, min(shipper_idx + 6, len(lines))):
             line = lines[j]
+            # Clean up right-aligned postage permit block if present
+            if re.search(r'\s{3,}(?:ชำระ|ใบอนุญาต|ไปรษณีย์|ปณ\.)', line):
+                line = re.split(r'\s{3,}(?:ชำระ|ใบอนุญาต|ไปรษณีย์|ปณ\.)', line)[0].strip()
             # Stop if we hit reference number, receiver, or non-address narrative block
             if (line.startswith("ที่") or line.startswith("เรียน") or line.startswith("วันที่") or 
                 "ผู้ขอรังวัด" in line or "นายช่างรังวัด" in line or "ฝ่ายรังวัด" in line or "ท.ด." in line or
@@ -556,6 +582,8 @@ def parse_shipper_label(text):
             # Ensure correct formatting (e.g. อ.เรณูนคร จ.นครพนม)
             addr_conv = re.sub(r'อำเภอ/เขต|อำเภอ|อ\.', 'อ.', addr_conv)
             addr_conv = re.sub(r'จังหวัด|จ\.', 'จ.', addr_conv)
+            if re.search(r'\s{3,}(?:ชำระ|ใบอนุญาต|ไปรษณีย์|ปณ\.)', addr_conv):
+                addr_conv = re.split(r'\s{3,}(?:ชำระ|ใบอนุญาต|ไปรษณีย์|ปณ\.)', addr_conv)[0].strip()
             shipper_address = addr_conv
 
         # If shipper_address is empty or doesn't have a 5-digit postal code, scan lines for an address line with postal code
@@ -594,6 +622,21 @@ def parse_shipper_label(text):
         'REF NO': ref_no
     }
 
+def extract_page_text_robust(page):
+    """
+    Extracts both standard and layout-preserved text streams from a PDF page,
+    normalizing decomposed Thai vowels and spacing.
+    """
+    raw_text = page.extract_text() or ""
+    text = normalize_pdf_text(raw_text)
+    layout_text = ""
+    try:
+        raw_layout = page.extract_text(extraction_mode="layout") or ""
+        layout_text = normalize_pdf_text(raw_layout)
+    except Exception:
+        pass
+    return text, layout_text
+
 def process_pdf(pdf_path):
     print(f"กำลังประมวลผลไฟล์: {os.path.basename(pdf_path)}...")
     reader = PdfReader(pdf_path)
@@ -618,57 +661,68 @@ def process_pdf(pdf_path):
         return s
 
     for page in reader.pages:
-        text = normalize_pdf_text(page.extract_text() or "")
-        shipper_info = parse_shipper_label(text)
-        if shipper_info:
-            name = shipper_info.get('SHIPPER NAME', '')
-            addr = shipper_info.get('SHIPPER ADDRESS', '')
-            if len(name) > len(best_shipper_name):
-                best_shipper_name = name
-            if score_shipper_addr(addr) > score_shipper_addr(best_shipper_address):
-                best_shipper_address = addr
+        text, layout_text = extract_page_text_robust(page)
+        for t in [text, layout_text]:
+            if not t: continue
+            shipper_info = parse_shipper_label(t)
+            if shipper_info:
+                name = shipper_info.get('SHIPPER NAME', '')
+                addr = shipper_info.get('SHIPPER ADDRESS', '')
+                if len(name) > len(best_shipper_name):
+                    best_shipper_name = name
+                if score_shipper_addr(addr) > score_shipper_addr(best_shipper_address):
+                    best_shipper_address = addr
+                    
+            # Also check envelope shipper info if available
+            env_info = parse_envelope_label(t)
+            if env_info:
+                env_name = env_info.get('SHIPPER NAME', '')
+                env_addr = env_info.get('SHIPPER ADDRESS', '')
+                if env_name and len(env_name) > len(best_shipper_name):
+                    best_shipper_name = env_name
+                if env_addr and score_shipper_addr(env_addr) > score_shipper_addr(best_shipper_address):
+                    best_shipper_address = env_addr
+                    
+            tel = extract_tel(t)
+            if len(tel) > len(best_shipper_tel):
+                best_shipper_tel = tel
                 
-        # Also check envelope shipper info if available
-        env_info = parse_envelope_label(text)
-        if env_info:
-            env_name = env_info.get('SHIPPER NAME', '')
-            env_addr = env_info.get('SHIPPER ADDRESS', '')
-            if env_name and len(env_name) > len(best_shipper_name):
-                best_shipper_name = env_name
-            if env_addr and score_shipper_addr(env_addr) > score_shipper_addr(best_shipper_address):
-                best_shipper_address = env_addr
-                
-        tel = extract_tel(text)
-        if len(tel) > len(best_shipper_tel):
-            best_shipper_tel = tel
-            
-        # Extract form type (e.g. (ท.ด. ๓๘) -> ท.ด. 38, (ท.ด. ๓๘ ค.) -> ท.ด. 38 ค.) if not found yet
-        if not product_in_box:
-            form_match = re.search(r'\(\s*(ท\s*\.\s*ด\s*\.\s*[๐-๙0-9]+(?:\s*[ก-ฮ]\.?)?)\s*\)', text)
-            if form_match:
-                extracted = form_match.group(1).strip()
-                # Convert Thai numbers to Arabic
-                extracted = extracted.translate(THAI_TO_ARABIC)
-                # Clean up spaces
-                product_in_box = re.sub(r'\s+', ' ', extracted)
-            else:
-                # Fallback to extract from "เรื่อง ..." or specific document titles
-                # Use negative lookbehind (?<!รับ) to prevent matching "รับเรื่อง"
-                subject_match = re.search(r'(?<!รับ)เรื่อง\s+([^\n]+)', text)
-                if "หนังสือมอบเรื่องการระวังชี้แนวเขตและลงชื่อรับรองเขตที่ดิน" in text or "เรื่อง การระวังชี้แนวเขตและลงชื่อรับรองเขตที่ดิน" in text:
-                    product_in_box = "-"
-                elif "แจ้งการปักหลักเขตที่ดิน" in text or "ท.ด. 38 ค" in text or "ท.ด. ๓๘ ค" in text:
-                    product_in_box = "ท.ด. 38 ค."
-                elif subject_match:
-                    product_in_box = subject_match.group(1).strip()
-                elif "ออกโฉนดที่ดิน" in text:
-                    product_in_box = "ออกโฉนดที่ดิน"
+            # Extract form type (e.g. (ท.ด. ๓๘) -> ท.ด. 38, (ท.ด. ๓๘ ค.) -> ท.ด. 38 ค.) if not found yet
+            if not product_in_box:
+                form_match = re.search(r'\(\s*(ท\s*\.\s*ด\s*\.\s*[๐-๙0-9]+(?:\s*[ก-ฮ]\.?)?)\s*\)', t)
+                if form_match:
+                    extracted = form_match.group(1).strip()
+                    # Convert Thai numbers to Arabic
+                    extracted = extracted.translate(THAI_TO_ARABIC)
+                    # Clean up spaces
+                    product_in_box = re.sub(r'\s+', ' ', extracted)
+                else:
+                    # Fallback to extract from "เรื่อง ..." or specific document titles
+                    # Use negative lookbehind (?<!รับ) to prevent matching "รับเรื่อง"
+                    subject_match = re.search(r'(?<!รับ)เรื่อง\s+([^\n]+)', t)
+                    if "หนังสือมอบเรื่องการระวังชี้แนวเขตและลงชื่อรับรองเขตที่ดิน" in t or "เรื่อง การระวังชี้แนวเขตและลงชื่อรับรองเขตที่ดิน" in t:
+                        product_in_box = "-"
+                    elif "แจ้งการปักหลักเขตที่ดิน" in t or "ท.ด. 38 ค" in t or "ท.ด. ๓๘ ค" in t:
+                        product_in_box = "ท.ด. 38 ค."
+                    elif subject_match:
+                        product_in_box = subject_match.group(1).strip()
+                    elif "ออกโฉนดที่ดิน" in t:
+                        product_in_box = "ออกโฉนดที่ดิน"
             
     # Clean product in box prefix if present
     if product_in_box:
         product_in_box = product_in_box.replace("ขอให้ไปดำเนินการเรื่อง", "").strip()
 
     # 2. Post-process the shipper info based on the rules:
+    if "ฝ่ายรังวัด สำนักงานที่ดิน" in best_shipper_name:
+        best_shipper_name = best_shipper_name[best_shipper_name.find("ฝ่ายรังวัด สำนักงานที่ดิน"):]
+    elif "สำนักงานที่ดิน" in best_shipper_name:
+        best_shipper_name = best_shipper_name[best_shipper_name.find("สำนักงานที่ดิน"):]
+    if re.search(r'\s{3,}(?:ชำระ|ใบอนุญาต|ไปรษณีย์|ปณ\.)', best_shipper_name):
+        best_shipper_name = re.split(r'\s{3,}(?:ชำระ|ใบอนุญาต|ไปรษณีย์|ปณ\.)', best_shipper_name)[0].strip()
+    if re.search(r'\s{3,}(?:ชำระ|ใบอนุญาต|ไปรษณีย์|ปณ\.)', best_shipper_address):
+        best_shipper_address = re.split(r'\s{3,}(?:ชำระ|ใบอนุญาต|ไปรษณีย์|ปณ\.)', best_shipper_address)[0].strip()
+
     # Rule 2: "ถ้าข้อมูลที่คอลัมน์ G (SHIPPER ADDRESS) ว่าง ให้ไปเอาข้อมูลวรรคสุดท้ายของ F (SHIPPER NAME) มาใส่ และลบข้อความนั้นออกจากคอลัมน์ F"
     if not best_shipper_address and best_shipper_name:
         parts = [p.strip() for p in best_shipper_name.split() if p.strip()]
@@ -747,12 +801,13 @@ def process_pdf(pdf_path):
     
     # 3. Process each page to associate receiver details with the best shipper info
     for i in range(len(reader.pages)):
-        text = normalize_pdf_text(reader.pages[i].extract_text() or "")
+        page = reader.pages[i]
+        text, layout_text = extract_page_text_robust(page)
         
         receiver_info = None
         ref_no = ""
         
-        # Check standard receiver block with "เรียน"
+        # 1. Check standard receiver block with "เรียน" on text
         if "เรียน" in text and any(char.isdigit() or char in "๐๑๒๓๔๕๖๗๘๙" for char in text):
             receiver_info = parse_receiver_label(text)
             if receiver_info:
@@ -763,22 +818,40 @@ def process_pdf(pdf_path):
                     prev_shipper = parse_shipper_label(prev_text)
                     ref_no = prev_shipper.get('REF NO', '')
 
-        # Check envelope label (covers envelopes with "ผู้รับ" or inverted layout)
+        # 2. Check standard receiver block on layout_text if not found or incomplete
+        if (not receiver_info or not receiver_info.get('RECEIVER') or not receiver_info.get('RECEIVER ZIPCODE')) and layout_text:
+            if "เรียน" in layout_text and any(char.isdigit() or char in "๐๑๒๓๔๕๖๗๘๙" for char in layout_text):
+                l_rec = parse_receiver_label(layout_text)
+                if l_rec and l_rec.get('RECEIVER') and l_rec.get('RECEIVER ZIPCODE'):
+                    receiver_info = l_rec
+                    page_shipper = parse_shipper_label(layout_text)
+                    if not ref_no:
+                        ref_no = page_shipper.get('REF NO', '')
+                    if not ref_no and i > 0:
+                        prev_text = normalize_pdf_text(reader.pages[i - 1].extract_text(extraction_mode="layout") or "")
+                        prev_shipper = parse_shipper_label(prev_text)
+                        ref_no = prev_shipper.get('REF NO', '')
+
+        # 3. Check envelope label (covers envelopes with "ผู้รับ" or inverted layout)
         if not receiver_info:
-            env_info = parse_envelope_label(text)
-            if env_info:
-                receiver_info = {
-                    'RECEIVER': env_info['RECEIVER'],
-                    'RECEIVER ADDRESS': env_info['RECEIVER ADDRESS'],
-                    'RECEIVER AMPHUR': env_info['RECEIVER AMPHUR'],
-                    'RECEIVER PROVINCE': env_info['RECEIVER PROVINCE'],
-                    'RECEIVER ZIPCODE': env_info['RECEIVER ZIPCODE']
-                }
-                ref_no = env_info.get('REF NO', '')
-                if not ref_no and i > 0:
-                    prev_text = normalize_pdf_text(reader.pages[i - 1].extract_text() or "")
-                    prev_shipper = parse_shipper_label(prev_text)
-                    ref_no = prev_shipper.get('REF NO', '')
+            for t_candidate in [text, layout_text]:
+                if not t_candidate: continue
+                env_info = parse_envelope_label(t_candidate)
+                if env_info and env_info.get('RECEIVER'):
+                    receiver_info = {
+                        'RECEIVER': env_info['RECEIVER'],
+                        'RECEIVER ADDRESS': env_info['RECEIVER ADDRESS'],
+                        'RECEIVER AMPHUR': env_info['RECEIVER AMPHUR'],
+                        'RECEIVER PROVINCE': env_info['RECEIVER PROVINCE'],
+                        'RECEIVER ZIPCODE': env_info['RECEIVER ZIPCODE']
+                    }
+                    if not ref_no:
+                        ref_no = env_info.get('REF NO', '')
+                    if not ref_no and i > 0:
+                        prev_text = normalize_pdf_text(reader.pages[i - 1].extract_text() or "")
+                        prev_shipper = parse_shipper_label(prev_text)
+                        ref_no = prev_shipper.get('REF NO', '')
+                    break
 
         if receiver_info and receiver_info.get('RECEIVER'):
             record = {
