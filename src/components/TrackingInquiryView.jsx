@@ -271,7 +271,6 @@ export default function TrackingInquiryView({ currentPerson, records = [], initi
   }, [searchItems]);
 
   const handleBatchDownloadEar = async (format = 'pdf') => {
-    setShowEarDropdown(false);
     if (deliveredSearchItems.length === 0) {
       alert('ไม่พบรายการที่นำจ่ายสำเร็จสำหรับดาวน์โหลด e-AR');
       return;

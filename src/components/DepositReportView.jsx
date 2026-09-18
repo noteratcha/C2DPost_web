@@ -543,7 +543,6 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
   };
 
   const handleBatchDownloadEar = async (format = 'pdf') => {
-    setShowEarDropdown(false);
     const targetRecords = selectedBarcodes.size > 0 ? selectedDeliveredRecords : filteredDeliveredRecords;
     if (!targetRecords || targetRecords.length === 0) {
       alert('ไม่พบรายการที่นำจ่ายสำเร็จสำหรับดาวน์โหลด e-AR');

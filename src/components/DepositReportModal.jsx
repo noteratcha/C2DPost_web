@@ -386,7 +386,6 @@ export default function DepositReportModal({ isOpen, onClose, currentPerson, onS
   }, [reportData]);
 
   const handleBatchDownloadEar = async (format = 'pdf') => {
-    setShowEarDropdown(false);
     if (!deliveredRecords || deliveredRecords.length === 0) {
       alert('ไม่พบรายการที่นำจ่ายสำเร็จสำหรับดาวน์โหลด e-AR');
       return;
