@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { fetchTrackingHistory } from '../utils/api';
 import { formatStationWithZipcode } from '../utils/postalUtils';
 import { openEarWithBarcode } from '../utils/extensionBridge';
@@ -12,6 +12,9 @@ export default function TrackingTimelineModal({ isOpen, barcode, recInfo, curren
   const [clientEarData, setClientEarData] = useState(null);
   const [earLoading, setEarLoading] = useState(false);
   const [selectedSigModal, setSelectedSigModal] = useState(null);
+
+  const timelineBodyRef = useRef(null);
+  const latestStepRef = useRef(null);
 
   const handleFetch = useCallback(async (bcode) => {
     if (!bcode) return;
@@ -83,6 +86,31 @@ export default function TrackingTimelineModal({ isOpen, barcode, recInfo, curren
   const sortedEvents = [...events].sort((a, b) => (a.seq || 0) - (b.seq || 0));
   const latestEvent = sortedEvents.length > 0 ? sortedEvents[sortedEvents.length - 1] : null;
   const latestDatetime = trackData?.latest_datetime || latestEvent?.datetime || '';
+
+  // Auto-scroll to latest status on initial display and whenever data updates
+  useEffect(() => {
+    if (!loading && sortedEvents.length > 0 && isOpen) {
+      const scrollToLatest = (behavior = 'smooth') => {
+        if (latestStepRef.current) {
+          latestStepRef.current.scrollIntoView({ behavior, block: 'end' });
+        } else if (timelineBodyRef.current) {
+          timelineBodyRef.current.scrollTo({
+            top: timelineBodyRef.current.scrollHeight,
+            behavior
+          });
+        }
+      };
+
+      // Immediate fast positioning followed by smooth follow-up after images/layout finish
+      const t1 = setTimeout(() => scrollToLatest('auto'), 40);
+      const t2 = setTimeout(() => scrollToLatest('smooth'), 220);
+
+      return () => {
+        clearTimeout(t1);
+        clearTimeout(t2);
+      };
+    }
+  }, [loading, sortedEvents.length, clientEarData, isOpen]);
 
   const [copied, setCopied] = useState(false);
   const handleCopyBarcode = useCallback(() => {
@@ -381,7 +409,7 @@ export default function TrackingTimelineModal({ isOpen, barcode, recInfo, curren
         )}
 
         {/* Timeline Stepper */}
-        <div className="track-timeline-body">
+        <div className="track-timeline-body" ref={timelineBodyRef}>
           {loading ? (
             <div className="track-loading-state">
               <span className="track-spinner large"></span>
@@ -416,38 +444,46 @@ export default function TrackingTimelineModal({ isOpen, barcode, recInfo, curren
                 const isReturned = ev.status_key === 'returned' || /ส่งคืน|ตีกลับ/i.test(descNormalized);
 
                 // Determine step marker dot and class
+                // Rule: Checkmark (✓) is strictly displayed ONLY for the latest status (isLast)
                 let dotContent;
                 let dotClass = '';
                 let itemClass = '';
 
-                if (isDelivered) {
-                  dotContent = '✓';
-                  dotClass = 'delivered';
-                  itemClass = 'delivered-step';
-                } else if (isException) {
-                  dotContent = '⚠️';
-                  dotClass = 'exception';
-                  itemClass = 'exception-step';
-                } else if (isReturned) {
-                  dotContent = '↩';
-                  dotClass = 'returned';
-                  itemClass = 'returned-step';
-                } else if (isReceived) {
-                  dotContent = '✓';
-                  dotClass = 'received';
-                  itemClass = 'received-step';
-                } else if (isLast) {
-                  dotContent = '🚚';
-                  dotClass = 'in-transit-active';
-                  itemClass = 'in-transit-step';
+                if (isLast) {
+                  if (isDelivered) {
+                    dotContent = '✓';
+                    dotClass = 'delivered';
+                    itemClass = 'delivered-step';
+                  } else if (isException) {
+                    dotContent = '⚠️';
+                    dotClass = 'exception';
+                    itemClass = 'exception-step';
+                  } else if (isReturned) {
+                    dotContent = '↩';
+                    dotClass = 'returned';
+                    itemClass = 'returned-step';
+                  } else if (isReceived) {
+                    dotContent = '✓';
+                    dotClass = 'received';
+                    itemClass = 'received-step';
+                  } else {
+                    dotContent = '🚚';
+                    dotClass = 'in-transit-active';
+                    itemClass = 'in-transit-step';
+                  }
                 } else {
+                  // Past steps: ALWAYS show numeric sequence (1, 2, 3...), NEVER show checkmark
                   dotContent = idx + 1;
                   dotClass = 'normal';
-                  itemClass = 'normal-step';
+                  itemClass = isException ? 'exception-step-past' : 'normal-step';
                 }
 
                 return (
-                  <li key={ev.seq || idx} className={`track-step-item ${isLast ? 'last' : ''} ${itemClass}`}>
+                  <li
+                    key={ev.seq || idx}
+                    ref={isLast ? latestStepRef : null}
+                    className={`track-step-item ${isLast ? 'last' : ''} ${itemClass}`}
+                  >
                     <div className="track-step-marker">
                       <span className={`track-step-dot ${dotClass}`}>
                         {isLast && (isException || dotClass === 'in-transit-active') && (

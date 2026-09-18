@@ -709,8 +709,8 @@ export default function TrackingInquiryView({ currentPerson, records = [], initi
                             return (
                               <div key={evIndex} className={`stepper-item ${isLast ? 'latest' : ''} ${isDelivered ? 'delivered' : ''}`}>
                                 <div className="stepper-rail">
-                                  <div className={`stepper-dot ${isRec || isDelivered ? 'dot-success' : isLast ? 'dot-active' : ''}`}>
-                                    {isRec || isDelivered ? '✓' : evIndex + 1}
+                                  <div className={`stepper-dot ${isLast && (isRec || isDelivered) ? 'dot-success' : isLast ? 'dot-active' : ''}`}>
+                                    {isLast && (isRec || isDelivered) ? '✓' : evIndex + 1}
                                   </div>
                                   {!isLast && <div className="stepper-line"></div>}
                                 </div>

@@ -669,6 +669,12 @@
   z-index: 1;
 }
 
+[data-theme='dark'] .track-step-dot {
+  background: #1e293b;
+  border-color: #334155;
+  color: #94a3b8;
+}
+
 .track-step-dot.delivered {
   background: #059669;
   border-color: #059669;
