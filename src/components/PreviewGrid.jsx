@@ -433,18 +433,7 @@ export default function PreviewGrid({
                     {/* หมายเลข (Barcode) */}
                     <td className="col-barcode">
                       {barcode ? (
-                        <button
-                          type="button"
-                          className="barcode-table-btn"
-                          onClick={() => onViewTracking && onViewTracking(row)}
-                          title={`คลิกเพื่อดูสถานะการตรวจสอบพัสดุ ${barcode}`}
-                        >
-                          <span className="barcode-text has-bcode">{barcode}</span>
-                          <svg className="barcode-inline-track-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-                            <circle cx="11" cy="11" r="8"></circle>
-                            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                          </svg>
-                        </button>
+                        <span className="barcode-text has-bcode">{barcode}</span>
                       ) : (
                         <span className="barcode-text no-bcode">-</span>
                       )}
