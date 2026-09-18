@@ -513,7 +513,7 @@
   background: #059669;
   border-color: #059669;
   color: #ffffff;
-  box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.15);
+  box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.18);
 }
 
 [data-theme='dark'] .stepper-dot.dot-success {
@@ -526,7 +526,21 @@
   background: #0284c7;
   border-color: #0284c7;
   color: #ffffff;
-  box-shadow: 0 0 0 4px rgba(14, 165, 233, 0.15);
+  box-shadow: 0 0 0 4px rgba(14, 165, 233, 0.18);
+}
+
+.stepper-dot.dot-warning {
+  background: #f59e0b;
+  border-color: #d97706;
+  color: #ffffff;
+  box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.18);
+}
+
+.stepper-dot.dot-danger {
+  background: #e11d48;
+  border-color: #be123c;
+  color: #ffffff;
+  box-shadow: 0 0 0 4px rgba(225, 29, 72, 0.18);
 }
 
 .stepper-line {
@@ -550,69 +564,191 @@
   display: flex;
   align-items: center;
   gap: 0.6rem;
-  margin-bottom: 0.35rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.4rem;
 }
 
 .stepper-status-desc {
-  font-size: 1rem;
+  font-size: 0.98rem;
   font-weight: 700;
   color: var(--text-main, #0f172a);
+  line-height: 1.35;
 }
 
-.stepper-tag-rec {
-  font-size: 0.72rem;
-  padding: 0.15rem 0.5rem;
-  border-radius: 4px;
-  background: rgba(16, 185, 129, 0.12);
-  color: #059669;
+.stepper-status-desc.desc-delivered {
+  color: #047857;
+}
+
+.stepper-status-desc.desc-exception {
+  color: #b45309;
+}
+
+.stepper-status-desc.desc-returned {
+  color: #be123c;
+}
+
+.stepper-status-desc.desc-destination {
+  color: #6d28d9;
+}
+
+.stepper-status-desc.desc-dispatch {
+  color: #1d4ed8;
+}
+
+.stepper-status-desc.desc-sorting {
+  color: #0369a1;
+}
+
+.stepper-status-desc.desc-received {
+  color: #0f766e;
+}
+
+[data-theme='dark'] .stepper-status-desc.desc-delivered { color: #34d399; }
+[data-theme='dark'] .stepper-status-desc.desc-exception { color: #fbbf24; }
+[data-theme='dark'] .stepper-status-desc.desc-returned { color: #fb7185; }
+[data-theme='dark'] .stepper-status-desc.desc-destination { color: #c084fc; }
+[data-theme='dark'] .stepper-status-desc.desc-dispatch { color: #60a5fa; }
+[data-theme='dark'] .stepper-status-desc.desc-sorting { color: #38bdf8; }
+[data-theme='dark'] .stepper-status-desc.desc-received { color: #2dd4bf; }
+
+/* Detailed Step Badges */
+.stepper-badge-status {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.74rem;
   font-weight: 600;
+  padding: 0.18rem 0.55rem;
+  border-radius: 6px;
   white-space: nowrap !important;
+  line-height: 1.25;
+  letter-spacing: 0.2px;
 }
 
-[data-theme='dark'] .stepper-tag-rec {
-  background: rgba(16, 185, 129, 0.2);
-  color: #34d399;
+.stepper-badge-status.badge-step-received {
+  background: rgba(13, 148, 136, 0.12);
+  color: #0d9488;
+  border: 1px solid rgba(13, 148, 136, 0.28);
 }
 
+.stepper-badge-status.badge-step-sorting {
+  background: rgba(2, 132, 199, 0.12);
+  color: #0284c7;
+  border: 1px solid rgba(2, 132, 199, 0.28);
+}
+
+.stepper-badge-status.badge-step-dispatch {
+  background: rgba(99, 102, 241, 0.12);
+  color: #4f46e5;
+  border: 1px solid rgba(99, 102, 241, 0.28);
+}
+
+.stepper-badge-status.badge-step-destination {
+  background: rgba(139, 92, 246, 0.12);
+  color: #7c3aed;
+  border: 1px solid rgba(139, 92, 246, 0.28);
+}
+
+.stepper-badge-status.badge-step-out-for-delivery {
+  background: rgba(245, 158, 11, 0.14);
+  color: #b45309;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.stepper-badge-status.badge-step-delivered {
+  background: rgba(16, 185, 129, 0.14);
+  color: #059669;
+  border: 1px solid rgba(16, 185, 129, 0.32);
+}
+
+.stepper-badge-status.badge-step-exception {
+  background: rgba(239, 68, 68, 0.14);
+  color: #dc2626;
+  border: 1px solid rgba(239, 68, 68, 0.32);
+}
+
+.stepper-badge-status.badge-step-returned {
+  background: rgba(225, 29, 72, 0.14);
+  color: #be123c;
+  border: 1px solid rgba(225, 29, 72, 0.32);
+}
+
+.stepper-badge-status.badge-step-transit {
+  background: rgba(100, 116, 139, 0.12);
+  color: #475569;
+  border: 1px solid rgba(100, 116, 139, 0.25);
+}
+
+/* Dark mode overrides for step badges */
+[data-theme='dark'] .stepper-badge-status.badge-step-received {
+  background: rgba(45, 212, 191, 0.18);
+  color: #5eead4;
+  border-color: rgba(45, 212, 191, 0.35);
+}
+[data-theme='dark'] .stepper-badge-status.badge-step-sorting {
+  background: rgba(56, 189, 248, 0.18);
+  color: #7dd3fc;
+  border-color: rgba(56, 189, 248, 0.35);
+}
+[data-theme='dark'] .stepper-badge-status.badge-step-dispatch {
+  background: rgba(129, 140, 248, 0.18);
+  color: #a5b4fc;
+  border-color: rgba(129, 140, 248, 0.35);
+}
+[data-theme='dark'] .stepper-badge-status.badge-step-destination {
+  background: rgba(192, 132, 252, 0.18);
+  color: #d8b4fe;
+  border-color: rgba(192, 132, 252, 0.35);
+}
+[data-theme='dark'] .stepper-badge-status.badge-step-out-for-delivery {
+  background: rgba(251, 191, 36, 0.18);
+  color: #fde68a;
+  border-color: rgba(251, 191, 36, 0.35);
+}
+[data-theme='dark'] .stepper-badge-status.badge-step-delivered {
+  background: rgba(52, 211, 153, 0.18);
+  color: #6ee7b7;
+  border-color: rgba(52, 211, 153, 0.35);
+}
+[data-theme='dark'] .stepper-badge-status.badge-step-exception {
+  background: rgba(248, 113, 113, 0.18);
+  color: #fca5a5;
+  border-color: rgba(248, 113, 113, 0.35);
+}
+[data-theme='dark'] .stepper-badge-status.badge-step-returned {
+  background: rgba(251, 113, 133, 0.18);
+  color: #fda4af;
+  border-color: rgba(251, 113, 133, 0.35);
+}
+[data-theme='dark'] .stepper-badge-status.badge-step-transit {
+  background: rgba(148, 163, 184, 0.18);
+  color: #cbd5e1;
+  border-color: rgba(148, 163, 184, 0.35);
+}
+
+/* Latest Badge */
 .stepper-tag-latest {
   font-size: 0.72rem;
-  padding: 0.15rem 0.5rem;
-  border-radius: 4px;
-  background: rgba(14, 165, 233, 0.12);
-  color: #0284c7;
-  font-weight: 600;
-  white-space: nowrap !important;
-}
-
-[data-theme='dark'] .stepper-tag-latest {
-  background: rgba(14, 165, 233, 0.2);
-  color: #38bdf8;
-}
-
-.stepper-badge-status {
-  font-size: 0.72rem;
   padding: 0.15rem 0.55rem;
-  border-radius: 4px;
-  font-weight: 600;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #0284c7, #0369a1);
+  color: #ffffff !important;
+  font-weight: 700;
   white-space: nowrap !important;
+  box-shadow: 0 1px 3px rgba(2, 132, 199, 0.3);
 }
 
-.stepper-badge-status.delivered {
-  background: rgba(16, 185, 129, 0.15);
-  color: #059669;
-  border: 1px solid rgba(16, 185, 129, 0.25);
+/* Officer Meta Item */
+.stepper-meta-item.officer {
+  color: #475569;
+  background: rgba(100, 116, 139, 0.08);
+  padding: 0.2rem 0.55rem;
+  border-radius: 6px;
+  border: 1px solid rgba(100, 116, 139, 0.18);
 }
-
-.stepper-badge-status.in_transit {
-  background: rgba(245, 158, 11, 0.15);
-  color: #d97706;
-  border: 1px solid rgba(245, 158, 11, 0.25);
-}
-
-.stepper-badge-status.returned {
-  background: rgba(239, 68, 68, 0.15);
-  color: #e11d48;
-  border: 1px solid rgba(239, 68, 68, 0.25);
+[data-theme='dark'] .stepper-meta-item.officer {
+  color: #94a3b8;
+  background: rgba(100, 116, 139, 0.15);
+  border-color: rgba(100, 116, 139, 0.25);
 }
 
 .stepper-meta-row {

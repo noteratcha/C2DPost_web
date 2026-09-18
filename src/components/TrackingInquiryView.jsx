@@ -73,6 +73,129 @@ function getCardStatusInfo(latestEvent) {
   };
 }
 
+/**
+ * Resolves granular stage info and badge for a specific checkpoint event in the stepper
+ */
+function getDetailedStepInfo(ev) {
+  const rawDesc = (ev.status_description || '').trim();
+  const desc = rawDesc.replace(/\u0e4d\u0e32/g, 'ำ');
+  const code = String(ev.status || '').trim();
+
+  // 1. Delivered / นำจ่ายสำเร็จ
+  if (
+    /นำจ่ายถึงผู้รับแล้ว|นําจ่ายถึงผู้รับแล้ว|ถึงผู้รับแล้ว|นำจ่ายสำเร็จ|นําจ่ายสำเร็จ|ผู้รับได้รับ|จัดส่งสำเร็จ|ส่งมอบเรียบร้อย|ส่งถึงผู้รับแล้ว|นำจ่ายเรียบร้อย/i.test(desc) ||
+    code === '4' || code === '501' || ev.status_key === 'delivered'
+  ) {
+    return {
+      type: 'delivered',
+      label: 'นำจ่ายสำเร็จ',
+      className: 'badge-step-delivered',
+      descClass: 'desc-delivered'
+    };
+  }
+
+  // 2. Exception / ข้อผิดพลาด / ข้อยกเว้นการนำจ่าย
+  if (
+    /บ้านปิด|ออกใบแจ้ง|ไม่ชัดเจน|ไม่มีเลขบ้าน|ไม่มีเลขที่|ไม่ยอมรับ|ไม่มีผู้รับ|ไม่มารับตามกำหนด|รอจ่าย|ย้าย|เสียหาย|ระงับ|ตกค้าง|อายัด|จ่าหน้าไม่ชัดเจน|ติดต่อไม่ได้/i.test(desc)
+  ) {
+    const shortDesc = rawDesc.length > 22 ? rawDesc.slice(0, 22) + '...' : rawDesc;
+    return {
+      type: 'exception',
+      label: `ข้อยกเว้น: ${shortDesc}`,
+      className: 'badge-step-exception',
+      descClass: 'desc-exception'
+    };
+  }
+
+  // 3. Returned / ส่งคืนต้นทาง
+  if (
+    /ส่งคืน|คืนต้นทาง|ส่งคืนผู้ส่ง|ตีกลับ|ไม่สามารถส่งมอบ|ไม่สามารถนำจ่าย|คืนสู่ผู้ฝาก/i.test(desc) ||
+    (['502', '503', '401', '402'].includes(code) && /คืน|ตีกลับ/i.test(desc)) ||
+    ev.status_key === 'returned'
+  ) {
+    return {
+      type: 'returned',
+      label: 'ส่งคืนต้นทาง',
+      className: 'badge-step-returned',
+      descClass: 'desc-returned'
+    };
+  }
+
+  // 4. Initial Deposit / ปณ.ต้นทางรับฝาก
+  if (
+    code === '1' || code === '001' || code === '101' || code === '102' || code === '103' ||
+    /รับฝากเข้าระบบ|รับฝากแล้ว|^รับฝาก$|ปณ\.ต้นทางรับฝาก|รับฝาก/i.test(desc) ||
+    ev.status_key === 'received'
+  ) {
+    return {
+      type: 'received',
+      label: 'รับฝากต้นทาง',
+      className: 'badge-step-received',
+      descClass: 'desc-received'
+    };
+  }
+
+  // 5. Arrived at Destination Post Office / ถึง ปณ.ปลายทาง เตรียมนำจ่าย
+  if (
+    /ถึง.*ปลายทาง|ปลายทาง.*เตรียมนำจ่าย|ถึงที่ทำการปลายทาง/i.test(desc) ||
+    code === '401'
+  ) {
+    return {
+      type: 'destination',
+      label: 'ถึง ปณ.ปลายทาง',
+      className: 'badge-step-destination',
+      descClass: 'desc-destination'
+    };
+  }
+
+  // 6. Out for Delivery / เตรียมนำจ่าย / ออกไปนำจ่าย
+  if (
+    /เตรียมนำจ่าย|เตรียมการนำจ่าย|ออกไปนำจ่าย|อยู่ระหว่างการนำจ่าย/i.test(desc) &&
+    !/คัดแยก|ส่งออก|ศูนย์/i.test(desc)
+  ) {
+    return {
+      type: 'out_for_delivery',
+      label: 'เตรียมนำจ่าย',
+      className: 'badge-step-out-for-delivery',
+      descClass: 'desc-out-for-delivery'
+    };
+  }
+
+  // 7. Dispatched / ส่งออกจากศูนย์คัดแยกสินค้าหรือที่ทำการ
+  if (
+    /ส่งออกจาก|ส่งต่อ|อยู่ระหว่างนำส่ง|ส่งออกจากศูนย์/i.test(desc) ||
+    ['301', '302', '303'].includes(code)
+  ) {
+    return {
+      type: 'dispatch',
+      label: 'ส่งต่อระหว่างทาง',
+      className: 'badge-step-dispatch',
+      descClass: 'desc-dispatch'
+    };
+  }
+
+  // 8. Sorting Center / ศูนย์คัดแยกสินค้า
+  if (
+    /คัดแยก|ศูนย์คัดแยก/i.test(desc) ||
+    ['201', '202', '203', '204'].includes(code)
+  ) {
+    return {
+      type: 'sorting',
+      label: 'คัดแยกสินค้า',
+      className: 'badge-step-sorting',
+      descClass: 'desc-sorting'
+    };
+  }
+
+  // Fallback
+  return {
+    type: 'transit',
+    label: ev.status_label && ev.status_label !== 'อยู่ระหว่างการนำจ่าย' ? ev.status_label : 'อัปเดตสถานะ',
+    className: 'badge-step-transit',
+    descClass: 'desc-transit'
+  };
+}
+
 export default function TrackingInquiryView({ currentPerson, records = [], initialBarcode = '', onSwitchToWorkspace }) {
   const [barcodeInput, setBarcodeInput] = useState(initialBarcode || '');
   const [searchItems, setSearchItems] = useState([]);
@@ -696,35 +819,51 @@ export default function TrackingInquiryView({ currentPerson, records = [], initi
                         <div className="tracking-stepper">
                           {events.map((ev, evIndex) => {
                             const isLast = evIndex === events.length - 1;
-                            const isRec = `${ev.status_description || ''} ${ev.status || ''}`.includes('รับฝาก');
-                            const isDelivered = ev.status_key === 'delivered' || 
-                              String(ev.status) === '4' || 
-                              String(ev.status) === '501' || 
-                              (ev.status_description || '').includes('นำจ่ายถึงผู้รับ') || 
-                              (ev.status_description || '').includes('นำจ่ายสำเร็จ') ||
-                              (ev.status_description || '').includes('ผู้รับได้รับ');
+                            const stepInfo = getDetailedStepInfo(ev);
+                            const isDelivered = stepInfo.type === 'delivered';
+                            const isRec = stepInfo.type === 'received';
+                            const isException = stepInfo.type === 'exception';
+                            const isReturned = stepInfo.type === 'returned';
+
+                            // Sequential numeric dots (1, 2, 3...) for past steps.
+                            // Distinct icon strictly on the latest step (isLast).
+                            let dotContent = evIndex + 1;
+                            let dotClass = '';
+                            if (isLast) {
+                              if (isDelivered || isRec) {
+                                dotContent = '✓';
+                                dotClass = 'dot-success';
+                              } else if (isException) {
+                                dotContent = '⚠️';
+                                dotClass = 'dot-warning';
+                              } else if (isReturned) {
+                                dotContent = '↩';
+                                dotClass = 'dot-danger';
+                              } else {
+                                dotContent = '🚚';
+                                dotClass = 'dot-active';
+                              }
+                            }
 
                             const receiverDisplayName = matchedRecord?.name || matchedRecord?.receiver_name || '';
 
                             return (
-                              <div key={evIndex} className={`stepper-item ${isLast ? 'latest' : ''} ${isDelivered ? 'delivered' : ''}`}>
+                              <div key={evIndex} className={`stepper-item ${isLast ? 'latest' : ''} ${isDelivered ? 'delivered' : ''} ${isException ? 'exception' : ''}`}>
                                 <div className="stepper-rail">
-                                  <div className={`stepper-dot ${isLast && (isRec || isDelivered) ? 'dot-success' : isLast ? 'dot-active' : ''}`}>
-                                    {isLast && (isRec || isDelivered) ? '✓' : evIndex + 1}
+                                  <div className={`stepper-dot ${dotClass}`}>
+                                    {dotContent}
                                   </div>
                                   {!isLast && <div className="stepper-line"></div>}
                                 </div>
 
                                 <div className="stepper-content">
                                   <div className="stepper-status-row">
-                                    <span className="stepper-status-desc">{ev.status_description}</span>
-                                    {ev.status_label && (
-                                      <span className={`stepper-badge-status ${ev.status_key || (isDelivered ? 'delivered' : 'in_transit')}`}>
-                                        {ev.status_label}
-                                      </span>
-                                    )}
-                                    {isRec && <span className="stepper-tag-rec">รับฝากแล้ว</span>}
-                                    {isDelivered && !isRec && <span className="stepper-tag-rec delivered">นำจ่ายสำเร็จ</span>}
+                                    <span className={`stepper-status-desc ${stepInfo.descClass}`}>
+                                      {ev.status_description || 'อัปเดตสถานะ'}
+                                    </span>
+                                    <span className={`stepper-badge-status ${stepInfo.className}`}>
+                                      {stepInfo.label}
+                                    </span>
                                     {isLast && <span className="stepper-tag-latest">ล่าสุด</span>}
                                   </div>
 
@@ -747,6 +886,15 @@ export default function TrackingInquiryView({ currentPerson, records = [], initi
                                           <circle cx="12" cy="10" r="3"></circle>
                                         </svg>
                                         <span>{formatStationWithZipcode(ev.location)}</span>
+                                      </span>
+                                    )}
+                                    {ev.signature && !isDelivered && (
+                                      <span className="stepper-meta-item officer" title="เจ้าหน้าที่ / ผู้ดำเนินการ">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                                          <circle cx="12" cy="7" r="4"></circle>
+                                        </svg>
+                                        <span>{ev.signature}</span>
                                       </span>
                                     )}
                                     {isDelivered && receiverDisplayName && (
