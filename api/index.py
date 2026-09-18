@@ -1274,21 +1274,24 @@ def classify_step_for_pdf(ev, is_last):
     if code in ["1", "001", "101", "102", "103"] or any(k in desc for k in ["รับฝากเข้าระบบ", "รับฝากแล้ว", "รับฝาก", "ปณ.ต้นทางรับฝาก"]):
         return "รับฝากต้นทาง", "#0d9488"
 
-    # 5. Destination Office / ถึง ปณ.ปลายทาง
-    if any(k in desc for k in ["ถึงที่ทำการปลายทาง", "ถึง ปณ.ปลายทาง", "ปลายทาง"]) or "เตรียมนำจ่าย" in desc:
-        if "เตรียมนำจ่าย" in desc and "ถึง" not in desc:
-            return "เตรียมนำจ่าย", "#b45309"
-        return "ถึง ปณ.ปลายทาง", "#7c3aed"
-
-    # 6. Out for delivery / เตรียมนำจ่าย
-    if any(k in desc for k in ["ออกไปนำจ่าย", "เตรียมการนำจ่าย", "กำลังนำจ่าย"]):
+    # 5. Prepare for delivery / เตรียมนำจ่าย (ตรวจก่อน "ถึงปลายทาง" เพื่อให้
+    #    "ถึงปลายทาง (เตรียมนำจ่าย)" จำแนกเป็นสถานะการกระทำล่าสุดที่ถูกต้อง)
+    if "เตรียมนำจ่าย" in desc or "เตรียมการนำจ่าย" in desc:
         return "เตรียมนำจ่าย", "#b45309"
 
-    # 7. Dispatched / ส่งต่อระหว่างทาง
+    # 6. Destination Office / ถึง ปณ.ปลายทาง
+    if any(k in desc for k in ["ถึงที่ทำการปลายทาง", "ถึง ปณ.ปลายทาง", "ปลายทาง"]):
+        return "ถึง ปณ.ปลายทาง", "#7c3aed"
+
+    # 7. Out for delivery / กำลังนำจ่าย
+    if any(k in desc for k in ["ออกไปนำจ่าย", "กำลังนำจ่าย"]):
+        return "เตรียมนำจ่าย", "#b45309"
+
+    # 8. Dispatched / ส่งต่อระหว่างทาง
     if any(k in desc for k in ["ส่งออกจาก", "ส่งต่อ", "อยู่ระหว่างนำส่ง"]) or code in ["301", "302", "303"]:
         return "ส่งต่อระหว่างทาง", "#4f46e5"
 
-    # 8. Sorting Center / คัดแยกสินค้า
+    # 9. Sorting Center / คัดแยกสินค้า
     if any(k in desc for k in ["คัดแยก", "ศูนย์คัดแยก"]) or code in ["201", "202", "203", "204"]:
         return "คัดแยกสินค้า", "#0284c7"
 
