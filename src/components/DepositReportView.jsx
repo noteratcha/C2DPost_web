@@ -3,6 +3,7 @@ import { fetchReceivedReport, exportDepositReportExcel, exportDepositReportPdf, 
 import { formatStationWithZipcode } from '../utils/postalUtils';
 import { downloadBatchEar } from '../utils/earService';
 import TrackingTimelineModal from './TrackingTimelineModal';
+import ThaiDateInput from './ThaiDateInput';
 import './DepositReportView.css';
 
 const DEPOSIT_REPORT_CACHE_KEY = 'c2dpost_deposit_report_cache';
@@ -631,28 +632,22 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
               <label htmlFor="deposit-start-date" className="deposit-control-label">
                 ตั้งแต่วันที่:
               </label>
-              <input
+              <ThaiDateInput
                 id="deposit-start-date"
-                type="date"
-                className="deposit-date-input"
                 value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
+                onChange={setStartDate}
                 disabled={loading}
               />
             </div>
-
-            <span className="deposit-date-sep">ถึง</span>
 
             <div className="deposit-date-item">
               <label htmlFor="deposit-end-date" className="deposit-control-label">
                 ถึงวันที่:
               </label>
-              <input
+              <ThaiDateInput
                 id="deposit-end-date"
-                type="date"
-                className="deposit-date-input"
                 value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
+                onChange={setEndDate}
                 disabled={loading}
               />
             </div>

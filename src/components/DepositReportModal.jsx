@@ -4,6 +4,7 @@ import { getDeliveryStatusInfo } from './DepositReportView';
 import { formatStationWithZipcode } from '../utils/postalUtils';
 import { downloadBatchEar } from '../utils/earService';
 import TrackingTimelineModal from './TrackingTimelineModal';
+import ThaiDateInput from './ThaiDateInput';
 import './DepositReportModal.css';
 
 // Helper: Format Date object to YYYY-MM-DD for <input type="date">
@@ -464,28 +465,22 @@ export default function DepositReportModal({ isOpen, onClose, currentPerson, onS
               <label htmlFor="modal-deposit-start-date" className="deposit-control-label">
                 ตั้งแต่วันที่:
               </label>
-              <input
+              <ThaiDateInput
                 id="modal-deposit-start-date"
-                type="date"
-                className="deposit-date-input"
                 value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
+                onChange={setStartDate}
                 disabled={loading}
               />
             </div>
-
-            <span className="deposit-date-sep">ถึง</span>
 
             <div className="deposit-date-item">
               <label htmlFor="modal-deposit-end-date" className="deposit-control-label">
                 ถึงวันที่:
               </label>
-              <input
+              <ThaiDateInput
                 id="modal-deposit-end-date"
-                type="date"
-                className="deposit-date-input"
                 value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
+                onChange={setEndDate}
                 disabled={loading}
               />
             </div>
