@@ -202,6 +202,28 @@ export default function TrackingTimelineModal({ isOpen, barcode, recInfo, curren
   const receiverName = recInfo?.receiver || recInfo?.receiver_name || recInfo?.RECEIVER || '';
   const invNo = recInfo?.invNo || recInfo?.inv_no || recInfo?.INV_NO || recInfo?.['REF NO'] || '';
 
+  // Construct comprehensive receiver address
+  const receiverAddress = useMemo(() => {
+    if (!recInfo) return '';
+    if (recInfo.fullAddress) return String(recInfo.fullAddress).trim();
+    const baseAddr = String(recInfo.receiver_address || recInfo.address || recInfo.RECEIVER_ADDRESS || recInfo.cusAdd || '').trim();
+    const amphur = String(recInfo.receiver_amphur || recInfo.amphur || recInfo.RECEIVER_AMPHUR || '').trim();
+    const province = String(recInfo.receiver_province || recInfo.province || recInfo.RECEIVER_PROVINCE || '').trim();
+    const zipcode = String(recInfo.receiver_zipcode || recInfo.zipcode || recInfo.RECEIVER_ZIPCODE || '').trim();
+
+    const parts = [baseAddr];
+    if (amphur && !baseAddr.includes(amphur)) {
+      parts.push(amphur.startsWith('อ.') ? amphur : `อ.${amphur}`);
+    }
+    if (province && !baseAddr.includes(province)) {
+      parts.push(province.startsWith('จ.') ? province : `จ.${province}`);
+    }
+    if (zipcode && !baseAddr.includes(zipcode)) {
+      parts.push(zipcode);
+    }
+    return parts.filter(Boolean).join(' ').trim();
+  }, [recInfo]);
+
   return (
     <div className="track-modal-overlay" onClick={onClose}>
       <div className="track-modal-container" onClick={(e) => e.stopPropagation()}>
@@ -288,20 +310,32 @@ export default function TrackingTimelineModal({ isOpen, barcode, recInfo, curren
           </div>
 
           {/* Bottom Tier: Recipient & Reference Information Banner */}
-          {(receiverName || invNo) && (
+          {(receiverName || invNo || receiverAddress) && (
             <div className="track-summary-recipient-row">
-              <div className="track-recipient-pill" title={`ผู้รับตามจ่าหน้า: ${receiverName || '-'}`}>
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                  <circle cx="12" cy="7" r="4"></circle>
-                </svg>
-                <span className="recipient-label">ผู้รับ:</span>
-                <span className="recipient-value">{receiverName || '-'}</span>
-              </div>
+              {receiverName && (
+                <div className="track-recipient-pill" title={`ผู้รับตามจ่าหน้า: ${receiverName}`}>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="12" cy="7" r="4"></circle>
+                  </svg>
+                  <span className="recipient-label">ผู้รับ:</span>
+                  <span className="recipient-value">{receiverName}</span>
+                </div>
+              )}
               {invNo && (
                 <div className="track-ref-pill" title={`เลขที่อ้างอิง: ${invNo}`}>
                   <span className="ref-label">เลขที่อ้างอิง:</span>
                   <span className="ref-value">{invNo}</span>
+                </div>
+              )}
+              {receiverAddress && (
+                <div className="track-address-pill" title={`ที่อยู่ผู้รับ: ${receiverAddress}`}>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                    <path d="M12 2a8 8 0 0 0-8 8c0 5.25 8 12 8 12s8-6.75 8-12a8 8 0 0 0-8-8z"></path>
+                    <circle cx="12" cy="10" r="3"></circle>
+                  </svg>
+                  <span className="address-label">ที่อยู่:</span>
+                  <span className="address-value">{receiverAddress}</span>
                 </div>
               )}
             </div>

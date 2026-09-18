@@ -1268,9 +1268,15 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
           isOpen={!!selectedTrackingItem}
           barcode={selectedTrackingItem.barcode}
           recInfo={{
+            ...selectedTrackingItem,
             receiver: selectedTrackingItem.receiver_name,
             invNo: selectedTrackingItem.inv_no,
-            receiver_address: selectedTrackingItem.receiver_address,
+            receiver_address: [
+              selectedTrackingItem.receiver_address,
+              selectedTrackingItem.receiver_amphur ? (selectedTrackingItem.receiver_amphur.startsWith('อ.') ? selectedTrackingItem.receiver_amphur : `อ.${selectedTrackingItem.receiver_amphur}`) : '',
+              selectedTrackingItem.receiver_province ? (selectedTrackingItem.receiver_province.startsWith('จ.') ? selectedTrackingItem.receiver_province : `จ.${selectedTrackingItem.receiver_province}`) : '',
+              selectedTrackingItem.receiver_zipcode || ''
+            ].filter(Boolean).join(' ') || selectedTrackingItem.receiver_address,
             deposit_date: selectedTrackingItem.latest_date || selectedTrackingItem.received_date,
             status_key: selectedTrackingItem.status_key,
             status_label: selectedTrackingItem.status_label || selectedTrackingItem.status_description,

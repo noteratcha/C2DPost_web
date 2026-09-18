@@ -457,6 +457,44 @@
   font-weight: 600;
 }
 
+.track-address-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  padding: 0.15rem 0.55rem;
+  border-radius: 6px;
+  background: rgba(16, 185, 129, 0.08);
+  color: #059669;
+  border: 1px solid rgba(16, 185, 129, 0.22);
+  max-width: 100%;
+}
+
+[data-theme='dark'] .track-address-pill {
+  background: rgba(16, 185, 129, 0.16);
+  color: #34d399;
+  border-color: rgba(16, 185, 129, 0.32);
+}
+
+.address-label {
+  font-weight: 500;
+  color: #64748b;
+}
+
+[data-theme='dark'] .address-label {
+  color: #94a3b8;
+}
+
+.address-value {
+  font-weight: 600;
+  color: #065f46;
+  word-break: break-word;
+}
+
+[data-theme='dark'] .address-value {
+  color: #a7f3d0;
+}
+
 /* Alerts */
 .track-alert {
   display: flex;
