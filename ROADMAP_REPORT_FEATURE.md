@@ -312,23 +312,23 @@
   - แก้ไขโลจิก `classify_step_for_pdf` ใน `api/index.py` ที่จำแนกสถานะ `ถึงที่ทำการไปรษณีย์ปลายทาง (เตรียมการนำจ่าย)` ผิดเป็น "ถึง ปณ.ปลายทาง" เนื่องจากเงื่อนไข `"ถึง" not in desc` ไม่เคยเป็นจริงเพราะคำว่า "ถึง" ปรากฏใน "ถึงที่ทำการไปรษณีย์ปลายทาง"
   - ยกการตรวจ `เตรียมนำจ่าย` / `เตรียมการนำจ่าย` ขึ้นตรวจก่อนกลุ่ม "ถึงปลายทาง" และลบเงื่อนไขขัดแย้งทิ้ง ส่งผลให้สถานะการกระทำล่าสุดแสดงเป็น "เตรียมนำจ่าย" (สีส้ม) อย่างถูกต้อง ขณะที่ `ถึงที่ทำการไปรษณีย์ปลายทาง` ธรรมดายังคงจำแนกเป็น "ถึง ปณ.ปลายทาง" (สีม่วง) ตามเดิม
 
-- [x] **4.63 แก้บั๊กหน้าเว็บขาว (Blank White Page) หลังเพิ่ม Signature Detection (`v2026.0919.1055`)**
+- [x] **4.63 แก้บั๊กหน้าเว็บขาว (Blank White Page) หลังเพิ่ม Signature Detection (`v2026.0919.1354`)**
   - สาเหตุ: ฟีเจอร์ลายเซ็น (Smart Badge / Signature) อ่านค่า `signature`/`status_description` แล้วเรียก `.trim()` ตรง ๆ หากค่าเหล่านี้ไม่ใช่ string (เช่น object/boolean จากแหล่งข้อมูลจริง) จะทำให้ `TypeError` ระหว่าง render → ทั้งหน้าเทา-ขาวโดยไม่มี Error Boundary ดักจับ
   - แก้ไข: (1) coerce ค่าทุกรายการด้วย `String(...)` ก่อน `.trim()` ใน `TrackingInquiryView.jsx`, `TrackingTimelineModal.jsx`, `DepositReportView.jsx`, `DepositReportModal.jsx`; (2) กัน `events` เป็น `Array.isArray` ก่อนเข้าสาย render ใน `TrackingInquiryView.jsx`; (3) เพิ่ม `<AppErrorBoundary />` ครอบทั้งแอปที่ `main.jsx` แสดงหน้าความผิดพลาดแบบมี UI แทนหน้าเปล่า
   - ผลลัพธ์: `npm run build` ผ่าน 100% ทุก view (gate / demo / admin) render ปกติ headless Chrome
 
-- [x] **4.64 แก้บั๊ก `earInfo is not defined` — Timeline พัสดุที่นำจ่ายสำเร็จ crash (`v2026.0919.1142`)**
+- [x] **4.64 แก้บั๊ก `earInfo is not defined` — Timeline พัสดุที่นำจ่ายสำเร็จ crash (`v2026.0919.1354`)**
   - สาเหตุ: `TrackingTimelineModal.jsx` ใน `statusInfo` (useMemo) สาขา "นำจ่ายสำเร็จ" อ้าง `earInfo?.signature_image` แต่ตัวแปร `earInfo` ไม่เคยถูกประกาศใน component (มีแค่ `clientEarData`/`recInfo`/`trackData`) — `?.` กันไม่ได้กรณีชื่อตัวแปรไม่มีตัวตน → `ReferenceError` ทุกครั้งที่เปิด timeline ของพัสดุที่ส่งถึงแล้ว (Error Boundary ใหม่จับและแสดงข้อความนี้แทนหน้าขาว)
   - แก้ไข: ลบบรรทัด `earInfo?.signature_image ||` ทิ้ง (บรรทัดถัดไป `clientEarData?.signature_image` ครอบคลุมอยู่แล้ว); ตรวจแล้วจุด `earInfo` อื่น (`TrackingTimelineModal.jsx:589`, `TrackingInquiryView.jsx:974`) ประกาศ `const` ถูกต้อง และ `clientEarMap` (state `:246`) ปกติ
-  - ผลลัพธ์: bundle ใหม่ไม่มี `earInfo?.signature_image` หลงเหลือ; deploy production ผ่าน health `v2026.0919.1142`
+  - ผลลัพธ์: bundle ใหม่ไม่มี `earInfo?.signature_image` หลงเหลือ; deploy production ผ่าน health `v2026.0919.1354`
 
-- [x] **4.65 ฟีเจอร์หน้า สถิติ & แผนที่ (Dashboard) (`v2026.0919.1314`)**
+- [x] **4.65 ฟีเจอร์หน้า สถิติ & แผนที่ (Dashboard) (`v2026.0919.1354`)**
   - **Backend** (`api/index.py`): extract helper `_fetch_received_report_payload(req_date, req_end_date, req_username, req_password)` จาก endpoint เดิม (L537-864) เหลือ `POST /api/reports/received` แบบบางๆ + เพิ่ม `DashboardRequest` (`_classify_failure_reason`, 9 buckets) + `POST /api/reports/dashboard` ดึงข้อมูลหลายวันแบบขนาน ตรวจสอบบาร์โค้ดซ้ำ, enrich รายชื่อจริง/สถานะล่าสุด >35 รายการ ผ่าน `getOrderByBarcodes` (cap 400) + `getHistoryStatus` กันส่วนที่ขาด (≤50 missing), สรุป summary (delivered/failed/pending + %), แยกรายละเอียดตามสาเหตุส่งคืนและตามรายจังหวัด, ตัดสินใจ parcel 300 + flag `parcels_truncated`
   - **ข้อมูลแผนที่ประเทศไทย**: generator Node (`gen_map.cjs`) จาก GeoJSON 77 จังหวัด → `src/data/thailandMapData.js` (equirectangular + cos(latC), scale 640x1173, simplify Douglas-Peucker tol 0.9px เหลือ 4,099 จุด / 54KB); แก้ orientation/bug case-sensitive จนชื่อไทยครบ 77 (รวม alias `Bangkok Metropolis`, `Phangnga`, `Si Sa Ket`)
   - **Frontend**: tab "สถิติ & แผนที่" (`Navbar.jsx`), deep-link `?page=dashboard`, `DashboardView.jsx` + `DashboardView.css` (stat cards รับ/ส่ง failed + %, แผนที่ SVG สีตาม success_rate พร้อม tooltip/legend/panel จังหวัด, ตารางจัดอันดับ, ตารางพัสดุ tab/search/pagination 20/หน้า, cache sessionStorage, reuse ThaiDateInput + deposit CSS), `fetchDashboardReport()` ใน `src/utils/api.js`; `?autofetch=1` สำหรับ headless smoke; ในโหมด `?demo=1` ให้ส่ง account `demo` → backend ตอบข้อมูลตัวอย่าง
   - ผลลัพธ์: smoke headless (dev + `vite preview` prod bundle) แผนที่ 77 จังหวัด + stats + สาเหตุ + ranking + parcels render ครบไม่มี ErrorBoundary; `npm run build` ผ่าน
 
-- [x] **4.66 แสดงสถานะ "อยู่ระหว่างการนำจ่าย" แยกจาก "รับฝากแล้ว" บน Dashboard (`v2026.0919.1337`)**
+- [x] **4.66 แสดงสถานะ "อยู่ระหว่างการนำจ่าย" แยกจาก "รับฝากแล้ว" บน Dashboard (`v2026.0919.1354`)**
   - **Backend** (`api/index.py`): แยก aggregation เดิมที่รวม `received`+`in_transit` เป็น `pending` เดียว → นับแยก `received_count` / `in_transit_count` (+ `received_pct_of_total` / `in_transit_pct_of_total`) แต่คง `pending_count` ไว้เพื่อความเข้ากันได้; เพิ่ม field `received`/`in_transit` ในข้อมูลรายจังหวัด (`provinces[]`) สำหรับ map/ranking
   - **Frontend** (`DashboardView.jsx` + CSS): เพิ่ม card **"รับฝากแล้ว"** (info) และ **"อยู่ระหว่างการนำจ่าย"** (warn) เป็น 5 ใบ (รวม, รับฝากแล้ว, อยู่ระหว่างการนำจ่าย, นำจ่ายสำเร็จ, ส่งคืน/ไม่สำเร็จ) เทียบเท่าหน้า รายงานสถานะ; STATUS_META เพิ่ม `received`/`in_transit` badge (`dash-badge-info`); tooltip แผนที่ + panel รายจังหวัด + ตารางจัดอันดับโชว์ทั้ง รับฝากแล้ว/อยู่ระหว่างการนำจ่าย; tab ตารางพัสดุแยก `รับฝากแล้ว`/`อยู่ระหว่างการนำจ่าย`
   - ผลลัพธ์: API demo summary = received 1, in_transit 2, delivered 1, returned 1, pending(merged) 3; smoke headless (dev + prod bundle) แผนที่ 77 จังหวัด + 5 stat cards + badge info/warn ครบไม่มี ErrorBoundary; `npm run build` ผ่าน

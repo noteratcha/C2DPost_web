@@ -532,9 +532,10 @@ export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
                 <div className="dash-ranking-table-wrap">
                   <table className="dash-table">
                     <thead>
-                      <tr>
+<tr>
                         <th>จังหวัด</th>
                         <th className="ta-r">รวม</th>
+                        <th className="ta-r">รับฝากแล้ว</th>
                         <th className="ta-r">อยู่ระหว่างการนำจ่าย</th>
                         <th className="ta-r">สำเร็จ</th>
                         <th className="ta-r">ส่งคืน</th>
@@ -552,6 +553,7 @@ export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
                           >
                             <td className="ta-l">{p.province}</td>
                             <td className="ta-r">{p.count}</td>
+                            <td className="ta-r">{p.received ?? 0}</td>
                             <td className="ta-r">{p.in_transit ?? 0}</td>
                             <td className="ta-r">{p.delivered}</td>
                             <td className="ta-r">{p.failed}</td>
@@ -564,7 +566,7 @@ export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
                         );
                       })}
                       {provinces.length === 0 && (
-                        <tr><td colSpan="6" className="dash-section-empty">ไม่มีข้อมูล</td></tr>
+                        <tr><td colSpan="7" className="dash-section-empty">ไม่มีข้อมูล</td></tr>
                       )}
                     </tbody>
                   </table>
