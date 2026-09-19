@@ -296,3 +296,21 @@
 
 ### 8.6 ข้อจำกัดการพิสูจน์
 - ยังไม่สามารถ reproduce จุด crash แน่นอนได้เพราะต้องใช้ barcode + credentials จริง (demo records มี `BARCODE_NO=''`) — หากเกิดอีก Error Boundary จะแสดงข้อความ error จริงให้ทราบทันที
+
+## 9. `earInfo is not defined` — Timeline พัสดุที่นำจ่ายสำเร็จ crash (แก้แล้ว, v2026.0919.1142)
+
+### 9.1 อาการ
+- หลัง deploy 4.63 ผู้ใช้เปิด Timeline/Card ของพัสดุที่นำจ่ายสำเร็จ → Error Boundary โชว์ `earInfo is not defined` (งานนี้ Error Boundary ทำงานตามวัตถุประสงค์: แสดง error จริงแทนหน้าขาว)
+
+### 9.2 สาเหตุ
+- `src/components/TrackingTimelineModal.jsx` ใน `statusInfo` (useMemo) สาขา "นำจ่ายสำเร็จ" (เดิมบรรทัด ~208-214) มีบรรทัด `earInfo?.signature_image ||`
+- ตัวแปร `earInfo` **ไม่เคยถูกประกาศ**ใน component นี้ (ใน scope มีแค่ `clientEarData`/`recInfo`/`trackData`/`latestEvent`)
+- `earInfo?.x` กันไม่ได้เพราะ `ReferenceError` เกิดตอน resolve ชื่อตัวแปร (ไม่ใช่ตอนเข้าถึง property) → ทุกครั้งที่เข้าสาขา delivered = crash
+
+### 9.3 การแก้ไข
+- ลบบรรทัด `earInfo?.signature_image ||` ทิ้ง — บรรทัด `clientEarData?.signature_image` (เดิม :213) ครอบคลุมอยู่แล้ว
+- ตรวจประกอบ: `TrackingTimelineModal.jsx:589` และ `TrackingInquiryView.jsx:974` ประกาศ `const earInfo = ...` ถูกต้อง; `clientEarMap` state (`TrackingInquiryView.jsx:246`) ปกติ; `getCardStatusInfo` ใช้พารามิเตอร์ `earData` ถูกต้อง
+
+### 9.4 ผลลัพธ์
+- bundle ใหม่ `index-DrhfH7W1.js` (deploy รอบ 1055) ไม่มี `earInfo?.signature_image` หลงเหลือ
+- อัปเดตเวอร์ชันเป็น `v2026.0919.1142` + rebuild + commit + deploy (ตามกฎ §15/§27 6 จุด)

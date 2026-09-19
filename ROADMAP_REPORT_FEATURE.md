@@ -317,4 +317,9 @@
   - แก้ไข: (1) coerce ค่าทุกรายการด้วย `String(...)` ก่อน `.trim()` ใน `TrackingInquiryView.jsx`, `TrackingTimelineModal.jsx`, `DepositReportView.jsx`, `DepositReportModal.jsx`; (2) กัน `events` เป็น `Array.isArray` ก่อนเข้าสาย render ใน `TrackingInquiryView.jsx`; (3) เพิ่ม `<AppErrorBoundary />` ครอบทั้งแอปที่ `main.jsx` แสดงหน้าความผิดพลาดแบบมี UI แทนหน้าเปล่า
   - ผลลัพธ์: `npm run build` ผ่าน 100% ทุก view (gate / demo / admin) render ปกติ headless Chrome
 
+- [x] **4.64 แก้บั๊ก `earInfo is not defined` — Timeline พัสดุที่นำจ่ายสำเร็จ crash (`v2026.0919.1142`)**
+  - สาเหตุ: `TrackingTimelineModal.jsx` ใน `statusInfo` (useMemo) สาขา "นำจ่ายสำเร็จ" อ้าง `earInfo?.signature_image` แต่ตัวแปร `earInfo` ไม่เคยถูกประกาศใน component (มีแค่ `clientEarData`/`recInfo`/`trackData`) — `?.` กันไม่ได้กรณีชื่อตัวแปรไม่มีตัวตน → `ReferenceError` ทุกครั้งที่เปิด timeline ของพัสดุที่ส่งถึงแล้ว (Error Boundary ใหม่จับและแสดงข้อความนี้แทนหน้าขาว)
+  - แก้ไข: ลบบรรทัด `earInfo?.signature_image ||` ทิ้ง (บรรทัดถัดไป `clientEarData?.signature_image` ครอบคลุมอยู่แล้ว); ตรวจแล้วจุด `earInfo` อื่น (`TrackingTimelineModal.jsx:589`, `TrackingInquiryView.jsx:974`) ประกาศ `const` ถูกต้อง และ `clientEarMap` (state `:246`) ปกติ
+  - ผลลัพธ์: bundle ใหม่ไม่มี `earInfo?.signature_image` หลงเหลือ; deploy production ผ่าน health `v2026.0919.1142`
+
 
