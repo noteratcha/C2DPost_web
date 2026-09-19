@@ -395,6 +395,11 @@
   background: rgba(245, 158, 11, 0.15);
 }
 
+.dash-badge-info {
+  color: #1d4ed8;
+  background: rgba(59, 130, 246, 0.14);
+}
+
 .dash-pagination {
   display: flex;
   align-items: center;

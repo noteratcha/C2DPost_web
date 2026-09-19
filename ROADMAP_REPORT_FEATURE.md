@@ -328,4 +328,9 @@
   - **Frontend**: tab "สถิติ & แผนที่" (`Navbar.jsx`), deep-link `?page=dashboard`, `DashboardView.jsx` + `DashboardView.css` (stat cards รับ/ส่ง failed + %, แผนที่ SVG สีตาม success_rate พร้อม tooltip/legend/panel จังหวัด, ตารางจัดอันดับ, ตารางพัสดุ tab/search/pagination 20/หน้า, cache sessionStorage, reuse ThaiDateInput + deposit CSS), `fetchDashboardReport()` ใน `src/utils/api.js`; `?autofetch=1` สำหรับ headless smoke; ในโหมด `?demo=1` ให้ส่ง account `demo` → backend ตอบข้อมูลตัวอย่าง
   - ผลลัพธ์: smoke headless (dev + `vite preview` prod bundle) แผนที่ 77 จังหวัด + stats + สาเหตุ + ranking + parcels render ครบไม่มี ErrorBoundary; `npm run build` ผ่าน
 
+- [x] **4.66 แสดงสถานะ "อยู่ระหว่างการนำจ่าย" แยกจาก "รับฝากแล้ว" บน Dashboard (`v2026.0919.1337`)**
+  - **Backend** (`api/index.py`): แยก aggregation เดิมที่รวม `received`+`in_transit` เป็น `pending` เดียว → นับแยก `received_count` / `in_transit_count` (+ `received_pct_of_total` / `in_transit_pct_of_total`) แต่คง `pending_count` ไว้เพื่อความเข้ากันได้; เพิ่ม field `received`/`in_transit` ในข้อมูลรายจังหวัด (`provinces[]`) สำหรับ map/ranking
+  - **Frontend** (`DashboardView.jsx` + CSS): เพิ่ม card **"รับฝากแล้ว"** (info) และ **"อยู่ระหว่างการนำจ่าย"** (warn) เป็น 5 ใบ (รวม, รับฝากแล้ว, อยู่ระหว่างการนำจ่าย, นำจ่ายสำเร็จ, ส่งคืน/ไม่สำเร็จ) เทียบเท่าหน้า รายงานสถานะ; STATUS_META เพิ่ม `received`/`in_transit` badge (`dash-badge-info`); tooltip แผนที่ + panel รายจังหวัด + ตารางจัดอันดับโชว์ทั้ง รับฝากแล้ว/อยู่ระหว่างการนำจ่าย; tab ตารางพัสดุแยก `รับฝากแล้ว`/`อยู่ระหว่างการนำจ่าย`
+  - ผลลัพธ์: API demo summary = received 1, in_transit 2, delivered 1, returned 1, pending(merged) 3; smoke headless (dev + prod bundle) แผนที่ 77 จังหวัด + 5 stat cards + badge info/warn ครบไม่มี ErrorBoundary; `npm run build` ผ่าน
+
 

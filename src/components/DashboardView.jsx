@@ -62,7 +62,9 @@ function successColor(rate) {
 const STATUS_META = {
   delivered: { label: 'นำจ่ายสำเร็จ', className: 'dash-badge-success' },
   returned: { label: 'ส่งคืน / ไม่สำเร็จ', className: 'dash-badge-danger' },
-  pending: { label: 'อยู่ระหว่างดำเนินการ', className: 'dash-badge-warn' }
+  received: { label: 'รับฝากแล้ว', className: 'dash-badge-info' },
+  in_transit: { label: 'อยู่ระหว่างการนำจ่าย', className: 'dash-badge-warn' },
+  pending: { label: 'อยู่ระหว่างการนำจ่าย', className: 'dash-badge-warn' }
 };
 
 export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
@@ -172,6 +174,8 @@ export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
     total_items: 0,
     delivered_count: 0,
     failed_count: 0,
+    received_count: 0,
+    in_transit_count: 0,
     pending_count: 0,
     delivered_pct_of_concluded: 0,
     failed_pct_of_concluded: 0
@@ -244,6 +248,30 @@ export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
       )
     },
     {
+      label: 'รับฝากแล้ว',
+      value: summary.received_count,
+      unit: ` (${summary.received_pct_of_total ?? 0}% ของทั้งหมด)`,
+      className: 'dash-stat-blue',
+      icon: (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+          <path d="M22 12h-6l-2 3h-4l-2-3H2"></path>
+          <path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"></path>
+        </svg>
+      )
+    },
+    {
+      label: 'อยู่ระหว่างการนำจ่าย',
+      value: summary.in_transit_count,
+      unit: ` (${summary.in_transit_pct_of_total ?? 0}% ของทั้งหมด)`,
+      className: 'dash-stat-warn',
+      icon: (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+          <circle cx="12" cy="12" r="10"></circle>
+          <polyline points="12 6 12 12 16 14"></polyline>
+        </svg>
+      )
+    },
+    {
       label: 'นำจ่ายสำเร็จ',
       value: summary.delivered_count,
       unit: ` (${summary.delivered_pct_of_concluded ?? 0}% ของที่สรุปผล)`,
@@ -263,18 +291,6 @@ export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
           <path d="M18 6L6 18"></path>
           <path d="M6 6l12 12"></path>
-        </svg>
-      )
-    },
-    {
-      label: 'อยู่ระหว่างดำเนินการ',
-      value: summary.pending_count,
-      unit: ` (${summary.pending_pct_of_total ?? 0}% ของทั้งหมด)`,
-      className: 'dash-stat-warn',
-      icon: (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-          <circle cx="12" cy="12" r="10"></circle>
-          <polyline points="12 6 12 12 16 14"></polyline>
         </svg>
       )
     }
@@ -463,7 +479,7 @@ export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
                               onMouseEnter={() => setSelectedProvince(prov.name)}
                               onClick={() => setSelectedProvince(prov.name)}
                             >
-                              <title>{`${prov.name}: ${stat ? `สำเร็จ ${stat.success_rate}% (ส่งสำเร็จ ${stat.delivered}, ส่งคืน ${stat.failed}, รวม ${stat.count})` : 'ไม่มีข้อมูล'}`}</title>
+                              <title>{`${prov.name}: ${stat ? `สำเร็จ ${stat.success_rate}% (รวม ${stat.count}, อยู่ระหว่างการนำจ่าย ${stat.in_transit ?? 0}, รับฝากแล้ว ${stat.received ?? 0}, สำเร็จ ${stat.delivered}, ส่งคืน ${stat.failed})` : 'ไม่มีข้อมูล'}`}</title>
                             </path>
                           );
                         })}
@@ -491,10 +507,11 @@ export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
                           อัตราสำเร็จ <span className={selectedProvinceDetail.success_rate == null ? 'muted' : selectedProvinceDetail.success_rate >= 50 ? 'good' : 'bad'}>{selectedProvinceDetail.success_rate == null ? 'ไม่มีข้อมูล' : `${selectedProvinceDetail.success_rate}%`}</span>
                         </div>
                         <div className="dash-pd-stats">
-                          <div className="dash-pd-stat"><span className="dot t-blue"></span> รวม <strong>{selectedProvinceDetail.count}</strong></div>
+                          <div className="dash-pd-stat"><span className="dot t-blue"></span> รับฝากแล้ว <strong>{selectedProvinceDetail.received ?? 0}</strong></div>
+                          <div className="dash-pd-stat"><span className="dot t-amber"></span> อยู่ระหว่างการนำจ่าย <strong>{selectedProvinceDetail.in_transit ?? 0}</strong></div>
                           <div className="dash-pd-stat"><span className="dot t-green"></span> สำเร็จ <strong>{selectedProvinceDetail.delivered}</strong></div>
                           <div className="dash-pd-stat"><span className="dot t-red"></span> ส่งคืน <strong>{selectedProvinceDetail.failed}</strong></div>
-                          <div className="dash-pd-stat"><span className="dot t-amber"></span> อยู่ระหว่าง <strong>{selectedProvinceDetail.pending}</strong></div>
+                          <div className="dash-pd-stat"><span className="dot t-slate"></span> รวม <strong>{selectedProvinceDetail.count}</strong></div>
                         </div>
                       </div>
                     ) : (
@@ -518,6 +535,7 @@ export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
                       <tr>
                         <th>จังหวัด</th>
                         <th className="ta-r">รวม</th>
+                        <th className="ta-r">อยู่ระหว่างการนำจ่าย</th>
                         <th className="ta-r">สำเร็จ</th>
                         <th className="ta-r">ส่งคืน</th>
                         <th className="ta-r">%สำเร็จ</th>
@@ -534,6 +552,7 @@ export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
                           >
                             <td className="ta-l">{p.province}</td>
                             <td className="ta-r">{p.count}</td>
+                            <td className="ta-r">{p.in_transit ?? 0}</td>
                             <td className="ta-r">{p.delivered}</td>
                             <td className="ta-r">{p.failed}</td>
                             <td className="ta-r">
@@ -545,7 +564,7 @@ export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
                         );
                       })}
                       {provinces.length === 0 && (
-                        <tr><td colSpan="5" className="dash-section-empty">ไม่มีข้อมูล</td></tr>
+                        <tr><td colSpan="6" className="dash-section-empty">ไม่มีข้อมูล</td></tr>
                       )}
                     </tbody>
                   </table>
@@ -559,7 +578,7 @@ export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
                 <h3 className="dash-section-title">รายการพัสดุ ({parcels.length} รายการ{data?.parcels_truncated ? ' — แสดงบางส่วน' : ''})</h3>
                 <div className="dash-parcel-controls">
                   <div className="dash-parcel-tabs">
-                    {[['all', 'ทั้งหมด'], ['delivered', 'สำเร็จ'], ['returned', 'ส่งคืน'], ['pending', 'อยู่ระหว่าง']].map(([key, label]) => (
+                    {[['all', 'ทั้งหมด'], ['received', 'รับฝากแล้ว'], ['in_transit', 'อยู่ระหว่างการนำจ่าย'], ['delivered', 'สำเร็จ'], ['returned', 'ส่งคืน']].map(([key, label]) => (
                       <button
                         type="button"
                         key={key}
@@ -601,7 +620,7 @@ export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
                         <td className="ta-l">{p.receiver_province || '-'}</td>
                         <td className="ta-l">
                           <span className={`dash-badge ${STATUS_META[p.status_key]?.className || 'dash-badge-warn'}`}>
-                            {STATUS_META[p.status_key]?.label || p.status_label || 'อยู่ระหว่างดำเนินการ'}
+                            {STATUS_META[p.status_key]?.label || p.status_label || 'อยู่ระหว่างการนำจ่าย'}
                           </span>
                         </td>
                         <td className="ta-l">{p.reason || '-'}</td>

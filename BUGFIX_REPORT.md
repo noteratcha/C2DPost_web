@@ -334,3 +334,19 @@
 - `npm run build` ผ่าน (bundle `index-B4wp87FC.js` 585.96 kB / gzip 154.35 kB)
 - smoke headless: dev + `vite preview` (prod bundle) render แผนที่ 77 จังหวัด, stats, สาเหตุ, ranking, parcels ครบ ไม่มี ErrorBoundary
 - อัปเดตเวอร์ชัน 6 จุด เป็น `v2026.0919.1314`
+
+---
+
+## 11. แยกสถานะ "อยู่ระหว่างการนำจ่าย" ออกจาก "รับฝากแล้ว" บน Dashboard (`v2026.0919.1337`)
+
+### 11.1 บริบท
+- Dashboard เดิมรวม `received` (รับฝากแล้ว) + `in_transit` (อยู่ระหว่างการนำจ่าย) ไว้ใน card "อยู่ระหว่างดำเนินการ" card เดียว ทำให้ผู้ใช้เห็นแต่ยอดรวมไม่รู้สัดส่วนที่อยู่ระหว่างการนำจ่ายจริง
+
+### 11.2 สิ่งที่แก้
+- **Backend** `api/index.py`: aggregation แยก `received_count`/`in_transit_count` (+ % ของทั้งหมด); `provinces[]` เพิ่ม `received`/`in_transit`; คง `pending_count` (merged) ไว้เพื่อ backward compatibility
+- **Frontend** `DashboardView.jsx`/`DashboardView.css`: เปลี่ยน card เป็น 5 ใบ (รับฝากทั้งหมด / รับฝากแล้ว / อยู่ระหว่างการนำจ่าย / นำจ่ายสำเร็จ / ส่งคืน-ไม่สำเร็จ) ให้ parity กับหน้า รายงานสถานะ; เพิ่ม badge `dash-badge-info`; อัปเดต tooltip แผนที่, panel รายจังหวัด, ตารางจัดอันดับ (เพิ่มคอลัมน์ "อยู่ระหว่างการนำจ่าย"), และ tab ตารางพัสดุ (รับฝากแล้ว / อยู่ระหว่างการนำจ่าย)
+
+### 11.3 ผลลัพธ์
+- API demo: `total 5, received 1, in_transit 2, delivered 1, failed 1, pending 3` ถูกต้อง
+- smoke headless (dev + prod bundle `index-DTCv9eAo.js`): แผนที่ 77 จังหวัด, 5 stat cards, badge info 1 + warn 2 ตรงข้อมูล, ไม่มี ErrorBoundary
+- อัปเดตเวอร์ชัน 6 จุด เป็น `v2026.0919.1337`

@@ -1000,6 +1000,8 @@ def get_dashboard_report(req: DashboardRequest):
     total = len(records)
     delivered = 0
     failed = 0
+    received = 0
+    in_transit = 0
     pending = 0
     unknown = 0
     reason_counts = {}
@@ -1021,17 +1023,27 @@ def get_dashboard_report(req: DashboardRequest):
                 rec.get("status_description_raw") or rec.get("status_description") or rec.get("status_label")
             )
             reason_counts[reason] = reason_counts.get(reason, 0) + 1
-        elif key in ("received", "in_transit"):
+        elif key == "received":
+            received += 1
+            pending += 1
+        elif key == "in_transit":
+            in_transit += 1
             pending += 1
         else:
             unknown += 1
 
-        st = province_map.setdefault(province, {"count": 0, "delivered": 0, "failed": 0, "pending": 0})
+        st = province_map.setdefault(province, {"count": 0, "delivered": 0, "failed": 0, "pending": 0, "received": 0, "in_transit": 0})
         st["count"] += 1
         if key == "delivered":
             st["delivered"] += 1
         elif key == "returned":
             st["failed"] += 1
+        elif key == "received":
+            st["received"] += 1
+            st["pending"] += 1
+        elif key == "in_transit":
+            st["in_transit"] += 1
+            st["pending"] += 1
         else:
             st["pending"] += 1
 
@@ -1056,6 +1068,8 @@ def get_dashboard_report(req: DashboardRequest):
         "total_items": total,
         "delivered_count": delivered,
         "failed_count": failed,
+        "received_count": received,
+        "in_transit_count": in_transit,
         "pending_count": pending,
         "unknown_count": unknown,
         "concluded_count": concluded,
@@ -1063,6 +1077,8 @@ def get_dashboard_report(req: DashboardRequest):
         "failed_pct_of_concluded": round(failed * 100 / concluded, 1) if concluded else 0.0,
         "delivered_pct_of_total": round(delivered * 100 / total, 1) if total else 0.0,
         "failed_pct_of_total": round(failed * 100 / total, 1) if total else 0.0,
+        "received_pct_of_total": round(received * 100 / total, 1) if total else 0.0,
+        "in_transit_pct_of_total": round(in_transit * 100 / total, 1) if total else 0.0,
         "pending_pct_of_total": round(pending * 100 / total, 1) if total else 0.0,
     }
 
@@ -1079,6 +1095,8 @@ def get_dashboard_report(req: DashboardRequest):
             "count": st["count"],
             "delivered": st["delivered"],
             "failed": st["failed"],
+            "received": st["received"],
+            "in_transit": st["in_transit"],
             "pending": st["pending"],
             "concluded": conc,
             "success_rate": round(st["delivered"] * 100 / conc, 1) if conc else None,
