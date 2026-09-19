@@ -100,10 +100,12 @@
 
 ## 5. ขั้นตอนที่เหลือ (เพื่อปิดงาน)
 
-- [ ] Bump เวอร์ชัน 6 จุด → `v2026.0918.2157` (config.js, package.json, convert_dpost.py, PROJECT_DOCUMENTATION.md, ROADMAP_REPORT_FEATURE.md, SKILL.md x2 ให้ MD5 ตรงกัน)
-- [ ] ตรวจ Python AST + `npm run build`
-- [ ] Commit + push `origin main` + `vercel --prod --yes`
-- [ ] Verify `GET /api/health` → `{"status":"healthy","version":"2026.0918.2157"}`
+- [x] Bump เวอร์ชัน 6 จุด → `v2026.0918.2157` (config.js, package.json, convert_dpost.py, PROJECT_DOCUMENTATION.md, ROADMAP_REPORT_FEATURE.md, SKILL.md x2 ให้ MD5 ตรงกัน)
+- [x] ตรวจ Python AST + `npm run build`
+- [x] Commit + push `origin main` + `vercel --prod --yes`
+- [x] Verify `GET /api/health` → `{"status":"healthy","version":"2026.0918.2157"}`
+
+> ✅ **ปิดงาน 19 ก.ย. 2569:** deploy `v2026.0918.2157` ขึ้น production แล้ว (aliased `https://c2dpost-web.vercel.app`) — `GET /api/health` ตอบ `version: 2026.0918.2157`, หน้าเว็บ serve asset ใหม่ `index-CqgrJ8_p.js`
 
 > หมายเหตุ: การอัปโหลด zip v1.4.0 ขึ้น Chrome Web Store Developer Console และการลง permission ใหม่ (แจ้งเตือนผู้ใช้ให้ยอมรับการอัปเดตส่วนขยาย) เป็นงานนอกตัวที่ต้องทำคน
 
