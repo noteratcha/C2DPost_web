@@ -7,6 +7,7 @@ import PreviewGrid from './components/PreviewGrid';
 import AdminManagementView from './components/AdminManagementView';
 import DepositReportView from './components/DepositReportView';
 import TrackingInquiryView from './components/TrackingInquiryView';
+import DashboardView from './components/DashboardView';
 import DepositReportModal from './components/DepositReportModal';
 import TrackingTimelineModal from './components/TrackingTimelineModal';
 import { parseCsv } from './utils/parseCsv';
@@ -51,6 +52,12 @@ export default function App() {
     return typeof window !== 'undefined' ? localStorage.getItem(STORAGE_USER_KEY) || '' : '';
   });
   const [activePage, setActivePage] = useState(() => {
+    if (typeof window !== 'undefined' && !isDemoAdmin) {
+      const pageParam = new URLSearchParams(window.location.search).get('page');
+      if (['workspace', 'deposit-report', 'tracking', 'dashboard'].includes(pageParam)) {
+        return pageParam;
+      }
+    }
     if (isDemoAdmin) return 'admin';
     const saved = typeof window !== 'undefined' ? localStorage.getItem(STORAGE_USER_KEY) || '' : '';
     return saved.toLowerCase() === 'admin' ? 'admin' : 'workspace';
@@ -1206,7 +1213,15 @@ export default function App() {
             />
           )}
 
-          {/* Page 4: จัดการระบบ (Admin Portal) */}
+          {/* Page 4: สถิติ & แผนที่การนำจ่าย (Dashboard) */}
+          {activePage === 'dashboard' && (
+            <DashboardView
+              currentPerson={currentPerson}
+              onSwitchToWorkspace={() => setActivePage('workspace')}
+            />
+          )}
+
+          {/* Page 5: จัดการระบบ (Admin Portal) */}
           {activePage === 'admin' && isAdmin && (
             <AdminManagementView
               user={user}

@@ -317,7 +317,7 @@ export async function exportAllFiles(records, files = [], onProgress) {
 
 - **นโยบาย**: ทุกครั้งที่มีการแก้ไขโค้ดหรือปรับปรุงฟีเจอร์ใดๆ **ต้องอัปเดตเลขเวอร์ชันของเว็บทุกครั้ง** ก่อนทำการ Build และ Deploy ขึ้นระบบจริง
 - **รูปแบบเลขเวอร์ชัน**: `vYYYY.MMDD.HHMM` (อิงตามเวลาปัจจุบันในประเทศไทย เช่น `v2026.0914.1135`)
-- **เวอร์ชันล่าสุดคงค้างในงาน**: `v2026.0919.1142` (โฟลเดอร์ซิงก์ร่วม `PROJECT_DOCUMENTATION.md` และ `config.js`)
+- **เวอร์ชันล่าสุดคงค้างในงาน**: `v2026.0919.1314` (โฟลเดอร์ซิงก์ร่วม `PROJECT_DOCUMENTATION.md` และ `config.js`)
 - **ตำแหน่งที่ต้องอัปเดต**:
   1. `src/config.js`:
      ```javascript
@@ -570,9 +570,9 @@ vercel --prod --yes                    # 3. ขึ้น Production + Aliased �
      __version__ = "YYYY.MMDD.HHMM"
      ```
      *(สำคัญอย่างยิ่ง: จุดนี้ขับเคลื่อนค่า `/api/health` และหัวเรื่อง FastAPI Documentation หากไม่อัปเดต การตรวจสอบ API จะยังคงรายงานเวอร์ชันเก่า)*
-  4. `C2DPost_web/PROJECT_DOCUMENTATION.md`: หัวข้อเลขเวอร์ชันและประวัติ (`v2026.0919.1142`)
-  5. `C2DPost_web/ROADMAP_REPORT_FEATURE.md`: เช็กลิสต์เวอร์ชันล่าสุด (`v2026.0919.1142`)
-  6. `.agents/skills/c2dpost-web-workflow/SKILL.md`: ส่วนสรุปเวอร์ชันล่าสุด (`v2026.0919.1142`)
+  4. `C2DPost_web/PROJECT_DOCUMENTATION.md`: หัวข้อเลขเวอร์ชันและประวัติ (`v2026.0919.1314`)
+  5. `C2DPost_web/ROADMAP_REPORT_FEATURE.md`: เช็กลิสต์เวอร์ชันล่าสุด (`v2026.0919.1314`)
+  6. `.agents/skills/c2dpost-web-workflow/SKILL.md`: ส่วนสรุปเวอร์ชันล่าสุด (`v2026.0919.1314`)
 - **คำสั่งทดสอบตรวจสอบความถูกต้องหลัง Deploy ขึ้น Production**:
   ```powershell
   python -c "import urllib.request; print(urllib.request.urlopen('https://c2dpost-web.vercel.app/api/health').read().decode())"

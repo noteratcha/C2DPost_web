@@ -314,3 +314,23 @@
 ### 9.4 ผลลัพธ์
 - bundle ใหม่ `index-DrhfH7W1.js` (deploy รอบ 1055) ไม่มี `earInfo?.signature_image` หลงเหลือ
 - อัปเดตเวอร์ชันเป็น `v2026.0919.1142` + rebuild + commit + deploy (ตามกฎ §15/§27 6 จุด)
+
+---
+
+## 10. ฟีเจอร์หน้า สถิติ & แผนที่ (Dashboard) พร้อม Fix ระหว่างพัฒนา (`v2026.0919.1314`)
+
+### 10.1 บริบท
+- เพิ่มหน้า Dashboard (สถิติการนำจ่าย + แผนที่ประเทศไทย + สาเหตุส่งคืน + รายการพัสดุ) และ backend `/api/reports/dashboard`
+- จัดเก็บข้อมูลแผนที่ประเทศไทย (GeoJSON 77 จังหวัด) เป็น `src/data/thailandMapData.js`
+
+### 10.2 บั๊กที่พบและแก้ไขระหว่างพัฒนา
+1. **MEDIUM — แผนที่สลับพิกัด (Lon/Lat inverted)**: GeoJSON เป็นแบบมาตรฐาน `[lon, lat]` แต่ช่วงค่าดูแล้วผิดจนคิดว่าเป็น `[lat, lon]` → ตะแคง 90°; แก้โดยตรวจจับ bbox จริง (lon 97.351..105.651, lat 5.630..20.445) แล้วเปิด regen projection ถูกต้อง
+2. **MEDIUM — ตัวแปร `latMax=maxA` ผิดตัว (typo)**: ขอบบนของแถบ latitude ใช้ค่ามีดจากพิกัด x ทำให้แผนที่เบน/เอียง; แก้เป็น `latMax=maxB`
+3. **LOW — ชื่อไทย 3 จังหวัดไม่แมป**: `Phangnga`/`Si Sa Ket` เจอ case-sensitive (key กลับเป็น `PhangNga`/`SiSaKet` ไม่ตรงกับ feature name) และ `Bangkok Metropolis` ต่างจาก key `Bangkok` → เพิ่ม `.toLowerCase()` ใน normalize + alias `Bangkok Metropolis`
+4. **MEDIUM — จำแนกสาเหตุ "ส่งคืน (ติดต่อผู้รับไม่ได้)" ไม่เข้า bucket**: keyword `ติดต่อไม่` ไม่ match ข้อความที่มีคำว่า `ผู้รับ` คั่น (`ติดต่อ**ผู้รับ**ไม่ได้`) → เพิ่ม keyword `ติดต่อผู้รับ`
+5. **LOW — demo ใช้ creds ปลอมหลุดไป e-Parcel จริง → 401**: `?demo=1` ส่ง `renu_officer/demo_password` ทำให้ backend ตีว่า live user แล้วเรียกบัญชีปลอม → 401; แก้เฉพาะหน้า Dashboard ให้สลับเป็น account `demo` เมื่ออยู่ในโหมด demo (backend ตอบ mock ข้อมูล) โดยไม่แตะ flow หน้า รายงานสถานะ เดิม
+
+### 10.3 ผลลัพธ์
+- `npm run build` ผ่าน (bundle `index-B4wp87FC.js` 585.96 kB / gzip 154.35 kB)
+- smoke headless: dev + `vite preview` (prod bundle) render แผนที่ 77 จังหวัด, stats, สาเหตุ, ranking, parcels ครบ ไม่มี ErrorBoundary
+- อัปเดตเวอร์ชัน 6 จุด เป็น `v2026.0919.1314`

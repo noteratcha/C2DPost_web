@@ -212,6 +212,33 @@ export async function fetchReceivedReport({ date, endDate, username = '', passwo
 }
 
 /**
+ * Fetch aggregated delivery statistics dashboard.
+ *
+ * @param {Object} params
+ * @param {string} params.date - Start date in DD/MM/YYYY format
+ * @param {string} [params.endDate] - End date in DD/MM/YYYY format
+ * @param {string} [params.username] - e-Parcel username
+ * @param {string} [params.password] - e-Parcel password
+ * @returns {Promise<{success: boolean, summary: Object, reasons: Array, provinces: Array, parcels: Array}>}
+ */
+export async function fetchDashboardReport({ date, endDate, username = '', password = '' }) {
+  const response = await fetch(`${API_BASE}/reports/dashboard`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ date, end_date: endDate || date, username, password })
+  });
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    const errorMsg = data.message || data.detail || `เกิดข้อผิดพลาดในการดึงข้อมูลสถิติ (HTTP ${response.status})`;
+    throw new Error(errorMsg);
+  }
+
+  return data;
+}
+
+/**
  * Fetch delivery timeline for a single barcode via getHistoryStatus.
  *
  * @param {Object} params

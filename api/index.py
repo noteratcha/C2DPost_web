@@ -71,6 +71,12 @@ class ReceivedReportRequest(BaseModel):
     username: Optional[str] = ""
     password: Optional[str] = ""
 
+class DashboardRequest(BaseModel):
+    date: str  # Format: "DD/MM/YYYY" (Start date)
+    end_date: Optional[str] = None  # Format: "DD/MM/YYYY" (End date, optional)
+    username: Optional[str] = ""
+    password: Optional[str] = ""
+
 class DepositExportRequest(BaseModel):
     records: List[dict]
     summary: Optional[dict] = {}
@@ -535,9 +541,14 @@ def update_eparcel_status_endpoint(req: UpdateEparcelStatusRequest):
 
 @app.post("/api/reports/received")
 def get_received_report(req: ReceivedReportRequest):
+    """Fetches daily or date-range deposit report from Thailand Post e-Parcel API (getAllOrderReceived)."""
+    return _fetch_received_report_payload(req.date, req.end_date, req.username, req.password)
+
+
+def _fetch_received_report_payload(req_date, req_end_date, req_username, req_password):
     """
     Fetches daily or date-range deposit report from Thailand Post e-Parcel API (getAllOrderReceived).
-    Accepts start date in 'date' and optional 'end_date' in DD/MM/YYYY format and user credentials.
+    Returns the normalized payload dict (or JSONResponse for unauthorized).
     """
     import re
     from datetime import datetime, timedelta
@@ -547,14 +558,14 @@ def get_received_report(req: ReceivedReportRequest):
     import urllib3
     urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
     
-    clean_date = req.date.strip()
+    clean_date = (req_date or "").strip()
     if not re.match(r'^\d{2}/\d{2}/\d{4}$', clean_date):
         raise HTTPException(
             status_code=400, 
             detail="รูปแบบวันที่ไม่ถูกต้อง กรุณาใช้วันที่ในรูปแบบ DD/MM/YYYY เช่น 14/09/2026"
         )
 
-    clean_end_date = (req.end_date or "").strip()
+    clean_end_date = (req_end_date or "").strip()
     if clean_end_date:
         if not re.match(r'^\d{2}/\d{2}/\d{4}$', clean_end_date):
             raise HTTPException(
@@ -580,8 +591,8 @@ def get_received_report(req: ReceivedReportRequest):
 
     target_dates = [(start_dt + timedelta(days=i)).strftime("%d/%m/%Y") for i in range(days_diff)]
         
-    username = (req.username or "").strip()
-    password = (req.password or "").strip()
+    username = (req_username or "").strip()
+    password = (req_password or "").strip()
 
     # Check for demo mode / mock fallback (only if credentials are missing or explicitly demo)
     is_demo_user = not username or not password or username.lower() == "demo"
@@ -861,6 +872,231 @@ def get_received_report(req: ReceivedReportRequest):
             "pending_count": 0
         },
         "records": normalized_records
+    }
+
+
+def _classify_failure_reason(raw_desc):
+    """
+    Classifies the reason a parcel was not successfully delivered (returned)
+    into a friendly Thai bucket, based on the description text from tracking events.
+    """
+    norm = " ".join(str(raw_desc or "").split()).lower()
+    buckets = [
+        ("ผู้รับย้ายที่อยู่", ["ผู้รับย้ายที่อยู่", "ย้ายที่อยู่", "ย้ายบ้าน", "ย้ายออก", "ย้าย"]),
+        ("ติดต่อผู้รับไม่ได้", ["ติดต่อผู้รับ", "ติดต่อไม่ได้", "ติดต่อไม่", "โทรติดต่อ", "โทรไม่ติด", "ติดต่อไม่ได้เพราะ", "ไม่สามารถติดต่อ", "โทรศัพท์ไม่", "เจ้าหน้าที่ติดต่อ"]),
+        ("ไม่มีผู้รับตามจ่าหน้า", ["ไม่มีผู้รับ", "ไม่พบผู้รับ", "ไม่มีผู้มารับ", "ไม่เจอผู้รับ", "ไม่พบตัวผู้รับ", "บุคคลตามจ่าหน้า"]),
+        ("บ้านปิด / ผู้รับไม่อยู่", ["บ้านปิด", "ปิดบ้าน", "ไม่มีผู้อยู่", "ไม่มีคนอยู่", "ไม่มีผู้พักอาศัย", "ผู้รับไม่อยู่", "ไม่อยู่", "ไม่อยู่บ้าน"]),
+        ("ไม่มารับตามกำหนด", ["ไม่มารับตามกำหนด", "ไม่มารับ", "ไม่มารับของ", "ยังไม่รับ", "รอผู้รับ", "รอจ่าย"]),
+        ("จ่าหน้าไม่ชัดเจน / ที่อยู่ไม่ครบ", ["จ่าหน้าไม่", "หน้าจ่าไม่", "จ่าหน้าสลับ", "ไม่ชัดเจน", "ไม่ชัด", "ที่อยู่ไม่", "ที่อยู่ไม่ครบ", "ไม่พบที่อยู่", "จ่าหน้าผิด", "จ่าหน้าเปลี่ยน"]),
+        ("ปฏิเสธการรับ", ["ปฏิเสธ", "ไม่ยอมรับ", "ไม่ยอมรับพัสดุ"]),
+        ("พัสดุเสียหาย / ชำรุด", ["เสียหาย", "ชำรุด", "เปียกชื้น", "เปียก", "บุบสลาย", "สินค้าเสียหาย"]),
+        ("อื่น ๆ", []),
+    ]
+    if not norm or len(norm) < 3:
+        return "อื่น ๆ (ไม่ระบุสาเหตุ)"
+    for name, kws in buckets:
+        if any(kw in norm for kw in kws):
+            return name
+    return "อื่น ๆ"
+
+
+@app.post("/api/reports/dashboard")
+def get_dashboard_report(req: DashboardRequest):
+    """
+    Aggregated delivery statistics dashboard:
+    deposit totals, delivered/failed percentages, failure reasons, and per-province breakdown.
+    """
+    import requests
+    from requests.auth import HTTPBasicAuth
+    from concurrent.futures import ThreadPoolExecutor
+    import urllib3
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+    payload = _fetch_received_report_payload(req.date, req.end_date, req.username, req.password)
+    if isinstance(payload, JSONResponse):
+        return payload
+
+    records = payload.get("records") or []
+    is_mock = bool(payload.get("is_mock"))
+    api_notice = payload.get("api_notice") or None
+
+    username = (req.username or "").strip()
+    password = (req.password or "").strip()
+    is_live = bool(username and password and username.lower() != "demo")
+
+    # For large live datasets (more than 35) the received endpoint only enriches up to 35 records.
+    # Refresh conclusion statuses for the rest via the batch endpoint (getOrderByBarcodes).
+    unconcluded = [rec for rec in records if (rec.get("status_key") or "in_transit") not in ("delivered", "returned")]
+    if is_live and len(records) > 35 and unconcluded:
+        status_map = {}
+        target = [rec.get("barcode") for rec in unconcluded if rec.get("barcode")]
+        if target:
+            _t = target[:400]
+            if len(target) > 400:
+                api_notice = api_notice or f"ข้อมูลเกิน 400 รายการต่อรอบ ตรวจสถานะนำจ่ายเฉพาะ 400 รายการแรก"
+            try:
+                url = "https://r_dservice.thailandpost.com/webservice/getOrderByBarcodes"
+                headers = {"Content-Type": "application/json"}
+                r = requests.post(url, json={"barcodes": _t}, headers=headers,
+                                  auth=HTTPBasicAuth(username, password), timeout=30, verify=False)
+                if r.status_code == 200:
+                    try:
+                        raw = r.json()
+                    except Exception:
+                        raw = r.text
+                    for item in _normalize_payload_list(raw):
+                        if not isinstance(item, dict):
+                            continue
+                        bc = str(item.get("barcode") or "").strip()
+                        if not bc:
+                            continue
+                        status = str(item.get("status") or item.get("statusCode") or "").strip()
+                        desc = str(item.get("statusDescription") or item.get("status_description") or "").strip()
+                        sk, sl = classify_delivery_status(status, desc)
+                        status_map[bc] = (sk, sl, desc)
+            except Exception as e:
+                api_notice = api_notice or f"การตรวจสถานะนำจ่ายบางรายการล้มเหลว: {str(e)[:120]}"
+
+            missing = [b for b in _t if b not in status_map]
+            if missing and len(missing) <= 50:
+                def _hist_one(bcode):
+                    try:
+                        hurl = f"https://r_dservice.thailandpost.com/webservice/getHistoryStatus?barcode={bcode}"
+                        hr = requests.get(hurl, headers={"Content-Type": "application/json"},
+                                          auth=HTTPBasicAuth(username, password), timeout=10, verify=False)
+                        if hr.status_code == 200:
+                            try:
+                                hraw = hr.json()
+                            except Exception:
+                                hraw = hr.text
+                            evs = _parse_tracking_events(hraw, bcode)
+                            latest = evs[-1] if evs else {}
+                            sk = latest.get("status_key") or ""
+                            sl = latest.get("status_label") or ""
+                            return bcode, (sk, sl, latest.get("status_description") or "")
+                    except Exception:
+                        pass
+                    return bcode, None
+
+                with ThreadPoolExecutor(max_workers=10) as ex:
+                    for bcode, result in ex.map(_hist_one, missing):
+                        if result:
+                            status_map[bcode] = result
+
+            for rec in unconcluded:
+                bcode = rec.get("barcode")
+                upd = status_map.get(bcode) if bcode else None
+                if upd:
+                    sk, sl, desc = upd
+                    if sk in ("delivered", "returned"):
+                        rec["status_key"] = sk
+                        rec["status_label"] = sl
+                        rec["status_description"] = sl
+                        rec["status_description_raw"] = desc
+                    elif sk == "in_transit":
+                        rec["status_key"] = "in_transit"
+                        rec["status_label"] = sl or rec.get("status_label") or "อยู่ระหว่างนำจ่าย"
+
+    total = len(records)
+    delivered = 0
+    failed = 0
+    pending = 0
+    unknown = 0
+    reason_counts = {}
+    province_map = {}
+    parcels = []
+
+    for idx, rec in enumerate(records):
+        key = rec.get("status_key") or "in_transit"
+        province = (rec.get("receiver_province") or "").strip()
+        if not province:
+            zipcode = (rec.get("receiver_zipcode") or "").strip()
+            province = f"ZIP:{zipcode}" if zipcode else "(ไม่ระบุ)"
+        reason = ""
+        if key == "delivered":
+            delivered += 1
+        elif key == "returned":
+            failed += 1
+            reason = _classify_failure_reason(
+                rec.get("status_description_raw") or rec.get("status_description") or rec.get("status_label")
+            )
+            reason_counts[reason] = reason_counts.get(reason, 0) + 1
+        elif key in ("received", "in_transit"):
+            pending += 1
+        else:
+            unknown += 1
+
+        st = province_map.setdefault(province, {"count": 0, "delivered": 0, "failed": 0, "pending": 0})
+        st["count"] += 1
+        if key == "delivered":
+            st["delivered"] += 1
+        elif key == "returned":
+            st["failed"] += 1
+        else:
+            st["pending"] += 1
+
+        parcels.append({
+            "seq": idx + 1,
+            "barcode": rec.get("barcode") or "",
+            "receiver_name": rec.get("receiver_name") or "",
+            "receiver_province": province,
+            "receiver_zipcode": rec.get("receiver_zipcode") or "",
+            "status_key": key,
+            "status_label": rec.get("status_label") or "",
+            "reason": reason,
+            "latest_date": rec.get("latest_date") or "",
+            "latest_station": rec.get("latest_station") or "",
+        })
+
+    concluded = delivered + failed
+    parcels_truncated = len(parcels) > 300
+    if parcels_truncated:
+        parcels = parcels[:300]
+    summary = {
+        "total_items": total,
+        "delivered_count": delivered,
+        "failed_count": failed,
+        "pending_count": pending,
+        "unknown_count": unknown,
+        "concluded_count": concluded,
+        "delivered_pct_of_concluded": round(delivered * 100 / concluded, 1) if concluded else 0.0,
+        "failed_pct_of_concluded": round(failed * 100 / concluded, 1) if concluded else 0.0,
+        "delivered_pct_of_total": round(delivered * 100 / total, 1) if total else 0.0,
+        "failed_pct_of_total": round(failed * 100 / total, 1) if total else 0.0,
+        "pending_pct_of_total": round(pending * 100 / total, 1) if total else 0.0,
+    }
+
+    reasons = [
+        {"reason": r, "count": c, "pct_of_failed": round(c * 100 / failed, 1) if failed else 0.0}
+        for r, c in sorted(reason_counts.items(), key=lambda kv: -kv[1])
+    ]
+
+    provinces = []
+    for prov, st in province_map.items():
+        conc = st["delivered"] + st["failed"]
+        provinces.append({
+            "province": prov,
+            "count": st["count"],
+            "delivered": st["delivered"],
+            "failed": st["failed"],
+            "pending": st["pending"],
+            "concluded": conc,
+            "success_rate": round(st["delivered"] * 100 / conc, 1) if conc else None,
+        })
+    provinces.sort(key=lambda p: (-p["count"], p["province"]))
+
+    return {
+        "success": True,
+        "date": payload.get("date"),
+        "end_date": payload.get("end_date"),
+        "date_display": payload.get("date_display"),
+        "is_mock": is_mock,
+        "api_notice": api_notice,
+        "summary": summary,
+        "reasons": reasons,
+        "provinces": provinces,
+        "parcels": parcels,
+        "parcels_truncated": parcels_truncated,
     }
 
 

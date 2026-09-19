@@ -322,4 +322,10 @@
   - แก้ไข: ลบบรรทัด `earInfo?.signature_image ||` ทิ้ง (บรรทัดถัดไป `clientEarData?.signature_image` ครอบคลุมอยู่แล้ว); ตรวจแล้วจุด `earInfo` อื่น (`TrackingTimelineModal.jsx:589`, `TrackingInquiryView.jsx:974`) ประกาศ `const` ถูกต้อง และ `clientEarMap` (state `:246`) ปกติ
   - ผลลัพธ์: bundle ใหม่ไม่มี `earInfo?.signature_image` หลงเหลือ; deploy production ผ่าน health `v2026.0919.1142`
 
+- [x] **4.65 ฟีเจอร์หน้า สถิติ & แผนที่ (Dashboard) (`v2026.0919.1314`)**
+  - **Backend** (`api/index.py`): extract helper `_fetch_received_report_payload(req_date, req_end_date, req_username, req_password)` จาก endpoint เดิม (L537-864) เหลือ `POST /api/reports/received` แบบบางๆ + เพิ่ม `DashboardRequest` (`_classify_failure_reason`, 9 buckets) + `POST /api/reports/dashboard` ดึงข้อมูลหลายวันแบบขนาน ตรวจสอบบาร์โค้ดซ้ำ, enrich รายชื่อจริง/สถานะล่าสุด >35 รายการ ผ่าน `getOrderByBarcodes` (cap 400) + `getHistoryStatus` กันส่วนที่ขาด (≤50 missing), สรุป summary (delivered/failed/pending + %), แยกรายละเอียดตามสาเหตุส่งคืนและตามรายจังหวัด, ตัดสินใจ parcel 300 + flag `parcels_truncated`
+  - **ข้อมูลแผนที่ประเทศไทย**: generator Node (`gen_map.cjs`) จาก GeoJSON 77 จังหวัด → `src/data/thailandMapData.js` (equirectangular + cos(latC), scale 640x1173, simplify Douglas-Peucker tol 0.9px เหลือ 4,099 จุด / 54KB); แก้ orientation/bug case-sensitive จนชื่อไทยครบ 77 (รวม alias `Bangkok Metropolis`, `Phangnga`, `Si Sa Ket`)
+  - **Frontend**: tab "สถิติ & แผนที่" (`Navbar.jsx`), deep-link `?page=dashboard`, `DashboardView.jsx` + `DashboardView.css` (stat cards รับ/ส่ง failed + %, แผนที่ SVG สีตาม success_rate พร้อม tooltip/legend/panel จังหวัด, ตารางจัดอันดับ, ตารางพัสดุ tab/search/pagination 20/หน้า, cache sessionStorage, reuse ThaiDateInput + deposit CSS), `fetchDashboardReport()` ใน `src/utils/api.js`; `?autofetch=1` สำหรับ headless smoke; ในโหมด `?demo=1` ให้ส่ง account `demo` → backend ตอบข้อมูลตัวอย่าง
+  - ผลลัพธ์: smoke headless (dev + `vite preview` prod bundle) แผนที่ 77 จังหวัด + stats + สาเหตุ + ranking + parcels render ครบไม่มี ErrorBoundary; `npm run build` ผ่าน
+
 
