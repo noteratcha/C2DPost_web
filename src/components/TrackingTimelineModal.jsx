@@ -209,7 +209,6 @@ export default function TrackingTimelineModal({ isOpen, barcode, recInfo, curren
       const hasSig = Boolean(
         (rawSig && rawSig !== '-' && !/^(ไม่มี|ไม่พบ|null|undefined)$/i.test(rawSig)) ||
         latestEvent.signature_image ||
-        earInfo?.signature_image ||
         clientEarData?.signature_image
       );
       return {
