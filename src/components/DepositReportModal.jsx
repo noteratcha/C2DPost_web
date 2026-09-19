@@ -127,8 +127,9 @@ export default function DepositReportModal({ isOpen, onClose, currentPerson, onS
             latest_date: trackResult.latest_datetime || latestEv?.datetime || r.latest_date,
             latest_station: trackResult.latest_location || latestEv?.location || r.latest_station,
             status_key: trackResult.latest_status_key || latestEv?.status_key || r.status_key,
-            status_label: trackResult.latest_status || latestEv?.status || r.status_label,
-            status_description: trackResult.latest_status || latestEv?.status || r.status_description
+            status_label: trackResult.latest_status_label || latestEv?.status_label || r.status_label,
+            status_description: trackResult.latest_status_label || latestEv?.status_label || r.status_description,
+            status_description_raw: latestEv?.status_description || trackResult.latest_status_label || r.status_description_raw
           };
         }
         return r;
@@ -141,11 +142,10 @@ export default function DepositReportModal({ isOpen, onClose, currentPerson, onS
       let deliveredCount = 0;
       let returnedCount = 0;
       for (const rec of updatedRecords) {
-        const key = rec.status_key || 'received';
-        if (key === 'delivered') deliveredCount++;
-        else if (key === 'returned') returnedCount++;
-        else if (key === 'in_transit') inTransitCount++;
-        else receivedCount++;
+        if (rec.status_key === 'delivered') deliveredCount++;
+        else if (rec.status_key === 'returned') returnedCount++;
+        else if (rec.status_key === 'in_transit') inTransitCount++;
+        else if (rec.status_key === 'received') receivedCount++;
       }
 
       return {
@@ -153,10 +153,10 @@ export default function DepositReportModal({ isOpen, onClose, currentPerson, onS
         records: updatedRecords,
         summary: {
           ...prev.summary,
-          received_items: receivedCount,
-          in_transit_items: inTransitCount,
-          delivered_items: deliveredCount,
-          returned_items: returnedCount
+          received_count: receivedCount,
+          in_transit_count: inTransitCount,
+          delivered_count: deliveredCount,
+          returned_count: returnedCount
         }
       };
     });

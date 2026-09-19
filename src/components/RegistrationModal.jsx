@@ -52,7 +52,13 @@ export default function RegistrationModal({ isOpen, onClose }) {
 
   // Reset or clear state on open/close
   useEffect(() => {
-    if (!isOpen) {
+    if (isOpen) {
+      // เปิดใหม่ทุกครั้งต้องเริ่มก่อน verify ใหม่ — กันฟอร์มค้าง disabled/ยิงซ้ำ (บั๊ก #24)
+      setApiVerified(false);
+      setVerifyingApi(false);
+      setVerifyStatus({ text: '', type: '' });
+      setShowPassword(false);
+    } else {
       if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
       setCountdown(null);
       setLblMsg({ text: '', type: '' });
@@ -113,7 +119,10 @@ export default function RegistrationModal({ isOpen, onClose }) {
         setVerifyStatus({ text: '✅ ตรวจสอบ Username และ Password ถูกต้อง', type: 'success' });
       } else {
         setApiVerified(false);
-        setVerifyStatus({ text: '❌ Username หรือ Password ไม่ถูกต้อง', type: 'fail' });
+        setVerifyStatus({
+          text: data.success === false && data.message ? `❌ ${data.message}` : '❌ Username หรือ Password ไม่ถูกต้อง',
+          type: 'fail'
+        });
       }
     } catch (err) {
       console.error('Verify error:', err);

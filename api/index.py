@@ -2,6 +2,7 @@ import os
 import sys
 import io
 import json
+import base64
 import tempfile
 import zipfile
 from typing import List, Optional
@@ -395,15 +396,15 @@ def send_eparcel(req: SendEparcelRequest):
         except Exception:
             resp_data = response.text
             
-        return {
-            "status_code": response.status_code,
-            "data": resp_data
-        }
+        return JSONResponse(
+            status_code=response.status_code,
+            content={"status_code": response.status_code, "data": resp_data}
+        )
     except Exception as e:
-        return {
-            "status_code": 500,
-            "error": str(e)
-        }
+        return JSONResponse(
+            status_code=500,
+            content={"status_code": 500, "error": str(e)}
+        )
 
 @app.post("/api/log-barcodes")
 def log_barcodes_endpoint(req: LogBarcodesRequest):
@@ -1095,7 +1096,7 @@ def _fetch_ear_details(barcode: str) -> dict:
 def get_ear_pdf(barcode: str):
     """
     Proxies and serves the official e-AR PDF for a given barcode from Thailand Post.
-    Automatically enriches with Page 2 tracking timeline history and delivery evidence.
+    Returns the genuine e-AR document as-is (no fabricated tracking page is appended).
     """
     barcode = (barcode or "").strip().upper()
     if not barcode:
@@ -1125,26 +1126,8 @@ def get_ear_pdf(barcode: str):
                 detail=f"ไม่พบข้อมูลไฟล์ใบตอบรับ e-AR ฉบับจริงสำหรับพัสดุ {barcode} กรุณาตรวจสอบว่าเปิดใช้งานส่วนขยาย C2DPost Helper ใน Chrome แล้วรีเฟรชหน้าเว็บ"
             )
 
-        # Parse e-AR details
-        parsed_ear = _parse_ear_pdf_content(ear_bytes)
-        demo_evs = _build_demo_tracking(barcode)
-
-        info = {
-            "barcode": barcode,
-            "receiver_name": "",
-            "inv_no": "",
-            "relationship": parsed_ear.get("relationship") or "ผู้รับรับเอง",
-            "delivery_officer": parsed_ear.get("delivery_officer") or "-",
-            "signature_image": parsed_ear.get("signature_image") or "",
-            "latest_datetime": demo_evs[-1].get("datetime") if demo_evs else "",
-            "latest_location": demo_evs[-1].get("location") if demo_evs else "",
-            "events": demo_evs,
-            "downloaded_at": ""
-        }
-
-        combined_bytes = _combine_ear_and_tracking_pdf(ear_bytes, info)
         return Response(
-            content=combined_bytes,
+            content=ear_bytes,
             media_type="application/pdf",
             headers={
                 "Content-Disposition": f'inline; filename="e-AR-{barcode}.pdf"',
@@ -1213,11 +1196,6 @@ def create_ear_with_tracking_pdf(req: EarWithTrackingPdfRequest):
 
     # If events missing or empty, try to fetch or build demo tracking
     events = req.events or []
-    if not events:
-        try:
-            events = _build_demo_tracking(barcode)
-        except Exception:
-            events = []
 
     info = {
         "barcode": barcode,
@@ -1231,6 +1209,18 @@ def create_ear_with_tracking_pdf(req: EarWithTrackingPdfRequest):
         "events": events,
         "downloaded_at": req.downloaded_at or ""
     }
+
+    # Never fabricate a fake tracking timeline onto an official document.
+    # Without real checkpoint data, return the genuine e-AR (Page 1) only.
+    if not events:
+        return Response(
+            content=ear_bytes,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f'inline; filename="e-AR_{barcode}.pdf"',
+                "Cache-Control": "public, max-age=3600"
+            }
+        )
 
     try:
         combined_bytes = _combine_ear_and_tracking_pdf(ear_bytes, info)
@@ -1298,6 +1288,11 @@ def classify_step_for_pdf(ev, is_last):
     return ev.get("status_label") or "อัปเดตสถานะ", "#475569"
 
 
+def _xml_escape(value):
+    """Escape characters that ReportLab Paragraph interprets as XML markup."""
+    return str(value or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
 def _build_tracking_page2_pdf(info):
     """
     Generates Page 2 (Tracking Timeline & Delivery Evidence Report)
@@ -1336,19 +1331,19 @@ def _build_tracking_page2_pdf(info):
 
     elements = []
 
-    barcode = str(info.get("barcode") or "-").strip().upper()
-    receiver = str(info.get("receiver_name") or "-").strip()
-    inv_no = str(info.get("inv_no") or "").strip()
-    rel = str(info.get("relationship") or "ผู้รับรับเอง").strip()
-    officer = str(info.get("delivery_officer") or "-").strip()
-    latest_dt = str(info.get("latest_datetime") or "").strip()
-    latest_loc = str(info.get("latest_location") or "").strip()
+    barcode = _xml_escape(str(info.get("barcode") or "-").strip().upper())
+    receiver = _xml_escape(str(info.get("receiver_name") or "-").strip())
+    inv_no = _xml_escape(str(info.get("inv_no") or "").strip())
+    rel = _xml_escape(str(info.get("relationship") or "ผู้รับรับเอง").strip())
+    officer = _xml_escape(str(info.get("delivery_officer") or "-").strip())
+    latest_dt = _xml_escape(str(info.get("latest_datetime") or "").strip())
+    latest_loc = _xml_escape(str(info.get("latest_location") or "").strip())
     events = info.get("events") or []
 
     if events and not latest_dt:
-        latest_dt = str(events[-1].get("datetime") or "")
+        latest_dt = _xml_escape(str(events[-1].get("datetime") or ""))
     if events and not latest_loc:
-        latest_loc = str(events[-1].get("location") or "")
+        latest_loc = _xml_escape(str(events[-1].get("location") or ""))
 
     # 1. Header Title
     t_text = apply_thai_pua("บันทึกประวัติสถานะและการนำส่งพัสดุ (e-Parcel Tracking & Delivery Report)")
@@ -1410,9 +1405,9 @@ def _build_tracking_page2_pdf(info):
     for idx, ev in enumerate(events):
         is_last = (idx == len(events) - 1)
         seq_label = f"{idx + 1} ✓" if is_last else str(idx + 1)
-        dt = str(ev.get("datetime") or "-").strip()
-        loc = str(ev.get("location") or "-").strip()
-        desc = str(ev.get("status_description") or "-").strip()
+        dt = _xml_escape(str(ev.get("datetime") or "-").strip())
+        loc = _xml_escape(str(ev.get("location") or "-").strip())
+        desc = _xml_escape(str(ev.get("status_description") or "-").strip())
 
         badge_text, badge_color = classify_step_for_pdf(ev, is_last)
 
@@ -2120,7 +2115,7 @@ def reconcile_received(req: ReconcileRequest):
                             hraw = hresp.text
                         events = _parse_tracking_events(hraw, barcode)
                         received_events = [ev for ev in events if _is_received_event(ev)]
-                        latest = events[0] if events else {}
+                        latest = events[-1] if events else {}
                         received = len(received_events) > 0
                         order_map[barcode] = {
                             "barcode": barcode,
@@ -2262,10 +2257,14 @@ def verify_user(req: VerifyUserRequest):
             timeout=15, 
             verify=False
         )
-        if r.status_code != 401:
+        if r.status_code in (200, 201, 202):
             return {"success": True, "valid": True, "message": "ตรวจสอบ Username และ Password ถูกต้อง"}
-        else:
+        elif r.status_code == 401:
             return {"success": True, "valid": False, "message": "Username หรือ Password ไม่ถูกต้อง"}
+        elif r.status_code == 403:
+            return {"success": False, "valid": False, "message": "ระบบไปรษณีย์ปฏิเสธการเชื่อมต่อ (403) กรุณาตรวจสอบสิทธิ์การใช้งาน API"}
+        else:
+            return {"success": False, "valid": False, "message": f"ไม่สามารถตรวจสอบได้ ระบบไปรษณีย์ตอบสถานะ {r.status_code}: {r.text[:200]}"}
     except Exception as e:
         return {"success": False, "valid": False, "message": f"เชื่อมต่อ API ล้มเหลว: {str(e)}"}
 
@@ -2520,11 +2519,13 @@ async def convert_pdfs(files: List[UploadFile] = File(...)):
     error_files = []
     
     with tempfile.TemporaryDirectory() as temp_dir:
-        for uploaded_file in files:
-            if not uploaded_file.filename.lower().endswith(".pdf"):
+        for idx, uploaded_file in enumerate(files):
+            original_name = uploaded_file.filename or "upload.pdf"
+            safe_name = os.path.basename(original_name.replace("\\", "/"))
+            if not safe_name.lower().endswith(".pdf"):
                 continue
-                
-            temp_file_path = os.path.join(temp_dir, uploaded_file.filename)
+
+            temp_file_path = os.path.join(temp_dir, f"up_{idx}_{safe_name}")
             try:
                 content = await uploaded_file.read()
                 with open(temp_file_path, "wb") as f:
@@ -2532,10 +2533,10 @@ async def convert_pdfs(files: List[UploadFile] = File(...)):
                     
                 records = process_pdf(temp_file_path)
                 for rec in records:
-                    rec["SOURCE_FILE"] = uploaded_file.filename
+                    rec["SOURCE_FILE"] = original_name
                 all_records.extend(records)
             except Exception as e:
-                error_files.append({"filename": uploaded_file.filename, "error": str(e)})
+                error_files.append({"filename": original_name, "error": str(e)})
                 
     if all_records:
         df = records_to_dataframe(all_records)

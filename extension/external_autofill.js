@@ -509,11 +509,13 @@
   // Support SPA navigation (e.g. Next.js router transitions from /sign-in to /ear)
   let lastUrl = window.location.href;
   const urlCheckInterval = setInterval(() => {
+    if (document.visibilityState !== 'visible') return;
     if (window.location.href !== lastUrl) {
       lastUrl = window.location.href;
       inspectAndTriggerEarSearch();
     }
   }, 500);
+  window.addEventListener('pagehide', () => clearInterval(urlCheckInterval));
 
   window.addEventListener("popstate", inspectAndTriggerEarSearch);
   window.addEventListener("hashchange", inspectAndTriggerEarSearch);

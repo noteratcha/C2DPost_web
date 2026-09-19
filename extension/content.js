@@ -2,7 +2,7 @@
 // Injected into web pages (Vercel & Localhost)
 
 (function () {
-  const VERSION = "1.3.0";
+  const VERSION = "1.4.0";
 
   // Mark HTML element so the web page can detect immediately via DOM
   function markExtensionInstalled() {
@@ -54,7 +54,10 @@
           typ: typ || 2
         },
         (response) => {
-          // Send response back to the web page
+          if (chrome.runtime.lastError) {
+            window.postMessage({ type: "C2DPOST_BARCODES_RESULT", requestId, success: false, error: chrome.runtime.lastError.message }, "*");
+            return;
+          }
           window.postMessage(
             {
               type: "C2DPOST_BARCODES_RESULT",
@@ -83,6 +86,10 @@
           }
         },
         (response) => {
+          if (chrome.runtime.lastError) {
+            window.postMessage({ type: "C2DPOST_CREDENTIALS_SET_RESULT", success: false, error: chrome.runtime.lastError.message }, "*");
+            return;
+          }
           window.postMessage(
             {
               type: "C2DPOST_CREDENTIALS_SET_RESULT",
@@ -106,6 +113,10 @@
           barcode: barcode
         },
         (response) => {
+          if (chrome.runtime.lastError) {
+            window.postMessage({ type: "C2DPOST_EAR_SEARCH_SET_RESULT", success: false, error: chrome.runtime.lastError.message }, "*");
+            return;
+          }
           window.postMessage(
             {
               type: "C2DPOST_EAR_SEARCH_SET_RESULT",
@@ -128,6 +139,10 @@
           barcode: barcode
         },
         (response) => {
+          if (chrome.runtime.lastError) {
+            window.postMessage({ type: "C2DPOST_EAR_PDF_RESULT", requestId, success: false, error: chrome.runtime.lastError.message }, "*");
+            return;
+          }
           window.postMessage(
             {
               type: "C2DPOST_EAR_PDF_RESULT",

@@ -9,17 +9,20 @@
 ### 1. ไฟล์บีบอัด Zip สำหรับอัปโหลด Chrome Web Store หรือดาวน์โหลดติดตั้ง
 | ไฟล์ | เวอร์ชัน | ขนาด | รายละเอียดการปรับปรุง |
 | :--- | :---: | :---: | :--- |
-| **`C2DPost_Helper_v1.3.0_WebStore.zip`** | **1.3.0 (ล่าสุด)** | ~25 KB | เพิ่ม Bridge `FETCH_EAR_PDF` เพื่อดึงใบตอบรับและลายเซ็น e-AR จาก IP ประเทศไทยโดยตรง (ข้ามปัญหา CORS), รองรับการแสดงภาพลายเซ็นและข้อมูลผู้รับบนหน้าเว็บ |
+| **`C2DPost_Helper_v1.4.0_WebStore.zip`** | **1.4.0 (ล่าสุด)** | ~25 KB | รอบแก้บั๊กความเสถียร: เช็ค `lastError` + fallback เปิดแท็บใหม่ใน popup, เพิ่ม host permission `*.vercel.app`, เช็ค `lastError` ทุก sendMessage ใน content.js, ยับยั้ง auto-fill ตอนแท็บซ่อน + clearInterval ชั่วคราว |
+
+> 📋 ดูประวัติการปรับปรุงทุกเวอร์ชันได้ที่ **`CHANGELOG.md`** ในโฟลเดอร์นี้
 
 
 ### 2. โฟลเดอร์ซอร์สโค้ดแบบแตกไฟล์แล้ว (Unpacked Source Code)
-- **`C2DPost_Helper_v1.3.0_unpacked/`**:
+- **`../extension/` (ซอร์สปัจจุบัน = v1.4.0)** — ต้นฉบับโค้ดที่ใช้พัฒนาและแพ็ก zip (อ่านจาก `manifest.json` โดย `sync_extension_webstore.py`):
   - `manifest.json`: ไฟล์คอนฟิกหลักของ Extension (Manifest V3)
   - `background.js`: Service Worker สำหรับดึงข้อมูล API จาก PostOne และ e-AR
   - `content.js`: สคริปต์เชื่อมต่อสื่อสารระหว่างหน้าเว็บ C2DPost กับ Extension
   - `external_autofill.js`: สคริปต์ช่วยกรอกข้อมูลอัตโนมัติบนเว็บภายนอก (DPost / e-AR)
   - `popup.html` & `popup.js`: หน้าต่างป๊อปอัปแจ้งสถานะการทำงาน
   - `icons/`: ไอคอนขนาด 16x16, 48x48, 128x128 px
+- **`C2DPost_Helper_v1.3.0_unpacked/`** และ **`C2DPost_Helper_v1.3.0_WebStore/`**: สแนปช็อตเวอร์ชัน 1.3.0 (เก็บไว้เปรียบเทียบอ้างอิง) — โครงสร้างไฟล์เหมือนด้านบน
 
 ---
 
@@ -29,9 +32,8 @@
 1. เปิด Google Chrome แล้วไปที่ `chrome://extensions`
 2. เปิดสวิตช์ **"Developer mode" (โหมดนักพัฒนา)** ที่มุมบนขวา
 3. คลิกปุ่ม **"Load unpacked" (โหลดที่คลายการบีบอัดแล้ว)**
-4. เลือกโฟลเดอร์:
-   `e:\My Drive\ส่วน ทข.ปข.10\เว็บ\Convert PDF To Excel\extension_Webstore\C2DPost_Helper_v1.3.0_unpacked`
-5. ระบบจะติดตั้งส่วนขยายเวอร์ชัน **1.3.0** ทันที
+4. เลือกโฟลเดอร์ `C2DPost_web\extension` (ซอร์ส v1.4.0)
+5. ระบบจะติดตั้งส่วนขยายเวอร์ชัน **1.4.0** ทันที
 
 ### วิธีที่ B: อัปเดตจากเวอร์ชันเดิมที่ติดตั้งไว้แล้ว
 1. เปิด `chrome://extensions`

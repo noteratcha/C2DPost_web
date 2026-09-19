@@ -65,6 +65,12 @@ export default function App() {
   const [reconcileNotice, setReconcileNotice] = useState(null);
   const [trackingInfo, setTrackingInfo] = useState(null); // { barcode, receiver, invNo }
 
+  // Stable identity เพื่อไม่ให้ ExtensionGate effect รี-รันทุก render (บั๊ก #23)
+  const handleExtensionUnlocked = useCallback((ver) => {
+    setExtensionUnlocked(true);
+    if (ver) setExtensionVersion(ver);
+  }, []);
+
   // Global drag prevention to stop browser opening dropped PDFs
   useEffect(() => {
     const handleDragOver = (e) => e.preventDefault();
@@ -124,6 +130,8 @@ export default function App() {
   // Workspace Drag & Drop State
   const [isWorkspaceDragOver, setIsWorkspaceDragOver] = useState(false);
   const workspaceDragCounterRef = useRef(0);
+  // Synchronous lock เพื่อกัน drop/เลือกไฟล์ซ้อนกันระหว่างกำลังประมวลผล (บั๊ก #18)
+  const uploadLockRef = useRef(false);
 
   // App Main State
   const [selectedFiles, setSelectedFiles] = useState(() => {
@@ -307,6 +315,12 @@ export default function App() {
 
   // 1. Handle File Selection and Parsing
   const handleFilesSelected = async (fileList) => {
+    // Guard: ปฏิเสธถ้ามีการแปลงไฟล์กำลังทำงานอยู่ (ป้องกัน upload ชนกันทุกรูปแบบ drop)
+    if (uploadLockRef.current) {
+      alert('กำลังประมวลผลไฟล์อยู่ กรุณารอให้เสร็จก่อนจึงเลือกไฟล์ใหม่');
+      return;
+    }
+
     const rawFiles = Array.from(fileList);
     const pdfFiles = rawFiles.filter(f => f.name.toLowerCase().endsWith('.pdf'));
 
@@ -324,6 +338,12 @@ export default function App() {
 
     if (newFiles.length === 0) return;
 
+    if (isProcessing) {
+      alert('กำลังประมวลผลไฟล์อยู่ กรุณารอให้เสร็จก่อน');  // ซ้ำซ้อนกับ ref แต่กัน UI path ที่ยังอ่าน state ค้าง
+      return;
+    }
+
+    uploadLockRef.current = true;
     setIsProcessing(true);
     setProgress({ val: 0, current: 0, total: newFiles.length, percent: 0 });
     setStatusText(`กำลังแปลงไฟล์... 0/${newFiles.length} (0%)`);
@@ -371,36 +391,26 @@ export default function App() {
           };
         });
 
-        const updatedFiles = [...selectedFiles, ...newFiles];
-        const combinedRecords = [...records, ...formattedNewRecords];
-
-        // Recalculate continuous sequence numbers 1..N
-        const sequencedRecords = combinedRecords.map((r, i) => ({
-          ...r,
-          NO: i + 1
-        }));
-
-        // Map status for each newly uploaded file
-        const newStatusMap = { ...fileStatuses };
+        const addedStatusMap = {};
         newFiles.forEach((f) => {
           const name = f.name;
           const errObj = (result.error_files || []).find((ef) => ef.filename === name);
           const count = formattedNewRecords.filter((r) => r.SOURCE_FILE === name).length;
 
           if (errObj) {
-            newStatusMap[name] = {
+            addedStatusMap[name] = {
               status: 'error',
               error: errObj.error || 'เกิดข้อผิดพลาดในการประมวลผล',
               recordCount: 0
             };
           } else if (count > 0) {
-            newStatusMap[name] = {
+            addedStatusMap[name] = {
               status: 'success',
               recordCount: count,
               message: `แปลงข้อมูลสำเร็จ (${count} รายการ)`
             };
           } else {
-            newStatusMap[name] = {
+            addedStatusMap[name] = {
               status: 'error',
               error: 'ไม่พบรายการข้อมูลในไฟล์ หรือรูปแบบไม่ตรงกับมาตรฐาน',
               recordCount: 0
@@ -408,11 +418,15 @@ export default function App() {
           }
         });
 
-        setSelectedFiles(updatedFiles);
-        setFileStatuses(newStatusMap);
-        setRecords(sequencedRecords);
+        // ใช้ functional updates เพื่อไม่พึ่ง stale closure จาก render เดิม (กันข้อมูลทับกัน)
+        setSelectedFiles(prevFiles => [...prevFiles, ...newFiles]);
+        setFileStatuses(prevStatus => ({ ...prevStatus, ...addedStatusMap }));
+        setRecords((prevRecords) => {
+          const combined = [...prevRecords, ...formattedNewRecords].map((r, i) => ({ ...r, NO: i + 1 }));
+          return combined;
+        });
         setProgress(null);
-        setStatusText(`ประมวลผลเสร็จสิ้น รวมทั้งหมด ${sequencedRecords.length} รายการ`);
+        setStatusText(`ประมวลผลเสร็จสิ้น รวมทั้งหมด ${records.length + formattedNewRecords.length} รายการ`);
 
         if (result.error_files && result.error_files.length > 0) {
           const names = result.error_files.map(f => f.filename).join(', ');
@@ -427,6 +441,7 @@ export default function App() {
       setStatusText('เกิดข้อผิดพลาดในการแปลงไฟล์');
       alert(`เกิดข้อผิดพลาดในการประมวลผล PDF:\n${err.message || err}`);
     } finally {
+      uploadLockRef.current = false;
       setIsProcessing(false);
     }
   };
@@ -492,22 +507,29 @@ export default function App() {
 
     try {
       let barcodes = [];
-      // Try fetching from extension bridge with timeout race
+      let bridgeError = null;
+      // ดึงจาก extension เต็มเวลาตาม timeout ของ bridge (20s) ได้เอง
+      // ไม่ใช้ Promise.race ตัดเอง 1.5s ซึ่งทำให้ extension ที่ช้าแต่ทำงานปกติถูกตัดทิ้งแล้วสร้างเลขปลอม
       try {
-        const extRes = await Promise.race([
-          fetchBarcodesFromExtension(numRecords, 2),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('Extension timeout')), 1500))
-        ]);
+        const extRes = await fetchBarcodesFromExtension(numRecords, 2);
         if (extRes && extRes.success && extRes.barcodes && extRes.barcodes.length > 0) {
           barcodes = extRes.barcodes;
         }
       } catch (bridgeErr) {
-        // Fallback if extension not loaded or demo mode
-        const prefix = 'RE';
-        const start = 518924000 + Math.floor(Math.random() * 9000);
-        for (let i = 0; i < numRecords; i++) {
-          barcodes.push(`${prefix}${start + i}TH`);
+        bridgeError = bridgeErr;
+        if (isDemo) {
+          // โหมดสาธิตเท่านั้น: สร้างเลขจำลองให้ทดสอบ UI ได้โดยไม่ต้องพึ่งไปรษณีย์
+          const prefix = 'RE';
+          const start = 518924000 + Math.floor(Math.random() * 9000);
+          for (let i = 0; i < numRecords; i++) {
+            barcodes.push(`${prefix}${start + i}TH`);
+          }
         }
+      }
+
+      // ไม่มีบาร์โค้ดจริงในโหมดใช้งานจริง → ยกเลิกเลย อย่าปล่อยเลขปลอมเข้าระบบ
+      if (barcodes.length === 0) {
+        throw new Error(bridgeError?.message || 'ไม่สามารถดึงหมายเลขบาร์โค้ดจากส่วนขยายได้ กรุณาลองใหม่อีกครั้ง');
       }
 
       setRecords((prev) => {
@@ -590,7 +612,8 @@ export default function App() {
     const password = currentPerson?.Password || '';
     const prefix = currentPerson?.Prefix || 'C2D';
     const now = new Date();
-    const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
+    // ใช้วันตามเวลาประเทศไทย (Asia/Bangkok) ไม่ใช่ UTC — ก่อนเที่ยงคืน/เช้าตรู่เลข manifest ต้องเป็นวันเดียวกันกับผู้ใช้
+    const dateStr = now.toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' }).replace(/-/g, '');
     const manifestNo = `${prefix}${dateStr}-${String(manifestCounter).padStart(4, '0')}`;
 
     setIsSendingApi(true);
@@ -649,7 +672,6 @@ export default function App() {
       });
 
       const resJson = await response.json();
-      setManifestCounter(prev => prev + 1);
 
       if (resJson.status_code === 401) {
         alert(`บัญชีนี้ '${username}' ยังไม่ได้รับการเปิดใช้งาน API\n\nคำแนะนำ: กรุณาติดต่อผู้ดูแลระบบ\nStatus Code: 401`);
@@ -667,6 +689,9 @@ export default function App() {
           return;
         }
       }
+
+      // ถึงจุดนี้ระบบยอมรับคำขอแล้ว (200/0) จึงเบิร์นเลข manifest
+      setManifestCounter(prev => prev + 1);
 
       // Handle items response
       const respData = resJson.data;
@@ -903,6 +928,8 @@ export default function App() {
     if (fileObj) {
       const fileUrl = URL.createObjectURL(fileObj);
       window.open(fileUrl, '_blank');
+      // Revoke หลังหน้าต่างใหม่โหลดได้แล้ว กันหน่วยความจำรั่ว (บั๊ก #22)
+      setTimeout(() => URL.revokeObjectURL(fileUrl), 60000);
     } else {
       alert(`ไฟล์ต้นฉบับ: ${sourceFileName || 'ไม่มีข้อมูลไฟล์'}`);
     }
@@ -1050,10 +1077,7 @@ export default function App() {
       {/* 1. Chrome Extension Gatekeeper */}
       {!extensionUnlocked && (
         <ExtensionGate 
-          onUnlocked={(ver) => {
-            setExtensionUnlocked(true);
-            if (ver) setExtensionVersion(ver);
-          }} 
+          onUnlocked={handleExtensionUnlocked} 
           theme={theme}
           onToggleTheme={toggleTheme}
         />

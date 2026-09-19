@@ -34,7 +34,14 @@ def sync():
                     continue
                 full_path = os.path.join(root, f)
                 rel_path = os.path.relpath(full_path, ext_dir)
-                zf.write(full_path, rel_path)
+                if f == 'manifest.json':
+                    # Web Store build: strip "key" so Chrome Web Store manages the extension ID/key itself
+                    with open(full_path, 'r', encoding='utf-8') as mf:
+                        manifest_data = json.load(mf)
+                    manifest_data.pop('key', None)
+                    zf.writestr(rel_path, json.dumps(manifest_data, indent=2, ensure_ascii=False))
+                else:
+                    zf.write(full_path, rel_path)
     print(f"Created: {zip_path}")
     
     # 3. Clean up obsolete zip files in extension_Webstore

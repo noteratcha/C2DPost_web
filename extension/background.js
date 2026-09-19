@@ -141,7 +141,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === "PING") {
     sendResponse({
       success: true,
-      version: "1.3.0",
+      version: "1.4.0",
       status: "connected"
     });
     return true;

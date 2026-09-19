@@ -80,8 +80,6 @@ export default function TrackingTimelineModal({ isOpen, barcode, recInfo, curren
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
-  if (!isOpen) return null;
-
   const events = trackData?.events || [];
   // chronological: oldest first
   const sortedEvents = [...events].sort((a, b) => (a.seq || 0) - (b.seq || 0));
@@ -273,6 +271,9 @@ export default function TrackingTimelineModal({ isOpen, barcode, recInfo, curren
     }
     return parts.filter(Boolean).join(' ').trim();
   }, [recInfo]);
+
+  // Early return ต้องอยู่หลัง hooks ทั้งหมดเสมอ (ไม่งั้นละเมิด Rules of Hooks — บั๊ก #15)
+  if (!isOpen) return null;
 
   return (
     <div className="track-modal-overlay" onClick={onClose}>

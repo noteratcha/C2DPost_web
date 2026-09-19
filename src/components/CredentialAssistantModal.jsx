@@ -7,6 +7,7 @@ export default function CredentialAssistantModal({
   service = 'dpost', // 'dpost' | 'ear'
   currentPerson,
   extensionInstalled = true,
+  extensionVersion = '',
   onReopen
 }) {
   const [showPassword, setShowPassword] = useState(false);
@@ -113,7 +114,7 @@ export default function CredentialAssistantModal({
               </div>
               <div className="cred-status-content">
                 <strong>ระบบช่วยกรอกอัตโนมัติ (Auto-fill) พร้อมทำงาน</strong>
-                <p>ส่วนขยาย C2DPost Helper v1.1.0 จะช่วยนำ Username และ Password ไปกรอกในหน้าเว็บ {serviceName} ในแท็บใหม่ให้อัตโนมัติ</p>
+                <p>ส่วนขยาย C2DPost Helper{extensionVersion ? ` v${extensionVersion}` : ''} จะช่วยนำ Username และ Password ไปกรอกในหน้าเว็บ {serviceName} ในแท็บใหม่ให้อัตโนมัติ</p>
               </div>
             </div>
           ) : (

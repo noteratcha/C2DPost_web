@@ -37,7 +37,7 @@ except Exception as e:
     print(f"Error registering fonts: {e}")
     FONT_REGISTERED = False
 
-__version__ = "2026.0918.2118"
+__version__ = "2026.0918.2157"
 
 # Thailand Post API Credentials
 API_KEY = "V9JN25IFH5hdZYc1k8NNRVgnLYXyQLzc"
@@ -156,6 +156,12 @@ def apply_thai_pua(text):
             res.append(char)
             
     return "".join(res)
+
+def xml_escape(value):
+    """Escape characters that ReportLab Paragraph interprets as XML markup."""
+    if not isinstance(value, str):
+        value = str(value or "")
+    return value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 def extract_tel(text):
     """Extract telephone number from text and convert to Arabic digits."""
@@ -638,7 +644,7 @@ def extract_page_text_robust(page):
     return text, layout_text
 
 def process_pdf(pdf_path):
-    print(f"กำลังประมวลผลไฟล์: {os.path.basename(pdf_path)}...")
+    print(f"กำลังประมวลผลไฟล์: {os.path.basename(pdf_path)}...") if __name__ == "__main__" else None
     reader = PdfReader(pdf_path)
     records = []
     
@@ -983,9 +989,8 @@ def generate_combined_pdf(dataframe, output_pdf_path, envelope_only=False):
             if (is_envelope or is_last_page) and current_record_idx < len(file_records):
                 barcode_no = file_records[current_record_idx].get('BARCODE_NO', '')
                 
-                if barcode_no and str(barcode_no).strip() != "":
-                    width = float(page.mediabox.width)
-                    height = float(page.mediabox.height)
+                width = float(page.mediabox.width)
+                height = float(page.mediabox.height)
                 
                 # Find X and Y coordinate of "เรียน" and sender address block
                 y_coord_rian = None
@@ -1013,101 +1018,102 @@ def generate_combined_pdf(dataframe, output_pdf_path, envelope_only=False):
                             sender_x_list.append(x)
                 page.extract_text(visitor_text=visitor_body)
                 
-                packet = io.BytesIO()
-                c = canvas.Canvas(packet, pagesize=(width, height))
+                if barcode_no and str(barcode_no).strip() != "":
+                    packet = io.BytesIO()
+                    c = canvas.Canvas(packet, pagesize=(width, height))
                 
-                # Scale factor to make overlay smaller
-                scale = 0.8
-                sender_bottom = min(sender_y_list) if sender_y_list else None
-                sender_left = min(sender_x_list) if sender_x_list else None
+                    # Scale factor to make overlay smaller
+                    scale = 0.8
+                    sender_bottom = min(sender_y_list) if sender_y_list else None
+                    sender_left = min(sender_x_list) if sender_x_list else None
 
-                if y_coord_rian is not None and x_coord_rian is not None:
-                    # Position dynamically relative to "เรียน"
-                    # Align the bottom edge of the e-AR box with the baseline of the "เรียน" text
-                    # The e-AR box bottom is at base_y + (155 * scale)
-                    # So base_y = y_coord_rian - (155 * scale)
-                    base_y = y_coord_rian - (155 * scale)
+                    if y_coord_rian is not None and x_coord_rian is not None:
+                        # Position dynamically relative to "เรียน"
+                        # Align the bottom edge of the e-AR box with the baseline of the "เรียน" text
+                        # The e-AR box bottom is at base_y + (155 * scale)
+                        # So base_y = y_coord_rian - (155 * scale)
+                        base_y = y_coord_rian - (155 * scale)
                     
-                    # Position horizontally to the left of "เรียน" making it closer (5pt gap)
-                    # Right edge of barcode is base_x + (164.7 * scale)
-                    base_x = x_coord_rian - 5 - (164.7 * scale)
+                        # Position horizontally to the left of "เรียน" making it closer (5pt gap)
+                        # Right edge of barcode is base_x + (164.7 * scale)
+                        base_x = x_coord_rian - 5 - (164.7 * scale)
                     
-                    # Prevent going off-screen to the left or bottom
-                    base_x = max(10, base_x)
-                    base_y = max(10, base_y)
-                elif sender_bottom is not None:
-                    # Position under sender's address (ใต้ที่อยู่ผู้ฝากส่ง)
-                    # Box top is at base_y + (210 * scale)
-                    # Gap of 18pt below the sender bottom line
-                    base_y = sender_bottom - 18 - (210 * scale)
-                    base_x = max(18, sender_left if sender_left is not None else 20)
-                    base_y = max(10, base_y)
-                else:
-                    # Fallback to old default if neither "เรียน" nor sender address is found
-                    base_x = width * 0.05
-                    base_y = 40
+                        # Prevent going off-screen to the left or bottom
+                        base_x = max(10, base_x)
+                        base_y = max(10, base_y)
+                    elif sender_bottom is not None:
+                        # Position under sender's address (ใต้ที่อยู่ผู้ฝากส่ง)
+                        # Box top is at base_y + (210 * scale)
+                        # Gap of 18pt below the sender bottom line
+                        base_y = sender_bottom - 18 - (210 * scale)
+                        base_x = max(18, sender_left if sender_left is not None else 20)
+                        base_y = max(10, base_y)
+                    else:
+                        # Fallback to old default if neither "เรียน" nor sender address is found
+                        base_x = width * 0.05
+                        base_y = 40
                 
-                # Draw Barcode (Code128)
-                barcode128 = code128.Code128(str(barcode_no), barHeight=20.625 * scale, barWidth=0.825 * scale)
-                barcode128.drawOn(c, base_x, base_y + (40 * scale))
+                    # Draw Barcode (Code128)
+                    barcode128 = code128.Code128(str(barcode_no), barHeight=20.625 * scale, barWidth=0.825 * scale)
+                    barcode128.drawOn(c, base_x, base_y + (40 * scale))
                 
-                # Get actual width for perfect centering
-                barcode_width = getattr(barcode128, 'width', 164.7 * scale)
-                center_x = base_x + (barcode_width / 2.0)
+                    # Get actual width for perfect centering
+                    barcode_width = getattr(barcode128, 'width', 164.7 * scale)
+                    center_x = base_x + (barcode_width / 2.0)
                 
-                # Draw text centered under barcode
-                c.setFont("Helvetica-Bold", 14 * scale)
-                c.drawCentredString(center_x, base_y + (20 * scale), str(barcode_no))
+                    # Draw text centered under barcode
+                    c.setFont("Helvetica-Bold", 14 * scale)
+                    c.drawCentredString(center_x, base_y + (20 * scale), str(barcode_no))
                 
-                # Draw QR Code centered above barcode
-                qr_code = qr.QrCodeWidget(str(barcode_no))
-                bounds = qr_code.getBounds()
-                qr_width = bounds[2] - bounds[0]
-                qr_height = bounds[3] - bounds[1]
+                    # Draw QR Code centered above barcode
+                    qr_code = qr.QrCodeWidget(str(barcode_no))
+                    bounds = qr_code.getBounds()
+                    qr_width = bounds[2] - bounds[0]
+                    qr_height = bounds[3] - bounds[1]
                 
-                # Scale QR code
-                qr_size = 75.0 * scale
-                scale_w = qr_size / qr_width
-                scale_h = qr_size / qr_height
-                d = Drawing(qr_size, qr_size, transform=[scale_w, 0, 0, scale_h, 0, 0])
-                d.add(qr_code)
-                # Centered, Y: above barcode
-                renderPDF.draw(d, c, center_x - (qr_size / 2.0), base_y + (65 * scale))
+                    # Scale QR code
+                    qr_size = 75.0 * scale
+                    scale_w = qr_size / qr_width
+                    scale_h = qr_size / qr_height
+                    d = Drawing(qr_size, qr_size, transform=[scale_w, 0, 0, scale_h, 0, 0])
+                    d.add(qr_code)
+                    # Centered, Y: above barcode
+                    renderPDF.draw(d, c, center_x - (qr_size / 2.0), base_y + (65 * scale))
                 
-                # --- Draw E-AR Box above QR Code ---
-                box_w = 120 * scale
-                box_h = 55 * scale
-                box_x = center_x - (box_w / 2.0)
-                box_y = base_y + (155 * scale)
+                    # --- Draw E-AR Box above QR Code ---
+                    box_w = 120 * scale
+                    box_h = 55 * scale
+                    box_x = center_x - (box_w / 2.0)
+                    box_y = base_y + (155 * scale)
                 
-                c.setStrokeColorRGB(0, 0, 0) # Black border
-                c.setLineWidth(1)
-                c.setFillColorRGB(1, 1, 1) # White fill
-                c.rect(box_x, box_y, box_w, box_h, fill=1, stroke=1)
+                    c.setStrokeColorRGB(0, 0, 0) # Black border
+                    c.setLineWidth(1)
+                    c.setFillColorRGB(1, 1, 1) # White fill
+                    c.rect(box_x, box_y, box_w, box_h, fill=1, stroke=1)
                 
-                c.setFillColorRGB(0, 0, 0)
-                if FONT_REGISTERED:
-                    c.setFont('Tahoma-Bold', 24 * scale)
-                else:
-                    c.setFont('Helvetica-Bold', 24 * scale)
-                c.drawCentredString(center_x, box_y + (31 * scale), "e-AR")
+                    c.setFillColorRGB(0, 0, 0)
+                    if FONT_REGISTERED:
+                        c.setFont('Tahoma-Bold', 24 * scale)
+                    else:
+                        c.setFont('Helvetica-Bold', 24 * scale)
+                    c.drawCentredString(center_x, box_y + (31 * scale), "e-AR")
                 
-                if FONT_REGISTERED:
-                    c.setFont('Tahoma', max(7.5, 9 * scale))
-                else:
-                    c.setFont('Helvetica', max(7.5, 9 * scale))
-                c.drawCentredString(center_x, box_y + (19 * scale), "ลงทะเบียนตอบรับ")
-                c.drawCentredString(center_x, box_y + (9 * scale), "ทางอิเล็กทรอนิกส์")
-                # -----------------------------------
+                    if FONT_REGISTERED:
+                        c.setFont('Tahoma', max(7.5, 9 * scale))
+                    else:
+                        c.setFont('Helvetica', max(7.5, 9 * scale))
+                    c.drawCentredString(center_x, box_y + (19 * scale), "ลงทะเบียนตอบรับ")
+                    c.drawCentredString(center_x, box_y + (9 * scale), "ทางอิเล็กทรอนิกส์")
+                    # -----------------------------------
                 
-                c.save()
-                packet.seek(0)
+                    c.save()
+                    packet.seek(0)
                 
-                overlay_pdf = PdfReader(packet)
-                page.merge_page(overlay_pdf.pages[0])
+                    overlay_pdf = PdfReader(packet)
+                    page.merge_page(overlay_pdf.pages[0])
                 
-                has_overlay = True
-                current_record_idx += 1
+                    has_overlay = True
+                    current_record_idx += 1
                 
             if envelope_only:
                 if has_overlay:
@@ -1170,10 +1176,10 @@ def generate_delivery_note_pdf(dataframe, output_pdf_path):
     
     # Get shipper info from the first row
     first_row = dataframe.iloc[0]
-    shipper_name = apply_thai_pua(str(first_row.get('SHIPPER_NAME', '')))
-    shipper_addr = apply_thai_pua(str(first_row.get('SHIPPER_ADDRESS', '')))
-    shipper_amphur = apply_thai_pua(str(first_row.get('SHIPPER_AMPHUR', '')))
-    shipper_prov = apply_thai_pua(str(first_row.get('SHIPPER_PROVINCE', '')))
+    shipper_name = apply_thai_pua(xml_escape(first_row.get('SHIPPER_NAME', '')))
+    shipper_addr = apply_thai_pua(xml_escape(first_row.get('SHIPPER_ADDRESS', '')))
+    shipper_amphur = apply_thai_pua(xml_escape(first_row.get('SHIPPER_AMPHUR', '')))
+    shipper_prov = apply_thai_pua(xml_escape(first_row.get('SHIPPER_PROVINCE', '')))
     shipper_zip = str(first_row.get('SHIPPER_ZIPCODE', ''))
     shipper_tel = str(first_row.get('SHIPPER_TEL', ''))
     
@@ -1218,11 +1224,10 @@ def generate_delivery_note_pdf(dataframe, output_pdf_path):
     for idx, row in dataframe.iterrows():
         no = str(row.get('NO', idx + 1))
         barcode = str(row.get('BARCODE_NO', ''))
-        receiver = apply_thai_pua(str(row.get('RECEIVER', '')))
-        
-        r_addr = apply_thai_pua(str(row.get('RECEIVER_ADDRESS', '')))
-        r_amphur = apply_thai_pua(str(row.get('RECEIVER_AMPHUR', '')))
-        r_prov = apply_thai_pua(str(row.get('RECEIVER_PROVINCE', '')))
+        receiver = apply_thai_pua(xml_escape(row.get('RECEIVER', '')))
+        r_addr = apply_thai_pua(xml_escape(row.get('RECEIVER_ADDRESS', '')))
+        r_amphur = apply_thai_pua(xml_escape(row.get('RECEIVER_AMPHUR', '')))
+        r_prov = apply_thai_pua(xml_escape(row.get('RECEIVER_PROVINCE', '')))
         r_zip = str(row.get('RECEIVER_ZIPCODE', ''))
         
         # Use <br/> to break line before Amphur
@@ -1774,7 +1779,7 @@ def generate_deposit_report_pdf(records, summary, meta, output_pdf_path):
 
     elements.append(Paragraph(apply_thai_pua(f"รายงานสรุปการรับฝากเอกสารส่งทางไปรษณีย์ (e-Parcel Deposit Report)"), style_title))
     elements.append(Spacer(1, 0.2*cm))
-    subtitle_text = f"<b>หน่วยงาน:</b> {org_name}  |  <b>วันที่นำส่ง:</b> {report_date}  |  <b>ยอดรวม:</b> {total_items} ฉบับ (นำจ่ายสำเร็จ {delivered_count} ฉบับ, อยู่ระหว่างการนำจ่าย {in_transit_count} ฉบับ, ส่งคืน {returned_count} ฉบับ)"
+    subtitle_text = f"<b>หน่วยงาน:</b> {xml_escape(org_name)}  |  <b>วันที่นำส่ง:</b> {report_date}  |  <b>ยอดรวม:</b> {total_items} ฉบับ (นำจ่ายสำเร็จ {delivered_count} ฉบับ, อยู่ระหว่างการนำจ่าย {in_transit_count} ฉบับ, ส่งคืน {returned_count} ฉบับ)"
     if total_weight > 0:
         subtitle_text += f"  |  <b>น้ำหนักรวม:</b> {total_weight:,.1f} กรัม"
     subtitle_text += f"  |  <b>ยอดค่าบริการ:</b> {total_fee:,.2f}"
@@ -1788,14 +1793,14 @@ def generate_deposit_report_pdf(records, summary, meta, output_pdf_path):
     table_data = [[Paragraph(apply_thai_pua(h), style_th) for h in th_headers]]
 
     for i, r in enumerate(records):
-        full_addr = f"{r.get('receiver_address', '')} {r.get('receiver_amphur', '')} {r.get('receiver_province', '')} {r.get('receiver_zipcode', '')}".strip()
+        full_addr = xml_escape(f"{r.get('receiver_address', '')} {r.get('receiver_amphur', '')} {r.get('receiver_province', '')} {r.get('receiver_zipcode', '')}".strip())
         weight = float(r.get("weight") or 0.0)
         fee = float(r.get("fee") or 0.0)
         latest_d = r.get("latest_date") or r.get("received_date") or "-"
-        latest_s = format_station_with_zipcode(r.get("latest_station") or r.get("received_postoffice") or "-", r)
+        latest_s = xml_escape(format_station_with_zipcode(r.get("latest_station") or r.get("received_postoffice") or "-", r))
         
-        status_lbl = r.get("status_label") or r.get("status_description") or "รับฝากเข้าระบบแล้ว"
-        raw_desc = (r.get("status_description_raw") or "").strip()
+        status_lbl = xml_escape(r.get("status_label") or r.get("status_description") or "รับฝากเข้าระบบแล้ว")
+        raw_desc = (xml_escape(r.get("status_description_raw") or "")).strip()
         if raw_desc and raw_desc != status_lbl and raw_desc not in status_lbl:
             is_exc = any(k in raw_desc for k in ["บ้านปิด", "ออกใบแจ้ง", "ไม่ชัดเจน", "ไม่มีเลขบ้าน", "ไม่ยอมรับ", "ไม่มีผู้รับ", "ไม่มารับตามกำหนด", "รอจ่าย", "ย้าย", "ส่งคืน", "ระงับ"])
             color_hex = "#c2410c" if is_exc else "#475569"
@@ -1805,9 +1810,9 @@ def generate_deposit_report_pdf(records, summary, meta, output_pdf_path):
 
         row = [
             Paragraph(str(i + 1), style_td_c),
-            Paragraph(f"<b>{r.get('barcode', '')}</b>", style_td_c),
-            Paragraph(r.get("inv_no", "-"), style_td_c),
-            Paragraph(apply_thai_pua(r.get("receiver_name", "")), style_td_l),
+            Paragraph(f"<b>{xml_escape(r.get('barcode', ''))}</b>", style_td_c),
+            Paragraph(xml_escape(r.get("inv_no", "-")), style_td_c),
+            Paragraph(apply_thai_pua(xml_escape(r.get("receiver_name", ""))), style_td_l),
             Paragraph(apply_thai_pua(full_addr), style_td_l),
             Paragraph(f"{weight:,.1f}", style_td_r),
             Paragraph(f"{fee:,.2f}", style_td_r),
@@ -1852,7 +1857,7 @@ def generate_deposit_report_pdf(records, summary, meta, output_pdf_path):
     sig_land = (
         "ลงชื่อ .............................................................. ผู้ส่งมอบเอกสาร<br/>"
         "( .............................................................. )<br/>"
-        f"เจ้าหน้าที่ {apply_thai_pua(org_name)}<br/>"
+        f"เจ้าหน้าที่ {apply_thai_pua(xml_escape(org_name))}<br/>"
         "วันที่ ............. / ............. / ............."
     )
     sig_post = (

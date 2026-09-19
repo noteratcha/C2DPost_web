@@ -2554,6 +2554,33 @@ useEffect(() => {
 - **Solution**: Check `เตรียมนำจ่าย` / `เตรียมการนำจ่าย` in a dedicated step placed BEFORE the destination-office group, and delete the contradictory `"ถึง" not in desc` guard entirely. Plain `ถึงที่ทำการไปรษณีย์ปลายทาง` (no prepare-phrase) still classifies as `ถึง ปณ.ปลายทาง`.
 - **Rule**: Always classify by the *latest action* (e.g. ready-for-delivery) before grouping by the *arrival checkpoint* when both keywords coexist in one description.
 
+---
+
+## 93. Central Bugfix Ledger and Bug Resolution Protocol (`BUGFIX_REPORT.md`)
+
+### 1. Mandatory Bug Tracking Policy
+- Any bug detected, investigated, or resolved in `C2DPost_web` (across Python Backend, PDF Core Engine, React Frontend, or Chrome Extension) must be permanently logged in `C2DPost_web/BUGFIX_REPORT.md`.
+- `BUGFIX_REPORT.md` acts as the single source of truth (SSOT) for all quality engineering findings, root-cause analyses, and resolution verifications.
+
+### 2. Standard Bugfix Documentation Schema
+Each bug recorded must adhere to the standardized structure:
+1. **Severity Classification**:
+   - `HIGH`: Unhandled crashes, serverless 500 errors, core data corruption, or fatal missing imports.
+   - `MEDIUM`: Misclassified state logic, UI mismatch between View & Modal, or unauthorized mock/demo data leakage into official government documents.
+   - `MINOR/LOW`: Path sanitization, XML escaping in ReportLab, logging cleanup in hot paths, or extension interval/memory leak hygiene.
+2. **Tabular Summary Matrix**:
+   - Column schema: `#` | `ความรุนแรง (Severity)` | `ตำแหน่ง (File:Line)` | `ปัญหา (Issue)` | `ผลกระทบ (Impact)` | `สถานะ (Status)`
+3. **Deep-Dive Engineering Section**:
+   - Detailed "ก่อน (Before)" vs "หลัง (After)" code comparison.
+   - Root-cause explanation and technical solution.
+   - Architectural benefits and regression prevention.
+4. **Verification & Deployment Checklist**:
+   - Python AST syntax checking.
+   - `npm run build` frontend bundling.
+   - Multi-file version bump synchronization (`config.js`, `package.json`, `convert_dpost.py`, `PROJECT_DOCUMENTATION.md`, `ROADMAP_REPORT_FEATURE.md`, `SKILL.md`).
+   - Production deployment verification (`GET /api/health`).
+
+
 
 
 

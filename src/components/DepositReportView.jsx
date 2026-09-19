@@ -1345,11 +1345,11 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
 
             <div className="ear-help-modal-footer">
               <a
-                href="/C2DPost_Helper_v1.3.0_WebStore.zip"
-                download="C2DPost_Helper_v1.3.0_WebStore.zip"
+                href="/C2DPost_Helper_v1.4.0_WebStore.zip"
+                download="C2DPost_Helper_v1.4.0_WebStore.zip"
                 className="btn-download-ext-zip"
               >
-                📥 ดาวน์โหลดส่วนขยาย C2DPost_Helper_v1.3.0.zip
+                📥 ดาวน์โหลดส่วนขยาย C2DPost_Helper_v1.4.0.zip
               </a>
               <button
                 type="button"
