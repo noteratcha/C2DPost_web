@@ -129,7 +129,8 @@ export default function DepositReportModal({ isOpen, onClose, currentPerson, onS
             status_key: trackResult.latest_status_key || latestEv?.status_key || r.status_key,
             status_label: trackResult.latest_status_label || latestEv?.status_label || r.status_label,
             status_description: trackResult.latest_status_label || latestEv?.status_label || r.status_description,
-            status_description_raw: latestEv?.status_description || trackResult.latest_status_label || r.status_description_raw
+            status_description_raw: latestEv?.status_description || trackResult.latest_status_label || r.status_description_raw,
+            signature: trackResult.signature || latestEv?.signature || r.signature
           };
         }
         return r;
@@ -695,7 +696,12 @@ export default function DepositReportModal({ isOpen, onClose, currentPerson, onS
             <div className="stat-data">
               <span className="stat-label">ยอดรวมค่าบริการ</span>
               <div className="stat-number-row">
-                <span className="stat-number text-gold">{summary.total_fee.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                <span className="stat-number text-gold">
+                  {Number(summary.total_fee || 0).toLocaleString('th-TH', { 
+                    minimumFractionDigits: Number(summary.total_fee || 0) % 1 === 0 ? 0 : 2, 
+                    maximumFractionDigits: 2 
+                  })}
+                </span>
               </div>
             </div>
           </div>
@@ -816,12 +822,17 @@ export default function DepositReportModal({ isOpen, onClose, currentPerson, onS
                 paginatedRecords.map((rec, idx) => {
                   const statusInfo = getDeliveryStatusInfo(rec);
                   const globalIdx = (currentPage - 1) * PAGE_SIZE + idx + 1;
-                  const rawDesc = (rec.status_description_raw || rec.status_description || '').trim();
-                  const isException = /บ้านปิด|ออกใบแจ้ง|ไม่ชัดเจน|ไม่มีเลขบ้าน|ไม่ยอมรับ|ไม่มีผู้รับ|ไม่มารับตามกำหนด|รอจ่าย|ย้าย|เสียหาย|ระงับ|คืน|ตกค้าง|อายัด|จ่าหน้าไม่ชัดเจน|ติดต่อไม่ได้/i.test(rawDesc);
-                  const shouldShowAlertSubtext = isException && rawDesc;
-                  const tooltipText = rawDesc && rawDesc !== statusInfo.label
-                    ? `${statusInfo.label} (${rawDesc})`
-                    : statusInfo.label;
+                  const rawDesc = String(rec.status_description_raw || rec.status_description || '').trim();
+                  let tooltipText = rawDesc && rawDesc !== statusInfo.smartLabel
+                    ? `[${statusInfo.label}] ${rawDesc}`
+                    : statusInfo.smartLabel;
+
+                  if (statusInfo.key === 'delivered') {
+                    const sigDetail = statusInfo.hasSignature
+                      ? (statusInfo.signatureName ? `ผู้ลงนาม: ${statusInfo.signatureName}` : 'มีลายเซ็นในระบบ')
+                      : 'ไม่มีลายเซ็น';
+                    tooltipText = `${statusInfo.smartLabel} • ${sigDetail}${rawDesc && rawDesc !== 'นำจ่ายสำเร็จ' ? ` (${rawDesc})` : ''}`;
+                  }
                   return (
                     <tr key={rec.barcode || globalIdx} className={`row-status-${statusInfo.key}`}>
                       <td className="td-center text-muted">{globalIdx}</td>
@@ -846,7 +857,9 @@ export default function DepositReportModal({ isOpen, onClose, currentPerson, onS
                       </td>
                       <td className="td-right">{rec.weight ? `${rec.weight}g` : '-'}</td>
                       <td className="td-right font-medium">
-                        {rec.fee ? `${Number(rec.fee).toFixed(2)}` : '-'}
+                        {rec.fee !== undefined && rec.fee !== null && rec.fee !== ''
+                          ? `${Number(rec.fee).toLocaleString('th-TH', { minimumFractionDigits: Number(rec.fee) % 1 === 0 ? 0 : 2, maximumFractionDigits: 2 })}`
+                          : '-'}
                       </td>
                       <td className="received-date text-emerald-dark">
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" className="inline-clock-icon">
@@ -866,24 +879,17 @@ export default function DepositReportModal({ isOpen, onClose, currentPerson, onS
                         </span>
                       </td>
                       <td className="td-center cell-status-wrapper">
-                        <div className="status-cell-container">
-                          <span 
-                            className={`deposit-status-pill ${statusInfo.className}`}
-                            title={tooltipText}
-                          >
+                        <span 
+                          className={`deposit-status-pill ${statusInfo.className}`}
+                          title={tooltipText}
+                        >
+                          {statusInfo.icon ? (
+                            <span className="status-pill-icon">{statusInfo.icon}</span>
+                          ) : (
                             <span className={`status-dot dot-${statusInfo.key}`}></span>
-                            <span>{statusInfo.label}</span>
-                          </span>
-                          {shouldShowAlertSubtext && (
-                            <div 
-                              className="status-subtext status-subtext-alert"
-                              title={`ข้อยกเว้นการนำจ่าย: ${rawDesc}`}
-                            >
-                              <span className="status-subtext-icon">⚠️</span>
-                              <span>{rawDesc}</span>
-                            </div>
                           )}
-                        </div>
+                          <span className="status-pill-text">{statusInfo.smartLabel}</span>
+                        </span>
                       </td>
                     </tr>
                   );

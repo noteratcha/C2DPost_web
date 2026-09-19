@@ -8,7 +8,7 @@ import './TrackingInquiryView.css';
 /**
  * Classifies tracking event into canonical status
  */
-function getCardStatusInfo(latestEvent) {
+function getCardStatusInfo(latestEvent, item, earData) {
   if (!latestEvent) {
     return {
       key: 'in_transit',
@@ -18,33 +18,55 @@ function getCardStatusInfo(latestEvent) {
     };
   }
 
-  const desc = (latestEvent.status_description || '').trim();
+  const desc = String(latestEvent.status_description || '').trim();
   const code = String(latestEvent.status || '').trim();
 
-  // 1. Delivered / นำจ่ายสำเร็จ
+  // 1. Returned / ส่งคืน / คืนต้นทาง (ตรวจก่อนนำจ่ายสำเร็จ)
   if (
-    /นำจ่ายถึงผู้รับแล้ว|นําจ่ายถึงผู้รับแล้ว|ถึงผู้รับแล้ว|นำจ่ายสำเร็จ|นําจ่ายสำเร็จ|ผู้รับได้รับ|จัดส่งสำเร็จ|ส่งมอบเรียบร้อย|ส่งถึงผู้รับแล้ว|นำจ่ายเรียบร้อย/i.test(desc) ||
-    code === '4' || code === '501' || latestEvent.status_key === 'delivered'
+    /ส่งคืน|คืนต้นทาง|ตีกลับ|คืนผู้ฝาก|คืนสู่ผู้ฝาก|ส่งคืนผู้ส่ง|ไม่สามารถส่งมอบ|ไม่สามารถนำจ่าย|ส่งมอบคืน|นำจ่ายคืน/i.test(desc) ||
+    ['502', '503', '401', '402'].includes(code) || latestEvent.status_key === 'returned'
   ) {
+    let smartLabel = 'ส่งคืนต้นทาง';
+    if (/ผู้ฝากรับคืน|ส่งคืน.*แล้ว|คืนผู้ฝากสำเร็จ/i.test(desc)) {
+      smartLabel = 'ผู้ฝากรับคืนเรียบร้อย';
+    } else if (/ถึง.*ต้นทาง|เตรียมนำจ่ายคืน|เตรียมคืน/i.test(desc)) {
+      smartLabel = 'ถึง ปณ.ต้นทาง (เตรียมคืน)';
+    } else if (desc && desc.length <= 30 && desc !== 'ส่งคืน') {
+      smartLabel = desc;
+    }
     return {
-      key: 'delivered',
-      label: 'นำจ่ายสำเร็จ',
-      badgeClass: 'delivered',
-      dotClass: 'dot-green',
+      key: 'returned',
+      label: 'ส่งคืน',
+      smartLabel,
+      icon: '↩️',
+      badgeClass: 'returned',
+      dotClass: 'dot-rose',
       rawDesc: desc
     };
   }
 
-  // 2. Returned / ส่งคืน
+  // 2. Delivered / นำจ่ายสำเร็จ
   if (
-    /ส่งคืน|คืนต้นทาง|ส่งคืนผู้ส่ง|ตีกลับ|ไม่สามารถส่งมอบ|ไม่สามารถนำจ่าย|คืนสู่ผู้ฝาก/i.test(desc) ||
-    ['502', '503', '401', '402'].includes(code) || latestEvent.status_key === 'returned'
+    /นำจ่ายถึงผู้รับแล้ว|นําจ่ายถึงผู้รับแล้ว|ถึงผู้รับแล้ว|นำจ่ายสำเร็จ|นําจ่ายสำเร็จ|ผู้รับได้รับ|จัดส่งสำเร็จ|ส่งมอบเรียบร้อย|ส่งถึงผู้รับแล้ว|นำจ่ายเรียบร้อย/i.test(desc) ||
+    code === '4' || code === '501' || latestEvent.status_key === 'delivered'
   ) {
+    const rawSig = String(latestEvent.signature || item?.trackData?.signature || item?.signature || '').trim();
+    const hasSig = Boolean(
+      (rawSig && rawSig !== '-' && !/^(ไม่มี|ไม่พบ|null|undefined)$/i.test(rawSig)) ||
+      latestEvent.signature_image ||
+      earData?.signature_image ||
+      item?.signature_image
+    );
+
     return {
-      key: 'returned',
-      label: 'ส่งคืน',
-      badgeClass: 'returned',
-      dotClass: 'dot-rose',
+      key: 'delivered',
+      label: 'นำจ่ายสำเร็จ',
+      smartLabel: hasSig ? 'นำจ่ายสำเร็จ ✍️' : 'นำจ่ายสำเร็จ',
+      hasSignature: hasSig,
+      signatureName: rawSig,
+      icon: null,
+      badgeClass: 'delivered',
+      dotClass: 'dot-green',
       rawDesc: desc
     };
   }
@@ -57,6 +79,8 @@ function getCardStatusInfo(latestEvent) {
     return {
       key: 'received',
       label: 'รับฝากแล้ว',
+      smartLabel: 'รับฝากเข้าระบบแล้ว',
+      icon: '📦',
       badgeClass: 'received',
       dotClass: 'dot-blue',
       rawDesc: desc
@@ -64,10 +88,27 @@ function getCardStatusInfo(latestEvent) {
   }
 
   // 4. Default: In transit / อยู่ระหว่างการนำจ่าย
+  const isPhone = /ติดต่อ|โทรศัพท์/i.test(desc);
+  const isException = /บ้านปิด|ออกใบแจ้ง|ไม่ชัดเจน|ไม่มีเลขบ้าน|ไม่มีเลขที่|ไม่ยอมรับ|ไม่มีผู้รับ|ไม่มารับตามกำหนด|รอจ่าย|รอนำจ่าย|เก็บรอ|ย้าย|เสียหาย|ระงับ|ตกค้าง|อายัด|จ่าหน้าไม่ชัดเจน|ติดต่อไม่ได้|เหตุขัดข้อง/i.test(desc);
+
+  let smartLabel = desc || 'อยู่ระหว่างการนำจ่าย';
+  let icon = '🚚';
+  let badgeClass = 'in-transit';
+
+  if (isPhone) {
+    icon = '📞';
+    badgeClass = 'phone-contact';
+  } else if (isException) {
+    icon = '⚠️';
+    badgeClass = 'exception';
+  }
+
   return {
     key: 'in_transit',
     label: 'อยู่ระหว่างการนำจ่าย',
-    badgeClass: 'in-transit',
+    smartLabel,
+    icon,
+    badgeClass,
     dotClass: 'dot-amber',
     rawDesc: desc
   };
@@ -77,7 +118,7 @@ function getCardStatusInfo(latestEvent) {
  * Resolves granular stage info and badge for a specific checkpoint event in the stepper
  */
 function getDetailedStepInfo(ev) {
-  const rawDesc = (ev.status_description || '').trim();
+  const rawDesc = String(ev.status_description || '').trim();
   const desc = rawDesc.replace(/\u0e4d\u0e32/g, 'ำ');
   const code = String(ev.status || '').trim();
 
@@ -332,7 +373,7 @@ export default function TrackingInquiryView({ currentPerson, records = [], initi
             const evs = data.events || [];
             const sorted = [...evs].sort((a, b) => (a.seq || 0) - (b.seq || 0));
             const latest = sorted.length > 0 ? sorted[sorted.length - 1] : null;
-            const sInfo = getCardStatusInfo(latest);
+            const sInfo = getCardStatusInfo(latest, { ...item, trackData: data });
             return {
               ...item,
               loading: false,
@@ -704,7 +745,9 @@ export default function TrackingInquiryView({ currentPerson, records = [], initi
           <div className="tracking-cards-list">
             {searchItems.map((item, index) => {
               const isExpanded = !!expandedCards[item.barcode];
-              const { barcode, matchedRecord, loading: itemLoading, error: itemErr, events, latestEvent, statusInfo } = item;
+              const { barcode, matchedRecord, loading: itemLoading, error: itemErr, latestEvent } = item;
+              const events = Array.isArray(item.events) ? item.events : [];
+              const cardStatus = getCardStatusInfo(latestEvent, item, clientEarMap[barcode]) || item.statusInfo;
 
               const latestDatetime = latestEvent?.datetime || '';
               const latestLocation = latestEvent?.location || '';
@@ -771,7 +814,7 @@ export default function TrackingInquiryView({ currentPerson, records = [], initi
                               {events.length} เหตุการณ์
                             </span>
                           )}
-                          {statusInfo?.key === 'delivered' && (clientEarMap[barcode]?.relationship || item.trackData?.relationship) && (
+                          {cardStatus?.key === 'delivered' && (clientEarMap[barcode]?.relationship || item.trackData?.relationship) && (
                             <span className="result-location-badge" style={{ background: '#ecfdf5', color: '#047857', borderColor: '#a7f3d0' }} title="ความสัมพันธ์ผู้รับจริง">
                               ✍️ ผู้รับ: {clientEarMap[barcode]?.relationship || item.trackData?.relationship}
                             </span>
@@ -789,22 +832,18 @@ export default function TrackingInquiryView({ currentPerson, records = [], initi
                         <span className="status-pill returned" title={itemErr}>
                           <span className="status-dot dot-rose"></span> ไม่พบข้อมูล
                         </span>
-                      ) : statusInfo ? (
-                        <div className="card-status-pill-group">
-                          <span className={`status-pill ${statusInfo.badgeClass}`} title={statusInfo.rawDesc || statusInfo.label}>
-                            <span className={`status-dot ${statusInfo.dotClass}`}></span>
-                            {statusInfo.label}
-                          </span>
-                          {statusInfo.rawDesc && /บ้านปิด|ออกใบแจ้ง|ไม่ชัดเจน|ไม่มีเลขบ้าน|ไม่ยอมรับ|ไม่มีผู้รับ|ไม่มารับตามกำหนด|รอจ่าย|ย้าย|เสียหาย|ระงับ|คืน|ตกค้าง|อายัด|จ่าหน้าไม่ชัดเจน|ติดต่อไม่ได้/i.test(statusInfo.rawDesc) && (
-                            <div
-                              className="status-subtext status-subtext-alert"
-                              title={`ข้อยกเว้นการนำจ่าย: ${statusInfo.rawDesc}`}
-                            >
-                              <span className="status-subtext-icon">⚠️</span>
-                              <span>{statusInfo.rawDesc}</span>
-                            </div>
+                      ) : cardStatus ? (
+                        <span 
+                          className={`status-pill ${cardStatus.badgeClass}`} 
+                          title={cardStatus.rawDesc && cardStatus.rawDesc !== cardStatus.smartLabel ? `[${cardStatus.label}] ${cardStatus.rawDesc}` : cardStatus.smartLabel}
+                        >
+                          {cardStatus.icon ? (
+                            <span className="status-pill-icon">{cardStatus.icon}</span>
+                          ) : (
+                            <span className={`status-dot ${cardStatus.dotClass}`}></span>
                           )}
-                        </div>
+                          <span className="status-pill-text">{cardStatus.smartLabel}</span>
+                        </span>
                       ) : null}
                     </div>
                   </div>

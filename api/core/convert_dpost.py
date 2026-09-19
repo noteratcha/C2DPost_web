@@ -1,6 +1,7 @@
 import os
 import re
 import glob
+import hashlib
 import pandas as pd
 from pypdf import PdfReader, PdfWriter
 import requests
@@ -37,7 +38,7 @@ except Exception as e:
     print(f"Error registering fonts: {e}")
     FONT_REGISTERED = False
 
-__version__ = "2026.0918.2157"
+__version__ = "2026.0919.1055"
 
 # Thailand Post API Credentials
 API_KEY = "V9JN25IFH5hdZYc1k8NNRVgnLYXyQLzc"
@@ -804,7 +805,15 @@ def process_pdf(pdf_path):
         'SHIPPER TEL': best_shipper_tel,
         'PRODUCT IN BOX': product_in_box
     }
-    
+
+    def _same_pdf_parcel(a, b):
+        """True when two parsed pages refer to the SAME parcel (letter body vs envelope)."""
+        a_ref = (a.get('REF NO') or '').strip()
+        b_ref = (b.get('REF NO') or '').strip()
+        if a_ref and b_ref:
+            return a_ref == b_ref
+        return (not a_ref and not b_ref) and a.get('RECEIVER') == b.get('RECEIVER')
+
     # 3. Process each page to associate receiver details with the best shipper info
     for i in range(len(reader.pages)):
         page = reader.pages[i]
@@ -867,16 +876,24 @@ def process_pdf(pdf_path):
                 'SOURCE_FILE': pdf_path
             }
             
-            # Check for duplicates (e.g., letter body vs envelope). 
-            # Overwrite the existing record because the envelope page has the cleaner, complete address.
+            # Duplicate check: combined PDFs print the SAME parcel several times (e.g. "S รวม 3 รายการ")
+            # with identical page text -> each copy must become its OWN record.
+            # Merge ONLY when this page is the letter/envelope counterpart of the immediately
+            # previous page: adjacent pages (i-1), different text, same REF NO / receiver.
+            src_sig = hashlib.md5((text or '').encode('utf-8', 'ignore')).hexdigest()
+            record['_src_idx'] = i
+            record['_src_sig'] = src_sig
+
             is_duplicate = False
-            for r_idx, r in enumerate(records):
-                if (r.get('REF NO') and r.get('REF NO') == record.get('REF NO')) or \
-                   (r.get('RECEIVER') == record.get('RECEIVER')):
-                    records[r_idx] = record
+            if records:
+                prev = records[-1]
+                if (isinstance(prev.get('_src_idx'), int)
+                        and prev.get('_src_idx') == i - 1
+                        and prev.get('_src_sig') != src_sig
+                        and _same_pdf_parcel(prev, record)):
+                    records[-1] = record  # envelope page carries the cleaner complete address
                     is_duplicate = True
-                    break
-                    
+
             if not is_duplicate:
                 records.append(record)
                 
@@ -1654,11 +1671,21 @@ def generate_deposit_report_excel(records, summary, meta, output_excel_path):
 
         # Status formatting: If raw description gives more detail than the label, include it in parentheses
         status_lbl = r.get("status_label") or r.get("status_description") or "รับฝากเข้าระบบแล้ว"
-        raw_desc = (r.get("status_description_raw") or "").strip()
-        if raw_desc and raw_desc != status_lbl and raw_desc not in status_lbl:
-            full_status_display = f"{status_lbl} ({raw_desc})"
+        status_key = r.get("status_key") or ""
+        sig = (r.get("signature") or "").strip()
+        has_sig = bool(sig and sig != "-" and sig not in ("ไม่มี", "ไม่พบ", "null", "undefined"))
+
+        if status_key == "delivered" or "นำจ่ายสำเร็จ" in status_lbl:
+            if has_sig:
+                full_status_display = f"นำจ่ายสำเร็จ ✍️ (ผู้รับ: {sig})"
+            else:
+                full_status_display = "นำจ่ายสำเร็จ"
         else:
-            full_status_display = status_lbl
+            raw_desc = (r.get("status_description_raw") or "").strip()
+            if raw_desc and raw_desc != status_lbl and raw_desc not in status_lbl:
+                full_status_display = f"{status_lbl} ({raw_desc})"
+            else:
+                full_status_display = status_lbl
 
         row_values = [
             i + 1,
@@ -1800,13 +1827,23 @@ def generate_deposit_report_pdf(records, summary, meta, output_pdf_path):
         latest_s = xml_escape(format_station_with_zipcode(r.get("latest_station") or r.get("received_postoffice") or "-", r))
         
         status_lbl = xml_escape(r.get("status_label") or r.get("status_description") or "รับฝากเข้าระบบแล้ว")
-        raw_desc = (xml_escape(r.get("status_description_raw") or "")).strip()
-        if raw_desc and raw_desc != status_lbl and raw_desc not in status_lbl:
-            is_exc = any(k in raw_desc for k in ["บ้านปิด", "ออกใบแจ้ง", "ไม่ชัดเจน", "ไม่มีเลขบ้าน", "ไม่ยอมรับ", "ไม่มีผู้รับ", "ไม่มารับตามกำหนด", "รอจ่าย", "ย้าย", "ส่งคืน", "ระงับ"])
-            color_hex = "#c2410c" if is_exc else "#475569"
-            status_p = Paragraph(apply_thai_pua(f"<b>{status_lbl}</b><br/><font size=6 color='{color_hex}'>{raw_desc}</font>"), style_td_c)
+        status_key = r.get("status_key") or ""
+        sig = (r.get("signature") or "").strip()
+        has_sig = bool(sig and sig != "-" and sig not in ("ไม่มี", "ไม่พบ", "null", "undefined"))
+
+        if status_key == "delivered" or "นำจ่ายสำเร็จ" in status_lbl:
+            if has_sig:
+                status_p = Paragraph(apply_thai_pua(f"<b>นำจ่ายสำเร็จ</b><br/><font size=6 color='#059669'>(ผู้ลงนาม: {xml_escape(sig)})</font>"), style_td_c)
+            else:
+                status_p = Paragraph(apply_thai_pua(f"<b>นำจ่ายสำเร็จ</b><br/><font size=6 color='#64748b'>(ไม่มีลายเซ็น)</font>"), style_td_c)
         else:
-            status_p = Paragraph(apply_thai_pua(f"<b>{status_lbl}</b>"), style_td_c)
+            raw_desc = (xml_escape(r.get("status_description_raw") or "")).strip()
+            if raw_desc and raw_desc != status_lbl and raw_desc not in status_lbl:
+                is_exc = any(k in raw_desc for k in ["บ้านปิด", "ออกใบแจ้ง", "ไม่ชัดเจน", "ไม่มีเลขบ้าน", "ไม่มีเลขที่", "ไม่ยอมรับ", "ไม่มีผู้รับ", "ไม่มารับตามกำหนด", "รอจ่าย", "รอนำจ่าย", "เก็บรอ", "ติดต่อ", "โทรศัพท์", "ย้าย", "ส่งคืน", "คืนต้นทาง", "คืนผู้ฝาก", "ตีกลับ", "ตกค้าง", "ระงับ", "อายัด", "เหตุขัดข้อง", "นำจ่ายคืน"])
+                color_hex = "#e11d48" if any(k in raw_desc for k in ["ส่งคืน", "คืนต้นทาง", "ตีกลับ", "คืนผู้ฝาก"]) else ("#c2410c" if is_exc else "#475569")
+                status_p = Paragraph(apply_thai_pua(f"<b>{status_lbl}</b><br/><font size=6 color='{color_hex}'>{raw_desc}</font>"), style_td_c)
+            else:
+                status_p = Paragraph(apply_thai_pua(f"<b>{status_lbl}</b>"), style_td_c)
 
         row = [
             Paragraph(str(i + 1), style_td_c),

@@ -235,7 +235,17 @@ def classify_delivery_status(status_code, status_desc):
     # Normalize decomposed Thai vowels (e.g. น + ำ vs อำ)
     desc_norm = desc.replace("\u0e4d\u0e32", "\u0e33")
 
-    # 1. Delivered / นำจ่ายสำเร็จ
+    # 1. Returned / ส่งคืน / คืนต้นทาง (Must check before delivered to avoid false-positive on "นำจ่ายคืน...")
+    if (
+        any(k in desc_norm for k in [
+            "ส่งคืน", "คืนต้นทาง", "ส่งคืนผู้ส่ง", "ตีกลับ", "คืนผู้ฝาก", "คืนสู่ผู้ฝาก",
+            "ไม่สามารถส่งมอบ", "ไม่สามารถนำจ่าย", "ส่งมอบคืน", "นำจ่ายคืน"
+        ])
+        or code in ["502", "503", "401", "402", "returned"]
+    ):
+        return "returned", "ส่งคืน"
+
+    # 2. Delivered / นำจ่ายสำเร็จ
     # Official Thailand Post e-Parcel statuses: "นำจ่ายถึงผู้รับแล้ว" (code 4), "นำจ่ายสำเร็จ" (code 501), "ถึงผู้รับแล้ว"
     if (
         any(k in desc_norm for k in [
@@ -245,13 +255,6 @@ def classify_delivery_status(status_code, status_desc):
         or code in ["4", "501", "delivered"]
     ):
         return "delivered", "นำจ่ายสำเร็จ"
-
-    # 2. Returned / ส่งคืน
-    if (
-        any(k in desc_norm for k in ["ส่งคืน", "คืนต้นทาง", "ส่งคืนผู้ส่ง", "ตีกลับ", "ไม่สามารถส่งมอบ", "ไม่สามารถนำจ่าย", "คืนสู่ผู้ฝาก"])
-        or code in ["502", "503", "401", "402", "returned"]
-    ):
-        return "returned", "ส่งคืน"
 
     # 3. Received / รับฝากแล้ว (initial deposit checkpoint - status code 1 or 001)
     if code in ["1", "001", "received"] or any(k in desc_norm for k in ["รับฝากเข้าระบบ", "รับฝากแล้ว", "รับฝาก"]):
@@ -823,6 +826,8 @@ def get_received_report(req: ReceivedReportRequest):
                             rec["status_description"] = latest["status_label"]
                         if latest.get("status_description"):
                             rec["status_description_raw"] = latest["status_description"]
+                        if latest.get("signature"):
+                            rec["signature"] = latest["signature"]
             except Exception:
                 pass
             return rec
@@ -1991,7 +1996,8 @@ def batch_tracking(req: BatchTrackingRequest):
                             "latest_station": latest.get("location", ""),
                             "status_key": latest.get("status_key", "in_transit"),
                             "status_label": latest.get("status_label", "อยู่ระหว่างการนำจ่าย"),
-                            "status_description_raw": latest.get("status_description", "")
+                            "status_description_raw": latest.get("status_description", ""),
+                            "signature": latest.get("signature", "")
                         }
             except Exception:
                 pass
@@ -2012,7 +2018,8 @@ def batch_tracking(req: BatchTrackingRequest):
                 "latest_station": latest.get("location", ""),
                 "status_key": latest.get("status_key", "in_transit"),
                 "status_label": latest.get("status_label", "อยู่ระหว่างการนำจ่าย"),
-                "status_description_raw": latest.get("status_description", "")
+                "status_description_raw": latest.get("status_description", ""),
+                "signature": latest.get("signature", "")
             }
 
     return {

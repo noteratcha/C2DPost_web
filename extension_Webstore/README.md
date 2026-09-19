@@ -26,6 +26,16 @@
 
 ---
 
+## นโยบายการจัดการเวอร์ชัน (Version Management Policy)
+
+> **เมื่อมี extension เวอร์ชันใหม่ ต้องลบของเดิมทุกตัวเสมอ** — ทั้ง zip และโฟลเดอร์สแนปช็อตเก่า (`*_unpacked/`, `*_WebStore/`) ในโฟลเดอร์นี้
+
+- บังคับอัตโนมัติโดย `sync_extension_webstore.py` (ขั้นตอนที่ 3.1): หลังแพ็กเวอร์ชันใหม่ จะลบ zip และ directory เวอร์ชันอื่นที่ไม่ตรงกับ `manifest.json` ทิ้งทันที
+- ทำงานกับ **zip** ใน: `extension_Webstore/`, `public/` และ `dist/` (dist สร้างใหม่โดย Vite จาก public)
+- ⚠️ **ข้อจำกัด Google Drive:** ถ้าโฟลเดอร์เก่าโดน Drive Virtual File System รั้ง ACL (ผิดพลาด `Access is denied` / `takeown: no support for ACLs`) สคริปต์จะ **ข้ามพร้อมคำเตือน WARN** ไม่ทำให้การแพ็กสะดุด — ต้องลบด้วยมือผ่าน **Google Drive (web/app)** หรือ PowerShell แบบ **Run as administrator**
+
+---
+
 ## วิธีการนำไปใช้งานใน Google Chrome
 
 ### วิธีที่ A: โหลดแบบ Unpacked (แนะนำสำหรับการทดสอบ/พัฒนา)

@@ -312,4 +312,9 @@
   - แก้ไขโลจิก `classify_step_for_pdf` ใน `api/index.py` ที่จำแนกสถานะ `ถึงที่ทำการไปรษณีย์ปลายทาง (เตรียมการนำจ่าย)` ผิดเป็น "ถึง ปณ.ปลายทาง" เนื่องจากเงื่อนไข `"ถึง" not in desc` ไม่เคยเป็นจริงเพราะคำว่า "ถึง" ปรากฏใน "ถึงที่ทำการไปรษณีย์ปลายทาง"
   - ยกการตรวจ `เตรียมนำจ่าย` / `เตรียมการนำจ่าย` ขึ้นตรวจก่อนกลุ่ม "ถึงปลายทาง" และลบเงื่อนไขขัดแย้งทิ้ง ส่งผลให้สถานะการกระทำล่าสุดแสดงเป็น "เตรียมนำจ่าย" (สีส้ม) อย่างถูกต้อง ขณะที่ `ถึงที่ทำการไปรษณีย์ปลายทาง` ธรรมดายังคงจำแนกเป็น "ถึง ปณ.ปลายทาง" (สีม่วง) ตามเดิม
 
+- [x] **4.63 แก้บั๊กหน้าเว็บขาว (Blank White Page) หลังเพิ่ม Signature Detection (`v2026.0919.1055`)**
+  - สาเหตุ: ฟีเจอร์ลายเซ็น (Smart Badge / Signature) อ่านค่า `signature`/`status_description` แล้วเรียก `.trim()` ตรง ๆ หากค่าเหล่านี้ไม่ใช่ string (เช่น object/boolean จากแหล่งข้อมูลจริง) จะทำให้ `TypeError` ระหว่าง render → ทั้งหน้าเทา-ขาวโดยไม่มี Error Boundary ดักจับ
+  - แก้ไข: (1) coerce ค่าทุกรายการด้วย `String(...)` ก่อน `.trim()` ใน `TrackingInquiryView.jsx`, `TrackingTimelineModal.jsx`, `DepositReportView.jsx`, `DepositReportModal.jsx`; (2) กัน `events` เป็น `Array.isArray` ก่อนเข้าสาย render ใน `TrackingInquiryView.jsx`; (3) เพิ่ม `<AppErrorBoundary />` ครอบทั้งแอปที่ `main.jsx` แสดงหน้าความผิดพลาดแบบมี UI แทนหน้าเปล่า
+  - ผลลัพธ์: `npm run build` ผ่าน 100% ทุก view (gate / demo / admin) render ปกติ headless Chrome
+
 

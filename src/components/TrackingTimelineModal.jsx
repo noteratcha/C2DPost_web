@@ -205,9 +205,18 @@ export default function TrackingTimelineModal({ isOpen, barcode, recInfo, curren
       /นำจ่ายถึงผู้รับ|นำจ่ายสำเร็จ|ผู้รับได้รับ|จัดส่งสำเร็จ/i.test(descNormalized);
 
     if (isDelivered) {
+      const rawSig = String(latestEvent.signature || trackData?.signature || recInfo?.signature || '').trim();
+      const hasSig = Boolean(
+        (rawSig && rawSig !== '-' && !/^(ไม่มี|ไม่พบ|null|undefined)$/i.test(rawSig)) ||
+        latestEvent.signature_image ||
+        earInfo?.signature_image ||
+        clientEarData?.signature_image
+      );
       return {
         key: 'delivered',
-        label: 'นำจ่ายสำเร็จ',
+        label: hasSig ? 'นำจ่ายสำเร็จ ✍️' : 'นำจ่ายสำเร็จ',
+        hasSignature: hasSig,
+        signatureName: rawSig,
         badgeClass: 'delivered',
         dotClass: 'dot-green',
         isException: false,

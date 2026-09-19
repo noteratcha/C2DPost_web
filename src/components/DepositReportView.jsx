@@ -52,26 +52,56 @@ function toApiDateFormat(isoDateStr) {
 export function getDeliveryStatusInfo(item) {
   if (!item) return { key: 'in_transit', label: 'อยู่ระหว่างการนำจ่าย', className: 'in-transit' };
 
-  const desc = (item.status_description_raw || item.status_description || item.statusDescription || '').trim();
+  const desc = String(item.status_description_raw || item.status_description || item.statusDescription || '').trim();
   const code = String(item.status || item.statusCode || '').trim();
 
-  // 1. Delivered / นำจ่ายสำเร็จ
+  // 1. Returned / ส่งคืน / คืนต้นทาง (ตรวจก่อนนำจ่ายสำเร็จ เผื่อกรณี "นำจ่ายคืนผู้ฝาก")
+  if (
+    /ส่งคืน|คืนต้นทาง|ตีกลับ|คืนผู้ฝาก|คืนสู่ผู้ฝาก|ส่งคืนผู้ส่ง|ไม่สามารถส่งมอบ|ไม่สามารถนำจ่าย|ส่งมอบคืน|นำจ่ายคืน/i.test(desc) ||
+    ['502', '503', '401', '402'].includes(code) || code.toLowerCase() === 'returned' ||
+    item.status_key === 'returned' || item.status_label === 'ส่งคืน'
+  ) {
+    // กำหนด label ที่แสดงบน Smart Badge
+    let smartLabel = 'ส่งคืนต้นทาง';
+    if (/ผู้ฝากรับคืน|ส่งคืน.*แล้ว|คืนผู้ฝากสำเร็จ/i.test(desc)) {
+      smartLabel = 'ผู้ฝากรับคืนเรียบร้อย';
+    } else if (/ถึง.*ต้นทาง|เตรียมนำจ่ายคืน|เตรียมคืน/i.test(desc)) {
+      smartLabel = 'ถึง ปณ.ต้นทาง (เตรียมคืน)';
+    } else if (desc && desc.length <= 30 && desc !== 'ส่งคืน') {
+      smartLabel = desc;
+    }
+    return { 
+      key: 'returned', 
+      label: 'ส่งคืน', 
+      smartLabel,
+      icon: '↩️',
+      className: 'returned' 
+    };
+  }
+
+  // 2. Delivered / นำจ่ายสำเร็จ
   // Checks official Thailand Post e-Parcel statuses: "นำจ่ายถึงผู้รับแล้ว" (code 4), "ถึงผู้รับแล้ว", "นำจ่ายสำเร็จ" (code 501)
   if (
     /นำจ่ายถึงผู้รับแล้ว|นําจ่ายถึงผู้รับแล้ว|ถึงผู้รับแล้ว|นำจ่ายสำเร็จ|นําจ่ายสำเร็จ|ผู้รับได้รับ|จัดส่งสำเร็จ|ส่งมอบเรียบร้อย|ส่งถึงผู้รับแล้ว|นำจ่ายเรียบร้อย/i.test(desc) ||
     code === '4' || code === '501' || code.toLowerCase() === 'delivered' ||
     item.status_key === 'delivered' || item.status_label === 'นำจ่ายสำเร็จ'
   ) {
-    return { key: 'delivered', label: 'นำจ่ายสำเร็จ', className: 'delivered' };
-  }
+    const rawSig = String(item.signature || item.signature_name || item.signer || '').trim();
+    const hasSig = Boolean(
+      (rawSig && rawSig !== '-' && !/^(ไม่มี|ไม่พบ|null|undefined)$/i.test(rawSig)) ||
+      item.signature_image ||
+      item.has_signature
+    );
 
-  // 2. Returned / ส่งคืน
-  if (
-    /ส่งคืน|คืนต้นทาง|ส่งคืนผู้ส่ง|ตีกลับ|ไม่สามารถส่งมอบ|ไม่สามารถนำจ่าย|คืนสู่ผู้ฝาก/i.test(desc) ||
-    ['502', '503', '401', '402'].includes(code) || code.toLowerCase() === 'returned' ||
-    item.status_key === 'returned' || item.status_label === 'ส่งคืน'
-  ) {
-    return { key: 'returned', label: 'ส่งคืน', className: 'returned' };
+    return { 
+      key: 'delivered', 
+      label: 'นำจ่ายสำเร็จ', 
+      smartLabel: hasSig ? 'นำจ่ายสำเร็จ ✍️' : 'นำจ่ายสำเร็จ',
+      hasSignature: hasSig,
+      signatureName: rawSig,
+      icon: null,
+      className: 'delivered' 
+    };
   }
 
   // 3. Received / รับฝากแล้ว (initial deposit checkpoint)
@@ -80,11 +110,38 @@ export function getDeliveryStatusInfo(item) {
     /รับฝากเข้าระบบ|รับฝากแล้ว|^รับฝาก$/i.test(desc) ||
     item.status_key === 'received' || item.status_label === 'รับฝากแล้ว'
   ) {
-    return { key: 'received', label: 'รับฝากแล้ว', className: 'received' };
+    return { 
+      key: 'received', 
+      label: 'รับฝากแล้ว', 
+      smartLabel: 'รับฝากเข้าระบบแล้ว',
+      icon: '📦',
+      className: 'received' 
+    };
   }
 
-  // 4. Default: In transit / อยู่ระหว่างการนำจ่าย
-  return { key: 'in_transit', label: 'อยู่ระหว่างการนำจ่าย', className: 'in-transit' };
+  // 4. In transit / อยู่ระหว่างการนำจ่าย (วิเคราะห์แยกกลุ่มเฉพาะสำหรับ Smart Badge)
+  const isPhone = /ติดต่อ|โทรศัพท์/i.test(desc);
+  const isException = /บ้านปิด|ออกใบแจ้ง|ไม่ชัดเจน|ไม่มีเลขบ้าน|ไม่มีเลขที่|ไม่ยอมรับ|ไม่มีผู้รับ|ไม่มารับตามกำหนด|รอจ่าย|รอนำจ่าย|เก็บรอ|ย้าย|เสียหาย|ระงับ|ตกค้าง|อายัด|จ่าหน้าไม่ชัดเจน|ติดต่อไม่ได้|เหตุขัดข้อง/i.test(desc);
+
+  let smartLabel = desc || 'อยู่ระหว่างการนำจ่าย';
+  let icon = '🚚';
+  let className = 'in-transit';
+
+  if (isPhone) {
+    icon = '📞';
+    className = 'phone-contact';
+  } else if (isException) {
+    icon = '⚠️';
+    className = 'exception';
+  }
+
+  return { 
+    key: 'in_transit', 
+    label: 'อยู่ระหว่างการนำจ่าย', 
+    smartLabel,
+    icon,
+    className 
+  };
 }
 
 export default function DepositReportView({ currentPerson, onSyncRecords, onSwitchToWorkspace, onOpenTrackingPage }) {
@@ -163,7 +220,8 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
             status_key: trackResult.latest_status_key || latestEv?.status_key || r.status_key,
             status_label: trackResult.latest_status_label || latestEv?.status_label || r.status_label,
             status_description: trackResult.latest_status_label || latestEv?.status_label || r.status_description,
-            status_description_raw: latestEv?.status_description || trackResult.latest_status_label || r.status_description_raw
+            status_description_raw: latestEv?.status_description || trackResult.latest_status_label || r.status_description_raw,
+            signature: trackResult.signature || latestEv?.signature || r.signature
           };
         }
         return r;
@@ -255,7 +313,8 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
                           status_key: match.status_key || r.status_key,
                           status_label: match.status_label || r.status_label,
                           status_description: match.status_label || r.status_description,
-                          status_description_raw: match.status_description_raw || r.status_description_raw
+                          status_description_raw: match.status_description_raw || r.status_description_raw,
+                          signature: match.signature !== undefined && match.signature !== '' ? match.signature : r.signature
                         };
                       }
                       return r;
@@ -859,7 +918,10 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
             <div className="stat-card-content">
               <div className="stat-label">ยอดรวมค่าบริการ</div>
               <div className="stat-value text-gold">
-                {summary.total_fee.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                {Number(summary.total_fee || 0).toLocaleString('th-TH', { 
+                  minimumFractionDigits: Number(summary.total_fee || 0) % 1 === 0 ? 0 : 2, 
+                  maximumFractionDigits: 2 
+                })}
               </div>
             </div>
           </div>
@@ -963,7 +1025,7 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
                   <th style={{ width: '90px', textAlign: 'right' }}>ค่าบริการ</th>
                   <th style={{ width: '140px', textAlign: 'center' }} title="วันและเวลาของสถานะล่าสุด">วัน-เวลาล่าสุด</th>
                   <th style={{ width: '120px', textAlign: 'center' }} title="ที่ทำการไปรษณีย์หรือสถานที่ของสถานะล่าสุด">ปณ./สถานที่ล่าสุด</th>
-                  <th style={{ width: '100px', textAlign: 'center' }}>สถานะ</th>
+                  <th style={{ width: '135px', minWidth: '120px', textAlign: 'center' }}>สถานะ</th>
                 </tr>
               </thead>
               <tbody>
@@ -999,11 +1061,16 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
                     const statusInfo = getDeliveryStatusInfo(item);
                     const globalIdx = (currentPage - 1) * PAGE_SIZE + idx + 1;
                     const rawDesc = (item.status_description_raw || item.status_description || '').trim();
-                    const isException = /บ้านปิด|ออกใบแจ้ง|ไม่ชัดเจน|ไม่มีเลขบ้าน|ไม่ยอมรับ|ไม่มีผู้รับ|ไม่มารับตามกำหนด|รอจ่าย|ย้าย|เสียหาย|ระงับ|คืน|ตกค้าง|อายัด|จ่าหน้าไม่ชัดเจน|ติดต่อไม่ได้/i.test(rawDesc);
-                    const shouldShowAlertSubtext = isException && rawDesc;
-                    const tooltipText = rawDesc && rawDesc !== statusInfo.label
-                      ? `${statusInfo.label} (${rawDesc})`
-                      : statusInfo.label;
+                    let tooltipText = rawDesc && rawDesc !== statusInfo.smartLabel
+                      ? `[${statusInfo.label}] ${rawDesc}`
+                      : statusInfo.smartLabel;
+
+                    if (statusInfo.key === 'delivered') {
+                      const sigDetail = statusInfo.hasSignature
+                        ? (statusInfo.signatureName ? `ผู้ลงนาม: ${statusInfo.signatureName}` : 'มีลายเซ็นในระบบ')
+                        : 'ไม่มีลายเซ็น';
+                      tooltipText = `${statusInfo.smartLabel} • ${sigDetail}${rawDesc && rawDesc !== 'นำจ่ายสำเร็จ' ? ` (${rawDesc})` : ''}`;
+                    }
                     const isDelivered = statusInfo.key === 'delivered';
                     const isRowSelected = selectedBarcodes.has(item.barcode);
                     return (
@@ -1053,7 +1120,9 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
                           {item.weight ? `${item.weight}g` : '-'}
                         </td>
                         <td style={{ textAlign: 'right' }} className="cell-fee">
-                          {item.fee !== undefined ? `${Number(item.fee).toFixed(2)}` : '-'}
+                          {item.fee !== undefined && item.fee !== null && item.fee !== ''
+                            ? `${Number(item.fee).toLocaleString('th-TH', { minimumFractionDigits: Number(item.fee) % 1 === 0 ? 0 : 2, maximumFractionDigits: 2 })}`
+                            : '-'}
                         </td>
                         <td style={{ textAlign: 'center' }} className="cell-timestamp">
                           {item.latest_date || item.received_date ? (
@@ -1078,23 +1147,13 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
                           {formatStationWithZipcode(item.latest_station || item.received_postoffice, item)}
                         </td>
                         <td style={{ textAlign: 'center' }} className="cell-status-wrapper">
-                          <div className="status-cell-container">
-                            <span 
-                              className={`status-pill ${statusInfo.className}`}
-                              title={tooltipText}
-                            >
-                              {statusInfo.label}
-                            </span>
-                            {shouldShowAlertSubtext && (
-                              <div 
-                                className="status-subtext status-subtext-alert"
-                                title={`ข้อยกเว้นการนำจ่าย: ${rawDesc}`}
-                              >
-                                <span className="status-subtext-icon">⚠️</span>
-                                <span>{rawDesc}</span>
-                              </div>
-                            )}
-                          </div>
+                          <span 
+                            className={`status-pill ${statusInfo.className}`}
+                            title={tooltipText}
+                          >
+                            {statusInfo.icon && <span className="status-pill-icon">{statusInfo.icon}</span>}
+                            <span className="status-pill-text">{statusInfo.smartLabel}</span>
+                          </span>
                         </td>
                       </tr>
                     );

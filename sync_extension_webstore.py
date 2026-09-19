@@ -5,6 +5,7 @@ Utility script to package and synchronize extension files into extension_Webstor
 """
 import os
 import json
+import sys
 import zipfile
 import shutil
 
@@ -52,6 +53,23 @@ def sync():
                 print(f"Removed obsolete zip: {f}")
             except Exception:
                 pass
+
+    # 3.1 POLICY: when a new version ships, ALWAYS remove every older snapshot —
+    #     both unpacked/ and _WebStore/ directories (zip cleanup is above).
+    #     Regex captures version from names like C2DPost_Helper_v1.3.0_unpacked.
+    import re as _re
+    for entry in os.listdir(tf):
+        entry_path = os.path.join(tf, entry)
+        if not os.path.isdir(entry_path):
+            continue
+        m = _re.fullmatch(r"C2DPost_Helper_v(\d+\.\d+\.\d+)_(unpacked|WebStore)", entry)
+        if m and m.group(1) != version:
+            try:
+                shutil.rmtree(entry_path)
+                print(f"Removed obsolete snapshot dir: {entry}")
+            except OSError as e:
+                # e.g. Google Drive virtual FS without ACL support — cannot force-delete
+                print(f"WARN: could not remove {entry}: {e}", file=sys.stderr)
         
     # 4. Also update public/ directory for direct web download
     public_dir = os.path.join(base_dir, 'public')
