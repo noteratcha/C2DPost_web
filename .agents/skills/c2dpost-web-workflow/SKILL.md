@@ -2657,3 +2657,16 @@ Each bug recorded must adhere to the standardized structure:
 - **Frontend Rules (`DepositReportView.jsx`, `TrackingInquiryView.jsx`)**:
   - `getDeliveryStatusInfo`: Intercept `/บ้านปิด/i` and code 301, returning `{ key: 'in_transit', label: 'อยู่ระหว่างการนำจ่าย', smartLabel: 'นำจ่ายไม่สำเร็จ (บ้านปิด)', className: 'exception' }`.
 
+## 99. True Return Cause Extraction Prior to Return Steps (v2026.0924.2055)
+
+- **Domain Rule**:
+  - In Thailand Post tracking, parcels marked with return steps (e.g. `ปณ.ปลายทางส่งคืน`, `ส่งคืนต้นทาง`, `ปณ.ต้นทางส่งคืนบริษัท`) have their actual failure reason recorded in the delivery attempt milestone IMMEDIATELY PRECEDING the return step (e.g. `ย้าย / ไม่ทราบที่อยู่ใหม่`, `บ้านปิด`, `ผู้รับไม่อยู่`, `ออกใบแจ้ง`, `ปฏิเสธการรับ`).
+  - The return step itself is NEVER the cause of failure; it is merely the transport action.
+- **Backend Rules (`api/index.py`)**:
+  - Must ensure `re` is imported at top level so regex normalization never raises `NameError`.
+  - `_extract_failure_reason_from_events(events)`: Locate the first return milestone, scan backward skipping transit milestones, and return the normalized preceding delivery exception.
+  - Dashboard reason aggregation: Ensure reasons containing return transport phrases are sanitized so they never appear in the "สาเหตุการส่งคืน / นำจ่ายไม่สำเร็จ" card.
+- **Frontend Rules (`TrackingTimelineModal.jsx`, `DepositReportView.jsx`)**:
+  - `TrackingTimelineModal.jsx`: Exclude return words from `isException` so return steps only receive the danger `ส่งคืนต้นทาง` badge, not `ข้อยกเว้น: ปณ.ปลายทางส่งคืน`.
+  - `DepositReportView.jsx`: Badge shows `ส่งคืน ({failureReason})` when available.
+

@@ -523,7 +523,7 @@ export default function TrackingTimelineModal({ isOpen, barcode, recInfo, curren
                   String(ev.status) === '501' || 
                   /นำจ่ายถึงผู้รับ|นำจ่ายสำเร็จ|ผู้รับได้รับ|จัดส่งสำเร็จ/i.test(descNormalized);
 
-                const isException = /บ้านปิด|ออกใบแจ้ง|ไม่ชัดเจน|ไม่มีเลขบ้าน|ไม่มีเลขที่|ไม่ยอมรับ|ไม่มีผู้รับ|ไม่มารับตามกำหนด|รอจ่าย|ย้าย|เสียหาย|ระงับ|คืน/i.test(descNormalized);
+                const isException = /บ้านปิด|ออกใบแจ้ง|ไม่ชัดเจน|ไม่มีเลขบ้าน|ไม่มีเลขที่|ไม่ยอมรับ|ไม่มีผู้รับ|ไม่มารับตามกำหนด|รอจ่าย|ย้าย|เสียหาย|ระงับ/i.test(descNormalized) && !/ส่งคืน|ปลายทางส่งคืน|ต้นทางส่งคืน|ตีกลับ/i.test(descNormalized);
 
                 const isReturned = ev.status_key === 'returned' || /ส่งคืน|ตีกลับ/i.test(descNormalized);
 

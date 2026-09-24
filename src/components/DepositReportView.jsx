@@ -97,7 +97,10 @@ export function getDeliveryStatusInfo(item) {
   ) {
     // กำหนด label ที่แสดงบน Smart Badge
     let smartLabel = 'ส่งคืนต้นทาง';
-    if (/ผู้ฝากรับคืน|ส่งคืน.*แล้ว|คืนผู้ฝากสำเร็จ/i.test(desc)) {
+    const failureReason = item.failure_reason || item.reason;
+    if (failureReason && !/ส่งคืน|ปณ\./i.test(failureReason)) {
+      smartLabel = `ส่งคืน (${failureReason})`;
+    } else if (/ผู้ฝากรับคืน|ส่งคืน.*แล้ว|คืนผู้ฝากสำเร็จ/i.test(desc)) {
       smartLabel = 'ผู้ฝากรับคืนเรียบร้อย';
     } else if (/ถึง.*ต้นทาง|เตรียมนำจ่ายคืน|เตรียมคืน/i.test(desc)) {
       smartLabel = 'ถึง ปณ.ต้นทาง (เตรียมคืน)';

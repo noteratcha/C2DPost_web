@@ -5,6 +5,7 @@ import json
 import base64
 import tempfile
 import zipfile
+import re
 from typing import List, Optional
 from datetime import datetime
 
@@ -943,7 +944,7 @@ def _normalize_failure_reason(raw_text):
     m = re.search(r'\(([^)]+)\)', t)
     if m:
         inner = m.group(1).strip()
-        if inner and not any(k in inner for k in ["ปณ.", "บริษัท", "ต้นทางส่งคืน", "ปลายทางส่งคืน"]):
+        if inner and not any(k in inner for k in ["ปณ.", "บริษัท", "ต้นทางส่งคืน", "ปลายทางส่งคืน", "ส่งคืน"]):
             t = inner
 
     norm = t.lower()
@@ -970,9 +971,9 @@ def _normalize_failure_reason(raw_text):
     if "ชำรุด" in norm or "เสียหาย" in norm:
         return "พัสดุเสียหาย / ชำรุด"
 
-    # Avoid returning transport steps as reason
-    if any(k in norm for k in ["ปณ.ต้นทางส่งคืน", "ปณ.ปลายทางส่งคืน", "ส่งคืนต้นทาง", "ส่งมอบคืน"]):
-        return "อื่น ๆ (ส่งคืนต้นทาง)"
+    # Avoid returning transport/return steps as reason
+    if any(k in norm for k in ["ปณ.ต้นทางส่งคืน", "ปณ.ปลายทางส่งคืน", "ส่งคืนต้นทาง", "ส่งมอบคืน", "ส่งคืน"]):
+        return "อื่น ๆ (ไม่ระบุสาเหตุ)"
 
     return t
 
@@ -981,10 +982,9 @@ def _extract_failure_reason_from_events(events):
     """
     Extracts the true failure reason from tracking timeline events.
     Per Thailand Post workflow:
-    When a delivery attempt fails at destination, an exception step is recorded
-    (e.g., 'ย้าย / ไม่ทราบที่อยู่ใหม่', 'บ้านปิด', 'ออกใบแจ้ง', 'ผู้รับไม่อยู่').
-    The destination office subsequently registers 'ปณ.ปลายทางส่งคืน'.
-    Therefore, the event IMMEDIATELY BEFORE 'ปณ.ปลายทางส่งคืน' contains the actual cause of return.
+    When a delivery attempt fails at destination (e.g. 'ย้าย / ไม่ทราบที่อยู่ใหม่', 'บ้านปิด'),
+    subsequent return events are registered ('ปณ.ปลายทางส่งคืน', 'ส่งคืนต้นทาง', 'ปณ.ต้นทางส่งคืนบริษัท').
+    The status IMMEDIATELY BEFORE the return step contains the true cause of return / failure.
     """
     if not events:
         return ""
@@ -992,33 +992,45 @@ def _extract_failure_reason_from_events(events):
     def _get_desc(ev):
         return str(ev.get("status_description") or ev.get("status_label") or "").strip()
 
-    # 1. Look for 'ปณ.ปลายทางส่งคืน' or 'ปลายทางส่งคืน'
-    dest_return_idx = -1
-    for i, ev in enumerate(events):
+    def _get_code(ev):
+        return str(ev.get("status") or ev.get("statusCode") or "").strip()
+
+    def _is_return_step(ev):
         d = _get_desc(ev)
-        if "ปลายทางส่งคืน" in d:
-            dest_return_idx = i
-            break
+        c = _get_code(ev)
+        if c in ["502", "503", "401", "402"]:
+            return True
+        return any(k in d for k in ["ส่งคืน", "คืนต้นทาง", "ตีกลับ", "ปลายทางส่งคืน", "ต้นทางส่งคืน", "ส่งมอบคืน", "คืนผู้ฝาก", "คืนสู่ผู้ฝาก"])
 
-    if dest_return_idx > 0:
-        prev_desc = _get_desc(events[dest_return_idx - 1])
-        if prev_desc and not any(k in prev_desc for k in ["รับฝาก", "ศป.", "ศูนย์คัดแยก"]):
-            return _normalize_failure_reason(prev_desc)
+    def _is_transit_step(desc):
+        return any(k in desc for k in [
+            "รับฝาก", "ศป.", "ศูนย์คัดแยก", "เตรียมการนำจ่าย", "เตรียมนำจ่าย",
+            "ส่งต่อ", "ส่งออกจาก", "อยู่ระหว่างนำส่ง", "ถึงที่ทำการไปรษณีย์ปลายทาง", "ถึง ปณ.ปลายทาง"
+        ])
 
-    # 2. Look for first return step ('ส่งคืน', 'คืนต้นทาง', 'ตีกลับ')
+    # 1. Look for the FIRST return step in the timeline
     first_return_idx = -1
     for i, ev in enumerate(events):
-        d = _get_desc(ev)
-        if any(k in d for k in ["ส่งคืน", "คืนต้นทาง", "ตีกลับ"]) and not any(k in d for k in ["รับฝาก"]):
+        if _is_return_step(ev):
             first_return_idx = i
             break
 
+    # Look backwards from the first return step for the preceding delivery failure event
     if first_return_idx > 0:
-        prev_desc = _get_desc(events[first_return_idx - 1])
-        if prev_desc and not any(k in prev_desc for k in ["รับฝาก", "ศป.", "ศูนย์คัดแยก", "เตรียมการนำจ่าย", "เตรียมนำจ่าย"]):
-            return _normalize_failure_reason(prev_desc)
+        for j in range(first_return_idx - 1, -1, -1):
+            prev_desc = _get_desc(events[j])
+            if prev_desc and not _is_transit_step(prev_desc) and not _is_return_step(events[j]):
+                return _normalize_failure_reason(prev_desc)
 
-    # 3. Look in reverse for any event with known failure keywords
+    # 2. Look backwards from ANY return step
+    for i in range(len(events) - 1, -1, -1):
+        if _is_return_step(events[i]):
+            for j in range(i - 1, -1, -1):
+                prev_desc = _get_desc(events[j])
+                if prev_desc and not _is_transit_step(prev_desc) and not _is_return_step(events[j]):
+                    return _normalize_failure_reason(prev_desc)
+
+    # 3. Look across all events for known failure keywords
     failure_keywords = [
         "ย้าย", "ไม่ทราบที่อยู่", "บ้านปิด", "ออกใบแจ้ง", "ผู้รับไม่อยู่", "ติดต่อไม่ได้",
         "ไม่มีผู้รับ", "จ่าหน้าไม่ชัดเจน", "ปฏิเสธ", "ไม่ยอมรับ", "ไม่มารับ", "เสียหาย", "ชำรุด"
@@ -1028,11 +1040,11 @@ def _extract_failure_reason_from_events(events):
         if any(kw in d for kw in failure_keywords):
             return _normalize_failure_reason(d)
 
-    # 4. Fallback to latest event description if not pure generic return
-    if events:
-        latest = _get_desc(events[-1])
-        if latest and not any(k in latest for k in ["ส่งคืน", "ปณ.ต้นทางส่งคืนบริษัท"]):
-            return _normalize_failure_reason(latest)
+    # 4. Fallback to latest non-return description
+    for ev in reversed(events):
+        d = _get_desc(ev)
+        if d and not _is_return_step(ev) and not _is_transit_step(d):
+            return _normalize_failure_reason(d)
 
     return "อื่น ๆ (ไม่ระบุสาเหตุ)"
 
@@ -1225,6 +1237,8 @@ def get_dashboard_report(req: DashboardRequest):
         reason = ""
         if has_failure_or_return and key != "delivered":
             reason = rec.get("failure_reason") or _classify_failure_reason(desc_full)
+            if any(k in str(reason) for k in ["ส่งคืนต้นทาง", "ปลายทางส่งคืน", "ต้นทางส่งคืน", "ส่งมอบคืน"]):
+                reason = "อื่น ๆ (ไม่ระบุสาเหตุ)"
             reason_counts[reason] = reason_counts.get(reason, 0) + 1
 
         if key == "delivered":
