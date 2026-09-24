@@ -1199,6 +1199,8 @@ def get_dashboard_report(req: DashboardRequest):
     pending = 0
     unknown = 0
     reason_counts = {}
+    return_reason_counts = {}
+    delivery_failed_reason_counts = {}
     province_map = {}
     parcels = []
 
@@ -1235,11 +1237,18 @@ def get_dashboard_report(req: DashboardRequest):
         )
 
         reason = ""
+        reason_type = ""
         if has_failure_or_return and key != "delivered":
             reason = rec.get("failure_reason") or _classify_failure_reason(desc_full)
             if any(k in str(reason) for k in ["ส่งคืนต้นทาง", "ปลายทางส่งคืน", "ต้นทางส่งคืน", "ส่งมอบคืน"]):
                 reason = "อื่น ๆ (ไม่ระบุสาเหตุ)"
             reason_counts[reason] = reason_counts.get(reason, 0) + 1
+            if is_actual_return or key == "returned":
+                reason_type = "return"
+                return_reason_counts[reason] = return_reason_counts.get(reason, 0) + 1
+            else:
+                reason_type = "delivery_failed"
+                delivery_failed_reason_counts[reason] = delivery_failed_reason_counts.get(reason, 0) + 1
 
         if key == "delivered":
             delivered += 1
@@ -1278,6 +1287,7 @@ def get_dashboard_report(req: DashboardRequest):
             "status_key": key,
             "status_label": rec.get("status_label") or ("อยู่ระหว่างการนำจ่าย" if key == "in_transit" else ""),
             "reason": reason,
+            "reason_type": reason_type,
             "latest_date": rec.get("latest_date") or "",
             "latest_station": rec.get("latest_station") or "",
         })
@@ -1289,6 +1299,10 @@ def get_dashboard_report(req: DashboardRequest):
     total_fee = payload.get("summary", {}).get("total_fee")
     if total_fee is None:
         total_fee = sum(float(r.get("fee") or 0.0) for r in records)
+
+    total_reasons = sum(reason_counts.values())
+    total_return_reasons = sum(return_reason_counts.values())
+    total_delivery_failed_reasons = sum(delivery_failed_reason_counts.values())
 
     summary = {
         "total_items": total,
@@ -1307,9 +1321,10 @@ def get_dashboard_report(req: DashboardRequest):
         "in_transit_pct_of_total": round(in_transit * 100 / total, 2) if total else 0.0,
         "pending_pct_of_total": round(pending * 100 / total, 2) if total else 0.0,
         "total_fee": round(float(total_fee or 0.0), 2),
+        "total_return_reasons": total_return_reasons,
+        "total_delivery_failed_reasons": total_delivery_failed_reasons,
     }
 
-    total_reasons = sum(reason_counts.values())
     reasons = [
         {
             "reason": r,
@@ -1318,6 +1333,24 @@ def get_dashboard_report(req: DashboardRequest):
             "pct_of_failed": round(c * 100 / total_reasons, 2) if total_reasons else 0.0,
         }
         for r, c in sorted(reason_counts.items(), key=lambda kv: -kv[1])
+    ]
+
+    return_reasons = [
+        {
+            "reason": r,
+            "count": c,
+            "pct": round(c * 100 / total_return_reasons, 2) if total_return_reasons else 0.0,
+        }
+        for r, c in sorted(return_reason_counts.items(), key=lambda kv: -kv[1])
+    ]
+
+    delivery_failed_reasons = [
+        {
+            "reason": r,
+            "count": c,
+            "pct": round(c * 100 / total_delivery_failed_reasons, 2) if total_delivery_failed_reasons else 0.0,
+        }
+        for r, c in sorted(delivery_failed_reason_counts.items(), key=lambda kv: -kv[1])
     ]
 
     provinces = []
@@ -1345,6 +1378,10 @@ def get_dashboard_report(req: DashboardRequest):
         "api_notice": api_notice,
         "summary": summary,
         "reasons": reasons,
+        "return_reasons": return_reasons,
+        "delivery_failed_reasons": delivery_failed_reasons,
+        "total_return_reasons": total_return_reasons,
+        "total_delivery_failed_reasons": total_delivery_failed_reasons,
         "provinces": provinces,
         "parcels": parcels,
         "parcels_truncated": parcels_truncated,

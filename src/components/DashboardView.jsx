@@ -336,9 +336,57 @@ export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
     setTooltip((prev) => ({ ...prev, visible: false }));
   }, []);
 
-  const totalReasonsCount = useMemo(() => {
-    return reasons.reduce((acc, r) => acc + (r.count || 0), 0);
-  }, [reasons]);
+  const rawReturnReasons = data?.return_reasons;
+  const rawDeliveryFailedReasons = data?.delivery_failed_reasons;
+
+  const {
+    returnReasons,
+    deliveryFailedReasons,
+    totalReturnReasonsCount,
+    totalDeliveryFailedReasonsCount
+  } = useMemo(() => {
+    if (Array.isArray(rawReturnReasons) && Array.isArray(rawDeliveryFailedReasons)) {
+      const totRet = rawReturnReasons.reduce((acc, r) => acc + (r.count || 0), 0);
+      const totFail = rawDeliveryFailedReasons.reduce((acc, r) => acc + (r.count || 0), 0);
+      return {
+        returnReasons: rawReturnReasons,
+        deliveryFailedReasons: rawDeliveryFailedReasons,
+        totalReturnReasonsCount: totRet,
+        totalDeliveryFailedReasonsCount: totFail
+      };
+    }
+
+    // Fallback if data was cached or returned in legacy format
+    const retList = [];
+    const failList = [];
+    let totRet = 0;
+    let totFail = 0;
+
+    for (const r of reasons) {
+      const reasonName = r.reason || '';
+      const isDeliveryAttempt = /บ้านปิด|ออกใบแจ้ง|ผู้รับไม่อยู่|ติดต่อไม่ได้|ไม่มารับตามกำหนด|จ่าหน้าไม่ชัดเจน|ขอรับ ณ/i.test(reasonName);
+      if (isDeliveryAttempt) {
+        failList.push(r);
+        totFail += (r.count || 0);
+      } else {
+        retList.push(r);
+        totRet += (r.count || 0);
+      }
+    }
+
+    return {
+      returnReasons: retList.map(r => ({
+        ...r,
+        pct: totRet > 0 ? (r.count * 100 / totRet) : 0
+      })),
+      deliveryFailedReasons: failList.map(r => ({
+        ...r,
+        pct: totFail > 0 ? (r.count * 100 / totFail) : 0
+      })),
+      totalReturnReasonsCount: totRet,
+      totalDeliveryFailedReasonsCount: totFail
+    };
+  }, [rawReturnReasons, rawDeliveryFailedReasons, reasons]);
 
   const totalItems = summary.total_items || 0;
   const receivedCount = summary.received_count || 0;
@@ -871,59 +919,118 @@ export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
               </div>
             </div>
 
-            {/* 3. Failure Reasons Card - Moved to the very bottom */}
-            <div className="dash-section-card dash-reasons-card">
-              <div className="dash-section-title-row">
-                <div className="dash-section-title-group">
-                  <div className="stat-card-icon icon-returned dash-mini-icon">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-                      <path d="M18 6L6 18"></path>
-                      <path d="M6 6l12 12"></path>
-                    </svg>
-                  </div>
-                  <div>
-                    <h3 className="dash-section-title">สาเหตุการส่งคืน / นำจ่ายไม่สำเร็จ</h3>
-                    <span className="dash-section-sub">
-                      {totalReasonsCount > 0
-                        ? `พบสาเหตุทั้งหมด ${totalReasonsCount} รายการ (${summary.failed_count ?? 0} พัสดุส่งคืน/ไม่สำเร็จ)`
-                        : `สรุปผลแล้ว ${summary.concluded_count ?? 0} รายการ`}
-                    </span>
+            {/* 3. Reasons Cards (Separated into Return Reasons and Delivery Failed Reasons) */}
+            <div className="dash-reasons-container">
+              {/* Card 1: สาเหตุการส่งคืน */}
+              <div className="dash-section-card dash-reasons-card dash-return-card">
+                <div className="dash-section-title-row">
+                  <div className="dash-section-title-group">
+                    <div className="stat-card-icon icon-returned dash-mini-icon">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                        <polyline points="9 14 4 9 9 4"></polyline>
+                        <path d="M20 20v-7a4 4 0 0 0-4-4H4"></path>
+                      </svg>
+                    </div>
+                    <div>
+                      <h3 className="dash-section-title">สาเหตุการส่งคืน</h3>
+                      <span className="dash-section-sub">
+                        {totalReturnReasonsCount > 0
+                          ? `พบสาเหตุการส่งคืนทั้งหมด ${totalReturnReasonsCount} รายการ (${summary.failed_count ?? totalReturnReasonsCount} พัสดุส่งคืน)`
+                          : 'ไม่พบรายการพัสดุส่งคืน'}
+                      </span>
+                    </div>
                   </div>
                 </div>
+                {returnReasons.length === 0 ? (
+                  <div className="dash-section-empty">
+                    <p>ไม่พบรายการพัสดุส่งคืนในช่วงวันที่ที่เลือก</p>
+                  </div>
+                ) : (
+                  <div className="dash-reasons-list">
+                    {returnReasons.map((r) => {
+                      const pct = totalReturnReasonsCount > 0
+                        ? (r.count * 100 / totalReturnReasonsCount)
+                        : (Number(r.pct) || 0);
+                      return (
+                        <div className="dash-reason-row dash-return-row" key={r.reason}>
+                          <div className="dash-reason-top">
+                            <div className="dash-reason-name">
+                              <span className="dash-reason-dot dot-return"></span>
+                              <span>{r.reason}</span>
+                            </div>
+                            <div className="dash-reason-nums">
+                              <span className="dash-reason-count">{r.count} <span className="stat-unit">รายการ</span></span>
+                              <span className="dash-reason-pct-chip chip-return">{formatPct(pct)}%</span>
+                            </div>
+                          </div>
+                          <div className="dash-reason-bar-track">
+                            <div
+                              className={`dash-reason-bar bar-return ${r.count > 0 ? 'has' : ''}`}
+                              style={{ width: `${Math.min(100, Math.max(5, pct))}%` }}
+                            ></div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
-              {reasons.length === 0 ? (
-                <div className="dash-section-empty">
-                  <p>ไม่พบรายการส่งคืนหรือนำจ่ายไม่สำเร็จในช่วงวันที่ที่เลือก</p>
+
+              {/* Card 2: สาเหตุการนำจ่ายไม่สำเร็จ */}
+              <div className="dash-section-card dash-reasons-card dash-failed-card">
+                <div className="dash-section-title-row">
+                  <div className="dash-section-title-group">
+                    <div className="stat-card-icon icon-transit dash-mini-icon">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="12" y1="8" x2="12" y2="12"></line>
+                        <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                      </svg>
+                    </div>
+                    <div>
+                      <h3 className="dash-section-title">สาเหตุการนำจ่ายไม่สำเร็จ</h3>
+                      <span className="dash-section-sub">
+                        {totalDeliveryFailedReasonsCount > 0
+                          ? `พบสาเหตุทั้งหมด ${totalDeliveryFailedReasonsCount} รายการ (${summary.in_transit_count ?? totalDeliveryFailedReasonsCount} พัสดุอยู่ระหว่างนำจ่าย)`
+                          : 'ไม่พบรายการนำจ่ายไม่สำเร็จ'}
+                      </span>
+                    </div>
+                  </div>
                 </div>
-              ) : (
-                <div className="dash-reasons-list">
-                  {reasons.map((r) => {
-                    const pct = totalReasonsCount > 0
-                      ? (r.count * 100 / totalReasonsCount)
-                      : (Number(r.pct ?? r.pct_of_failed) || 0);
-                    return (
-                      <div className="dash-reason-row" key={r.reason}>
-                        <div className="dash-reason-top">
-                          <div className="dash-reason-name">
-                            <span className="dash-reason-dot"></span>
-                            <span>{r.reason}</span>
+                {deliveryFailedReasons.length === 0 ? (
+                  <div className="dash-section-empty">
+                    <p>ไม่พบรายการนำจ่ายไม่สำเร็จในช่วงวันที่ที่เลือก</p>
+                  </div>
+                ) : (
+                  <div className="dash-reasons-list">
+                    {deliveryFailedReasons.map((r) => {
+                      const pct = totalDeliveryFailedReasonsCount > 0
+                        ? (r.count * 100 / totalDeliveryFailedReasonsCount)
+                        : (Number(r.pct) || 0);
+                      return (
+                        <div className="dash-reason-row dash-failed-row" key={r.reason}>
+                          <div className="dash-reason-top">
+                            <div className="dash-reason-name">
+                              <span className="dash-reason-dot dot-failed"></span>
+                              <span>{r.reason}</span>
+                            </div>
+                            <div className="dash-reason-nums">
+                              <span className="dash-reason-count">{r.count} <span className="stat-unit">รายการ</span></span>
+                              <span className="dash-reason-pct-chip chip-failed">{formatPct(pct)}%</span>
+                            </div>
                           </div>
-                          <div className="dash-reason-nums">
-                            <span className="dash-reason-count">{r.count} <span className="stat-unit">รายการ</span></span>
-                            <span className="dash-reason-pct-chip">{formatPct(pct)}%</span>
+                          <div className="dash-reason-bar-track">
+                            <div
+                              className={`dash-reason-bar bar-failed ${r.count > 0 ? 'has' : ''}`}
+                              style={{ width: `${Math.min(100, Math.max(5, pct))}%` }}
+                            ></div>
                           </div>
                         </div>
-                        <div className="dash-reason-bar-track">
-                          <div
-                            className={`dash-reason-bar ${r.count > 0 ? 'has' : ''}`}
-                            style={{ width: `${Math.min(100, Math.max(5, pct))}%` }}
-                          ></div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
           </>
         )}

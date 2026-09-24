@@ -946,13 +946,27 @@
 }
 
 /* 4. Failure Reasons Card (Moved to bottom of all cards) */
+.dash-reasons-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(460px, 1fr));
+  gap: 1.25rem;
+  margin-top: 0.5rem;
+  align-items: start;
+}
+
+@media (max-width: 960px) {
+  .dash-reasons-container {
+    grid-template-columns: 1fr;
+  }
+}
+
 .dash-reasons-card {
-  margin-top: 0.25rem;
+  margin-top: 0;
 }
 
 .dash-reasons-list {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 0.85rem 1.25rem;
 }
 
@@ -981,6 +995,64 @@
 [data-theme='dark'] .dash-reason-row:hover {
   background: rgba(239, 68, 68, 0.1);
   border-color: rgba(239, 68, 68, 0.3);
+}
+
+/* Return reasons specific (Rose/Red) */
+.dash-reason-dot.dot-return {
+  background: #e11d48;
+}
+
+.dash-reason-pct-chip.chip-return {
+  background: rgba(225, 29, 72, 0.1);
+  color: #e11d48;
+}
+
+[data-theme='dark'] .dash-reason-pct-chip.chip-return {
+  background: rgba(225, 29, 72, 0.2);
+  color: #fb7185;
+}
+
+.dash-reason-bar.bar-return.has {
+  background: linear-gradient(90deg, #fb7185, #e11d48);
+}
+
+.dash-return-row:hover {
+  background: rgba(225, 29, 72, 0.04);
+  border-color: rgba(225, 29, 72, 0.22);
+}
+
+[data-theme='dark'] .dash-return-row:hover {
+  background: rgba(225, 29, 72, 0.12);
+  border-color: rgba(225, 29, 72, 0.32);
+}
+
+/* Delivery Failed reasons specific (Amber/Orange) */
+.dash-reason-dot.dot-failed {
+  background: #f59e0b;
+}
+
+.dash-reason-pct-chip.chip-failed {
+  background: rgba(245, 158, 11, 0.12);
+  color: #d97706;
+}
+
+[data-theme='dark'] .dash-reason-pct-chip.chip-failed {
+  background: rgba(245, 158, 11, 0.22);
+  color: #fbbf24;
+}
+
+.dash-reason-bar.bar-failed.has {
+  background: linear-gradient(90deg, #fbbf24, #f59e0b);
+}
+
+.dash-failed-row:hover {
+  background: rgba(245, 158, 11, 0.04);
+  border-color: rgba(245, 158, 11, 0.25);
+}
+
+[data-theme='dark'] .dash-failed-row:hover {
+  background: rgba(245, 158, 11, 0.12);
+  border-color: rgba(245, 158, 11, 0.35);
 }
 
 .dash-reason-top {
