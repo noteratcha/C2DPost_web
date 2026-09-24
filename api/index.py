@@ -640,12 +640,18 @@ def _fetch_received_report_payload(req_date, req_end_date, req_username, req_pas
                         resp_json = response.json()
                         if isinstance(resp_json, list):
                             if len(resp_json) > 0 and isinstance(resp_json[0], dict) and resp_json[0].get("errorCode"):
-                                return {"items": [], "notice": resp_json[0].get("errorDetail")}
+                                err_detail = str(resp_json[0].get("errorDetail") or "")
+                                if re.search(r"no\s*receive\s*product|no\s*data", err_detail, re.IGNORECASE):
+                                    return {"items": []}
+                                return {"items": [], "notice": err_detail}
                             return {"items": resp_json}
                         elif isinstance(resp_json, dict) and "data" in resp_json and isinstance(resp_json["data"], list):
                             return {"items": resp_json["data"]}
                         elif isinstance(resp_json, dict) and resp_json.get("errorCode"):
-                            return {"items": [], "notice": resp_json.get("errorDetail")}
+                            err_detail = str(resp_json.get("errorDetail") or "")
+                            if re.search(r"no\s*receive\s*product|no\s*data", err_detail, re.IGNORECASE):
+                                return {"items": []}
+                            return {"items": [], "notice": err_detail}
                         return {"items": []}
                     except Exception:
                         return {"items": []}
@@ -671,7 +677,9 @@ def _fetch_received_report_payload(req_date, req_end_date, req_username, req_pas
             if res.get("items"):
                 aggregated_items.extend(res["items"])
             elif res.get("notice") and not api_error:
-                api_error = res["notice"]
+                notice = str(res["notice"])
+                if not re.search(r"no\s*receive\s*product|no\s*data", notice, re.IGNORECASE):
+                    api_error = notice
             elif res.get("error") and not api_error:
                 api_error = res["error"]
 
@@ -893,7 +901,7 @@ def _fetch_received_report_payload(req_date, req_end_date, req_username, req_pas
         "end_date": clean_end_date,
         "date_display": date_display,
         "is_mock": bool(is_demo_user),
-        "api_notice": api_error if not is_demo_user else None,
+        "api_notice": (api_error if not is_demo_user else None) if (api_error and not re.search(r"no\s*receive\s*product|no\s*data", str(api_error), re.IGNORECASE)) else None,
         "summary": {
             "total_items": len(normalized_records),
             "total_weight": round(total_weight, 2),
@@ -1044,6 +1052,8 @@ def get_dashboard_report(req: DashboardRequest):
     records = payload.get("records") or []
     is_mock = bool(payload.get("is_mock"))
     api_notice = payload.get("api_notice") or None
+    if api_notice and re.search(r"no\s*receive\s*product|no\s*data", str(api_notice), re.IGNORECASE):
+        api_notice = None
 
     username = (req.username or "").strip()
     password = (req.password or "").strip()
@@ -2366,7 +2376,7 @@ def get_tracking(req: TrackingRequest):
         "success": True,
         "barcode": barcode,
         "is_mock": bool(is_demo_user),
-        "api_notice": api_error if not is_demo_user else None,
+        "api_notice": (api_error if not is_demo_user else None) if (api_error and not re.search(r"no\s*receive\s*product|no\s*data", str(api_error), re.IGNORECASE)) else None,
         "events": events,
         "signature": final_signature,
         "ear_info": ear_info_res,
@@ -2597,7 +2607,7 @@ def reconcile_received(req: ReconcileRequest):
     return {
         "success": True,
         "is_mock": bool(is_demo_user),
-        "api_notice": api_error if not is_demo_user else None,
+        "api_notice": (api_error if not is_demo_user else None) if (api_error and not re.search(r"no\s*receive\s*product|no\s*data", str(api_error), re.IGNORECASE)) else None,
         "total_checked": len(results),
         "received_count": sum(1 for r in results if r["received"]),
         "results": results

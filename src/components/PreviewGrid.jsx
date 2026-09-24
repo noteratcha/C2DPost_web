@@ -225,50 +225,53 @@ export default function PreviewGrid({
       </div>
 
       {/* Reconcile Notice Banner */}
-      {reconcileNotice && (
-        <div className={`reconcile-banner ${reconcileNotice.api_notice ? 'warning' : 'info'}`}>
-          <div className="reconcile-banner-content">
-            <span className="reconcile-banner-icon">
-              {reconcileNotice.api_notice ? '⚠️' : 'ℹ️'}
-            </span>
-            <div className="reconcile-banner-text">
-              {reconcileNotice.api_notice ? (
-                <>
+      {reconcileNotice && (() => {
+        const hasWarning = Boolean(reconcileNotice.api_notice && !/no receive product|no data/i.test(reconcileNotice.api_notice));
+        return (
+          <div className={`reconcile-banner ${hasWarning ? 'warning' : 'info'}`}>
+            <div className="reconcile-banner-content">
+              <span className="reconcile-banner-icon">
+                {hasWarning ? '⚠️' : 'ℹ️'}
+              </span>
+              <div className="reconcile-banner-text">
+                {hasWarning ? (
+                  <>
+                    <div className="reconcile-banner-main">
+                      <strong>ข้อสังเกตจากระบบ e-Parcel:</strong> {reconcileNotice.api_notice}
+                    </div>
+                    <div className="reconcile-banner-sub">
+                      (การตรวจสอบจาก Vercel US อาจติดเงื่อนไข IP Whitelist ของไปรษณีย์ไทย ระบบจึงแสดงสถานะที่ไม่สามารถเข้าถึงได้ กรุณาตรวจสอบผ่านเครือข่ายภายในหรือแอปพลิเคชัน Desktop)
+                    </div>
+                  </>
+                ) : reconcileNotice.is_mock ? (
+                  <>
+                    <div className="reconcile-banner-main">
+                      <strong>โหมดสาธิต (Demo Mode):</strong> กำลังแสดงผลการตรวจสอบรับฝากแบบจำลองสำหรับบัญชีทดสอบ
+                    </div>
+                    <div className="reconcile-banner-sub">
+                      (ตรวจพบรับฝาก {reconcileNotice.received_count} จาก {reconcileNotice.total_checked} รายการ — แถวที่รับฝากแล้วจะแสดงพื้นหลังสีเขียว)
+                    </div>
+                  </>
+                ) : (
                   <div className="reconcile-banner-main">
-                    <strong>ข้อสังเกตจากระบบ e-Parcel:</strong> {reconcileNotice.api_notice}
+                    <strong>ผลการตรวจสอบรับฝาก:</strong> รับฝากแล้ว {reconcileNotice.received_count} จาก {reconcileNotice.total_checked} รายการ
                   </div>
-                  <div className="reconcile-banner-sub">
-                    (การตรวจสอบจาก Vercel US อาจติดเงื่อนไข IP Whitelist ของไปรษณีย์ไทย ระบบจึงแสดงสถานะที่ไม่สามารถเข้าถึงได้ กรุณาตรวจสอบผ่านเครือข่ายภายในหรือแอปพลิเคชัน Desktop)
-                  </div>
-                </>
-              ) : reconcileNotice.is_mock ? (
-                <>
-                  <div className="reconcile-banner-main">
-                    <strong>โหมดสาธิต (Demo Mode):</strong> กำลังแสดงผลการตรวจสอบรับฝากแบบจำลองสำหรับบัญชีทดสอบ
-                  </div>
-                  <div className="reconcile-banner-sub">
-                    (ตรวจพบรับฝาก {reconcileNotice.received_count} จาก {reconcileNotice.total_checked} รายการ — แถวที่รับฝากแล้วจะแสดงพื้นหลังสีเขียว)
-                  </div>
-                </>
-              ) : (
-                <div className="reconcile-banner-main">
-                  <strong>ผลการตรวจสอบรับฝาก:</strong> รับฝากแล้ว {reconcileNotice.received_count} จาก {reconcileNotice.total_checked} รายการ
-                </div>
-              )}
+                )}
+              </div>
             </div>
+            {onDismissReconcileNotice && (
+              <button
+                type="button"
+                className="reconcile-banner-close"
+                onClick={onDismissReconcileNotice}
+                title="ปิดการแจ้งเตือนนี้"
+              >
+                ✕
+              </button>
+            )}
           </div>
-          {onDismissReconcileNotice && (
-            <button
-              type="button"
-              className="reconcile-banner-close"
-              onClick={onDismissReconcileNotice}
-              title="ปิดการแจ้งเตือนนี้"
-            >
-              ✕
-            </button>
-          )}
-        </div>
-      )}
+        );
+      })()}
 
       {/* Table Frame */}
       <div className="table-wrapper">

@@ -2604,3 +2604,21 @@ Each bug recorded must adhere to the standardized structure:
 - In Thailand Post's tracking lifecycle, when a delivery fails, the destination post office logs the specific reason (e.g. `ย้าย / ไม่ทราบที่อยู่ใหม่`, `บ้านปิด`, `ออกใบแจ้ง`) BEFORE initiating the return dispatch (`ปณ.ปลายทางส่งคืน`).
 - Querying only the latest status snapshot (`getOrderByBarcodes` or `events[-1]`) returns transportation milestones such as `ปณ.ต้นทางส่งคืนบริษัท`, masking the underlying failure cause.
 - Protocol: Always traverse the tracking event list to locate `ปณ.ปลายทางส่งคืน`, extract the event immediately prior (`events[dest_return_idx - 1]`), and normalize it through `_normalize_failure_reason`.
+
+---
+
+## 96. Thailand Post Empty-Date Notice Suppression ("No Receive Product.") (v2026.0924.2018)
+
+### 1. Operational Logic of Multi-Day Range Queries
+- When querying Thailand Post e-Parcel web service `getAllOrderReceived` over multi-day ranges (e.g. "เดือนนี้" / 1st to 24th), days without deposits (weekends, holidays) respond with:
+  ```json
+  [{"errorCode": "...", "errorDetail": "No Receive Product."}]
+  ```
+- This is a normal empty-state response rather than an operational failure or system notice.
+- Aggregation loops must strictly drop `No Receive Product.` / `no data` notices so that non-empty days in the batch are not polluted with technical warning banners on the dashboard or deposit reports.
+- Frontends must also apply defense-in-depth sanitization:
+  ```javascript
+  {data?.api_notice && !/no receive product|no data/i.test(data.api_notice) && (
+    <div className="deposit-alert info">...</div>
+  )}
+  ```

@@ -399,7 +399,7 @@ export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
             <span>{error}</span>
           </div>
         )}
-        {data?.api_notice && (
+        {data?.api_notice && !/no receive product|no data/i.test(data.api_notice) && (
           <div className="deposit-alert info">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <circle cx="12" cy="12" r="10"></circle>

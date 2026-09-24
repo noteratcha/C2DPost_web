@@ -1080,9 +1080,11 @@ export default function App() {
       const totalChecked = result.total_checked || rowsWithBarcode.length;
       setStatusText(`ตรวจสอบรับฝากสำเร็จ: รับฝากแล้ว ${receivedCount} / ${totalChecked} รายการ`);
 
+      const validApiNotice = (result.api_notice && !/no receive product|no data/i.test(result.api_notice)) ? result.api_notice : null;
+
       // Set reconcile notice state for UI banner above table
       setReconcileNotice({
-        api_notice: result.api_notice || null,
+        api_notice: validApiNotice,
         is_mock: Boolean(result.is_mock),
         received_count: receivedCount,
         total_checked: totalChecked
@@ -1093,8 +1095,8 @@ export default function App() {
         `รายการที่ยังไม่รับฝาก: ${totalChecked - receivedCount} รายการ\n\n` +
         `แถวที่รับฝากแล้วจะถูกไฮไลต์สีเขียว`;
 
-      if (result.api_notice) {
-        alertMsg += `\n\n⚠️ ข้อสังเกตระบบ e-Parcel:\n${result.api_notice}\n(เซิร์ฟเวอร์อาจไม่สามารถเข้าถึงฐานข้อมูลจริงได้เนื่องจากติดเงื่อนไข IP Whitelist ของไปรษณีย์ไทย)`;
+      if (validApiNotice) {
+        alertMsg += `\n\n⚠️ ข้อสังเกตระบบ e-Parcel:\n${validApiNotice}\n(เซิร์ฟเวอร์อาจไม่สามารถเข้าถึงฐานข้อมูลจริงได้เนื่องจากติดเงื่อนไข IP Whitelist ของไปรษณีย์ไทย)`;
       } else if (result.is_mock) {
         alertMsg += `\n\nℹ️ โหมดสาธิต (Demo Mode): กำลังแสดงผลการตรวจสอบแบบจำลอง`;
       }

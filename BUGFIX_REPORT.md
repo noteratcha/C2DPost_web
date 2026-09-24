@@ -498,3 +498,23 @@
 - ทดสอบระบบป้องกันสระวรรณยุกต์และตัวอักษรผิดเพี้ยน (`encoding_guard.mjs`): ผ่าน 56 ไฟล์ 100% (0 mojibake)
 - การคอมไพล์ Production Bundle (`npm run build`): สำเร็จไร้ข้อผิดพลาด
 - ซิงก์เลขเวอร์ชัน 6 ตำแหน่งตรงกัน: `v2026.0924.2005`
+
+---
+
+## 18. ระงับการแสดงข้อความแจ้งเตือน "No Receive Product." ในทุกมุมมอง (`v2026.0924.2018`)
+
+### 18.1 รายการแก้ไขและปรับปรุง
+1. **บั๊ก #49 (Spurious Empty-Date Notice) — แสดงกล่องข้อความสีฟ้า `ℹ️ No Receive Product.` กวนใจบนหน้าสถิติและรายงานรับฝาก (`api/index.py`, `DashboardView.jsx`, `DepositReportView.jsx`, `DepositReportModal.jsx`, `PreviewGrid.jsx`, `App.jsx`)**:
+   - **รากเหง้าของปัญหา**: เมื่อผู้ใช้เปิดหน้าแดชบอร์ดหรือรายงานสถานะโดยใช้ตัวกรองช่วงวันที่ (เช่น "เดือนนี้" วันที่ 1-24) API `getAllOrderReceived` ของไปรษณีย์ไทยจะตอบกลับสำหรับวันใดวันหนึ่งที่ไม่มีการรับฝาก (เช่น วันเสาร์-อาทิตย์ หรือวันหยุดราชการ) ด้วยข้อความ `{ "errorCode": "...", "errorDetail": "No Receive Product." }` ฟังก์ชันรวบรวมข้อมูลหลังบ้านเข้าใจผิดว่าข้อความดังกล่าวเป็น Error หรือ Notice สำคัญ จึงตั้งเป็น `api_notice` ส่งผลให้ Frontend นำไปเรนเดอร์เป็นแถบสีฟ้า `.deposit-alert.info` ขึ้นบนหน้าจอ
+   - **การแก้ไขใน Backend (`api/index.py`)**:
+     - กรองข้อความ `errorDetail` ใน `_fetch_received_report_payload` หากพบคำว่า `No Receive Product` หรือ `no data` ให้คืนค่ารายการว่าง `{"items": []}` โดยไม่ส่ง `notice` ออกมา
+     - ในลูปการรวมข้อมูลแบบมัลติเธรด คัดกรองไม่ให้ข้อความดังกล่าวถูกนำไปกำหนดลงใน `api_error`
+     - ซานิไทซ์ตัวแปร `api_notice` ในการส่งกลับข้อมูลของทุก Endpoint (`/api/reports/received`, `/api/reports/dashboard`, `/api/reports/batch-tracking`, `/api/reports/tracking/<barcode>`)
+   - **การแก้ไขใน Frontend (`DashboardView.jsx`, `DepositReportView.jsx`, `DepositReportModal.jsx`, `PreviewGrid.jsx`, `App.jsx`)**:
+     - ใส่เงื่อนไข Regex `!/no receive product|no data/i.test(...)` ป้องกันการแสดงแถบแจ้งเตือน `.deposit-alert.info` หรือการแจ้งเตือน alert ของบราวเซอร์เมื่อเจอข้อความนี้
+
+### 18.2 ผลลัพธ์การทดสอบและการ Build
+- ตรวจสอบความถูกต้องของสคริปต์ Python AST: ผ่าน 100%
+- ทดสอบระบบป้องกันสระวรรณยุกต์และตัวอักษรผิดเพี้ยน (`encoding_guard.mjs`): ผ่าน 56 ไฟล์ 100% (0 mojibake)
+- การคอมไพล์ Production Bundle (`npm run build`): สำเร็จไร้ข้อผิดพลาด
+- ซิงก์เลขเวอร์ชัน 6 ตำแหน่งตรงกัน: `v2026.0924.2018`
