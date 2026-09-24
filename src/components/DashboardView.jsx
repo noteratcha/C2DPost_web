@@ -65,6 +65,36 @@ function formatPct(val) {
   return Number(val).toFixed(2);
 }
 
+// Rate badge background color (translucent pill)
+function getRateBgColor(rate) {
+  if (rate === null || rate === undefined || Number.isNaN(Number(rate))) return 'rgba(148, 163, 184, 0.18)';
+  if (rate >= 90) return 'rgba(34, 197, 94, 0.22)';
+  if (rate >= 70) return 'rgba(132, 204, 22, 0.22)';
+  if (rate >= 50) return 'rgba(245, 158, 11, 0.22)';
+  if (rate >= 20) return 'rgba(249, 115, 22, 0.22)';
+  return 'rgba(239, 68, 68, 0.25)';
+}
+
+// Rate text color
+function getRateTextColor(rate) {
+  if (rate === null || rate === undefined || Number.isNaN(Number(rate))) return '#cbd5e1';
+  if (rate >= 90) return '#4ade80';
+  if (rate >= 70) return '#a3e635';
+  if (rate >= 50) return '#fbbf24';
+  if (rate >= 20) return '#fb923c';
+  return '#f87171';
+}
+
+// Progress bar gradient
+function getRateGradient(rate) {
+  if (rate === null || rate === undefined || Number.isNaN(Number(rate))) return '#94a3b8';
+  if (rate >= 90) return 'linear-gradient(90deg, #10b981, #22c55e)';
+  if (rate >= 70) return 'linear-gradient(90deg, #65a30d, #84cc16)';
+  if (rate >= 50) return 'linear-gradient(90deg, #d97706, #f59e0b)';
+  if (rate >= 20) return 'linear-gradient(90deg, #ea580c, #f97316)';
+  return 'linear-gradient(90deg, #dc2626, #ef4444)';
+}
+
 export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
   const AUTO_FETCH = useMemo(
     () => typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('autofetch') === '1',
@@ -113,7 +143,19 @@ export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [data, setData] = useState(() => cachedState?.data || null);
-  const [selectedProvince, setSelectedProvince] = useState(null);
+  const [lockedProvince, setLockedProvince] = useState(null);
+  const [hoveredProvince, setHoveredProvince] = useState(null);
+  const [tooltip, setTooltip] = useState({
+    visible: false,
+    x: 0,
+    y: 0,
+    flipX: false,
+    flipY: false,
+    province: null,
+    stat: null,
+    rate: null
+  });
+  const mapWrapRef = useRef(null);
 
   useEffect(() => {
     setCachedDashboardState({ startDate, endDate, data, updatedAt: Date.now() });
@@ -143,7 +185,8 @@ export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
       });
       if (result && result.success) {
         setData(result);
-        setSelectedProvince(null);
+        setLockedProvince(null);
+        setHoveredProvince(null);
       } else {
         setData(null);
         setError((result && result.message) || 'ไม่พบข้อมูลสำหรับช่วงวันที่ที่เลือก');
@@ -208,11 +251,90 @@ export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
 
   const provinceCount = provinces.length;
 
-  // Selected province detail lookup (by raw name)
-  const selectedProvinceDetail = useMemo(() => {
-    if (!selectedProvince) return null;
-    return provinceStatsByKey[normalizeProvinceName(selectedProvince)] || null;
-  }, [selectedProvince, provinceStatsByKey]);
+  // Active province for detail panel (locked takes priority, fallback to hovered)
+  const activeProvinceName = lockedProvince || hoveredProvince;
+  const activeProvinceDetail = useMemo(() => {
+    if (!activeProvinceName) return null;
+    const found = provinceStatsByKey[normalizeProvinceName(activeProvinceName)];
+    if (found) return found;
+    return {
+      province: activeProvinceName,
+      count: 0,
+      delivered: 0,
+      failed: 0,
+      received: 0,
+      in_transit: 0,
+      success_rate: null
+    };
+  }, [activeProvinceName, provinceStatsByKey]);
+
+  const lockedProvinceObj = useMemo(() => {
+    if (!lockedProvince) return null;
+    return THAILAND_PROVINCES.find(
+      (p) => normalizeProvinceName(p.name) === normalizeProvinceName(lockedProvince)
+    ) || null;
+  }, [lockedProvince]);
+
+  const handleToggleLockProvince = useCallback((provinceName) => {
+    if (!provinceName) return;
+    setLockedProvince((prev) => {
+      if (prev && normalizeProvinceName(prev) === normalizeProvinceName(provinceName)) {
+        return null;
+      }
+      return provinceName;
+    });
+  }, []);
+
+  const handleMouseMove = useCallback((e) => {
+    if (!mapWrapRef.current) return;
+    const rect = mapWrapRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const flipX = x + 265 > rect.width;
+    const flipY = y + 215 > rect.height;
+    setTooltip((prev) => {
+      if (!prev.visible) return prev;
+      return { ...prev, x, y, flipX, flipY };
+    });
+  }, []);
+
+  const handleProvinceMouseEnter = useCallback((prov, e) => {
+    setHoveredProvince(prov.name);
+    const stat = provinceStatsByKey[normalizeProvinceName(prov.name)] || null;
+    const rate = stat ? Number(stat.success_rate) : null;
+
+    let x = 0;
+    let y = 0;
+    let flipX = false;
+    let flipY = false;
+    if (mapWrapRef.current) {
+      const rect = mapWrapRef.current.getBoundingClientRect();
+      x = e.clientX - rect.left;
+      y = e.clientY - rect.top;
+      flipX = x + 265 > rect.width;
+      flipY = y + 215 > rect.height;
+    }
+    setTooltip({
+      visible: true,
+      x,
+      y,
+      flipX,
+      flipY,
+      province: prov.name,
+      stat,
+      rate
+    });
+  }, [provinceStatsByKey]);
+
+  const handleProvinceMouseLeave = useCallback(() => {
+    setHoveredProvince(null);
+    setTooltip((prev) => ({ ...prev, visible: false }));
+  }, []);
+
+  const handleMapContainerMouseLeave = useCallback(() => {
+    setHoveredProvince(null);
+    setTooltip((prev) => ({ ...prev, visible: false }));
+  }, []);
 
   const totalReasonsCount = useMemo(() => {
     return reasons.reduce((acc, r) => acc + (r.count || 0), 0);
@@ -483,7 +605,12 @@ export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
                   </div>
                 </div>
                 <div className="dash-map-body">
-                  <div className="dash-map-svg-wrap" onMouseLeave={() => setSelectedProvince(null)}>
+                  <div
+                    className="dash-map-svg-wrap"
+                    ref={mapWrapRef}
+                    onMouseMove={handleMouseMove}
+                    onMouseLeave={handleMapContainerMouseLeave}
+                  >
                     <svg
                       viewBox={`${THAILAND_VIEWBOX.x} ${THAILAND_VIEWBOX.y} ${THAILAND_VIEWBOX.width} ${THAILAND_VIEWBOX.height}`}
                       className="dash-map-svg"
@@ -494,7 +621,8 @@ export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
                         {THAILAND_PROVINCES.map((prov) => {
                           const stat = provinceStatsByKey[normalizeProvinceName(prov.name)] || null;
                           const rate = stat ? Number(stat.success_rate) : null;
-                          const selected = selectedProvince && normalizeProvinceName(selectedProvince) === normalizeProvinceName(prov.name);
+                          const isLocked = lockedProvince && normalizeProvinceName(lockedProvince) === normalizeProvinceName(prov.name);
+                          const isHovered = hoveredProvince && normalizeProvinceName(hoveredProvince) === normalizeProvinceName(prov.name);
                           return (
                             <path
                               key={prov.name}
@@ -502,16 +630,115 @@ export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
                               fill={successColor(rate)}
                               stroke="#ffffff"
                               strokeWidth="0.8"
-                              className={`dash-map-prov ${selected ? 'selected' : ''}`}
-                              onMouseEnter={() => setSelectedProvince(prov.name)}
-                              onClick={() => setSelectedProvince(prov.name)}
-                            >
-                              <title>{`${prov.name}: ${stat ? `สำเร็จ ${formatPct(stat.success_rate)}% (รวม ${stat.count}, อยู่ระหว่างการนำจ่าย ${stat.in_transit ?? 0}, รับฝากแล้ว ${stat.received ?? 0}, สำเร็จ ${stat.delivered}, ส่งคืน ${stat.failed})` : 'ไม่มีข้อมูล'}`}</title>
-                            </path>
+                              className={`dash-map-prov ${isLocked ? 'locked' : isHovered ? 'hovered' : ''}`}
+                              onMouseEnter={(e) => handleProvinceMouseEnter(prov, e)}
+                              onMouseLeave={handleProvinceMouseLeave}
+                              onClick={() => handleToggleLockProvince(prov.name)}
+                            />
                           );
                         })}
+                        {/* Pinned/Locked province highlight overlay outline */}
+                        {lockedProvinceObj && (
+                          <path
+                            d={lockedProvinceObj.d}
+                            fill="none"
+                            stroke="#f59e0b"
+                            strokeWidth="3.2"
+                            strokeLinejoin="round"
+                            className="dash-map-prov-locked-ring"
+                            style={{ pointerEvents: 'none' }}
+                          />
+                        )}
                       </g>
                     </svg>
+
+                    {/* Rich Custom Floating Tooltip */}
+                    {tooltip.visible && tooltip.province && (
+                      <div
+                        className="dash-map-rich-tooltip"
+                        style={{
+                          left: `${tooltip.x}px`,
+                          top: `${tooltip.y}px`,
+                          transform: `translate(${tooltip.flipX ? '-108%' : '14px'}, ${tooltip.flipY ? '-105%' : '14px'})`
+                        }}
+                      >
+                        <div className="dash-tt-header">
+                          <div className="dash-tt-title">
+                            <span className="dash-tt-pin">📍</span>
+                            <span className="dash-tt-name">{tooltip.province}</span>
+                          </div>
+                          <div
+                            className="dash-tt-rate-pill"
+                            style={{
+                              backgroundColor: getRateBgColor(tooltip.rate),
+                              color: getRateTextColor(tooltip.rate)
+                            }}
+                          >
+                            {tooltip.rate !== null && !isNaN(tooltip.rate)
+                              ? `${formatPct(tooltip.rate)}% สำเร็จ`
+                              : 'ไม่มีข้อมูล'}
+                          </div>
+                        </div>
+
+                        {tooltip.stat && tooltip.stat.count > 0 ? (
+                          <div className="dash-tt-body">
+                            {/* Progress bar */}
+                            <div className="dash-tt-progress-track">
+                              <div
+                                className="dash-tt-progress-bar"
+                                style={{
+                                  width: `${Math.min(100, Math.max(0, tooltip.rate || 0))}%`,
+                                  background: getRateGradient(tooltip.rate)
+                                }}
+                              />
+                            </div>
+
+                            {/* Stats 2x2 grid */}
+                            <div className="dash-tt-metrics">
+                              <div className="dash-tt-metric">
+                                <span className="dash-tt-metric-label"><span className="dot t-blue"></span> รับฝาก</span>
+                                <strong className="dash-tt-metric-value">{tooltip.stat.received ?? 0}</strong>
+                              </div>
+                              <div className="dash-tt-metric">
+                                <span className="dash-tt-metric-label"><span className="dot t-amber"></span> นำจ่าย</span>
+                                <strong className="dash-tt-metric-value">{tooltip.stat.in_transit ?? 0}</strong>
+                              </div>
+                              <div className="dash-tt-metric">
+                                <span className="dash-tt-metric-label"><span className="dot t-green"></span> สำเร็จ</span>
+                                <strong className="dash-tt-metric-value text-emerald">{tooltip.stat.delivered ?? 0}</strong>
+                              </div>
+                              <div className="dash-tt-metric">
+                                <span className="dash-tt-metric-label"><span className="dot t-red"></span> ส่งคืน</span>
+                                <strong className="dash-tt-metric-value text-rose">{tooltip.stat.failed ?? 0}</strong>
+                              </div>
+                            </div>
+
+                            <div className="dash-tt-total">
+                              <span>รวมพัสดุทั้งหมด</span>
+                              <strong>{tooltip.stat.count} ฉบับ</strong>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="dash-tt-empty">
+                            <span>ยังไม่มีรายการจัดส่งในจังหวัดนี้</span>
+                          </div>
+                        )}
+
+                        {/* Footer Action Hint */}
+                        <div className="dash-tt-footer">
+                          {lockedProvince && normalizeProvinceName(lockedProvince) === normalizeProvinceName(tooltip.province) ? (
+                            <span className="dash-tt-action-hint is-locked">
+                              🔓 คลิกเพื่อปลดล็อคข้อมูล
+                            </span>
+                          ) : (
+                            <span className="dash-tt-action-hint">
+                              🔒 คลิกเพื่อล็อคข้อมูลจังหวัดนี้
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
                     <div className="dash-map-legend">
                       <div className="dash-legend-title">อัตราสำเร็จ</div>
                       <div className="dash-legend-item"><span className="dash-legend-swatch" style={{ background: '#22c55e' }}></span> 90%+</div>
@@ -524,27 +751,59 @@ export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
                   </div>
 
                   <div className="dash-province-detail">
-                    {selectedProvinceDetail ? (
-                      <div className="dash-province-detail-inner">
-                        <div className="dash-pd-name">
-                          <strong>{selectedProvinceDetail.province}</strong>
+                    {activeProvinceDetail ? (
+                      <div className={`dash-province-detail-inner ${lockedProvince ? 'is-locked' : ''}`}>
+                        {lockedProvince ? (
+                          <div className="dash-pd-lock-banner">
+                            <div className="dash-pd-lock-status">
+                              <span className="dash-pd-lock-icon">🔒</span>
+                              <span>ล็อคข้อมูลจังหวัด</span>
+                            </div>
+                            <button
+                              type="button"
+                              className="dash-pd-unlock-btn"
+                              onClick={() => setLockedProvince(null)}
+                              title="คลิกเพื่อปลดล็อคการแสดงผล"
+                            >
+                              ปลดล็อค ✕
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="dash-pd-hover-hint">
+                            <span className="dash-pd-hint-icon">👆</span>
+                            <span>คลิกที่แผนที่เพื่อล็อคข้อมูลจังหวัดนี้</span>
+                          </div>
+                        )}
+
+                        <div className="dash-pd-name-row">
+                          <div className="dash-pd-name">
+                            <strong>{activeProvinceDetail.province}</strong>
+                          </div>
+                          <div className="dash-pd-rate-wrap">
+                            {activeProvinceDetail.success_rate != null ? (
+                              <span className={`dash-pd-rate-pill ${activeProvinceDetail.success_rate >= 70 ? 'good' : activeProvinceDetail.success_rate >= 50 ? 'mid' : 'bad'}`}>
+                                {formatPct(activeProvinceDetail.success_rate)}% สำเร็จ
+                              </span>
+                            ) : (
+                              <span className="dash-pd-rate-pill muted">ไม่มีข้อมูล</span>
+                            )}
+                          </div>
                         </div>
-                        <div className="dash-pd-rate">
-                          อัตราสำเร็จ <span className={selectedProvinceDetail.success_rate == null ? 'muted' : selectedProvinceDetail.success_rate >= 50 ? 'good' : 'bad'}>{selectedProvinceDetail.success_rate == null ? 'ไม่มีข้อมูล' : `${formatPct(selectedProvinceDetail.success_rate)}%`}</span>
-                        </div>
+
                         <div className="dash-pd-stats">
-                          <div className="dash-pd-stat"><span className="dot t-blue"></span> รับฝากแล้ว <strong>{selectedProvinceDetail.received ?? 0}</strong></div>
-                          <div className="dash-pd-stat"><span className="dot t-amber"></span> อยู่ระหว่างการนำจ่าย <strong>{selectedProvinceDetail.in_transit ?? 0}</strong></div>
-                          <div className="dash-pd-stat"><span className="dot t-green"></span> สำเร็จ <strong>{selectedProvinceDetail.delivered}</strong></div>
-                          <div className="dash-pd-stat"><span className="dot t-red"></span> ส่งคืน <strong>{selectedProvinceDetail.failed}</strong></div>
-                          <div className="dash-pd-stat"><span className="dot t-slate"></span> รวม <strong>{selectedProvinceDetail.count}</strong></div>
+                          <div className="dash-pd-stat"><span className="dot t-blue"></span> รับฝากแล้ว <strong>{activeProvinceDetail.received ?? 0}</strong></div>
+                          <div className="dash-pd-stat"><span className="dot t-amber"></span> อยู่ระหว่างการนำจ่าย <strong>{activeProvinceDetail.in_transit ?? 0}</strong></div>
+                          <div className="dash-pd-stat"><span className="dot t-green"></span> สำเร็จ <strong>{activeProvinceDetail.delivered ?? 0}</strong></div>
+                          <div className="dash-pd-stat"><span className="dot t-red"></span> ส่งคืน <strong>{activeProvinceDetail.failed ?? 0}</strong></div>
+                          <div className="dash-pd-stat total"><span className="dot t-slate"></span> รวมทั้งหมด <strong>{activeProvinceDetail.count ?? 0}</strong></div>
                         </div>
                       </div>
                     ) : (
                       <div className="dash-pd-placeholder">
-                        เลื่อนเมาส์หรือคลิกบนแผนที่เพื่อดูรายละเอียดรายจังหวัด
-                        <br />
-                        <span className="dash-pd-hint">สามารถลากเมาส์คลุมได้ (แผนที่สูง — ใช้ scroll บนช่วงแผนที่)</span>
+                        <div className="dash-pd-placeholder-icon">🗺️</div>
+                        <div className="dash-pd-placeholder-title">เลือกดูข้อมูลจังหวัด</div>
+                        <div>เลื่อนเมาส์ชี้บนแผนที่เพื่อดูสรุป หรือคลิกที่จังหวัดเพื่อล็อคข้อมูล</div>
+                        <span className="dash-pd-hint">สามารถคลิกเลือกจากตารางจัดอันดับด้านขวาได้เช่นกัน</span>
                       </div>
                     )}
                   </div>
@@ -572,14 +831,24 @@ export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
                     </thead>
                     <tbody>
                       {provinces.map((p) => {
+                        const isLocked = lockedProvince && normalizeProvinceName(lockedProvince) === normalizeProvinceName(p.province);
+                        const isHovered = hoveredProvince && normalizeProvinceName(hoveredProvince) === normalizeProvinceName(p.province);
                         const rate = p.success_rate == null ? '' : `${formatPct(p.success_rate)}%`;
                         return (
                           <tr
                             key={p.province}
-                            className={selectedProvince && normalizeProvinceName(selectedProvince) === normalizeProvinceName(p.province) ? 'selected-row' : ''}
-                            onClick={() => setSelectedProvince(p.province)}
+                            className={`dash-table-row ${isLocked ? 'locked-row' : isHovered ? 'hovered-row' : ''}`}
+                            onClick={() => handleToggleLockProvince(p.province)}
+                            onMouseEnter={() => setHoveredProvince(p.province)}
+                            onMouseLeave={() => setHoveredProvince(null)}
+                            title={isLocked ? 'คลิกเพื่อปลดล็อค' : 'คลิกเพื่อล็อคข้อมูลจังหวัดนี้'}
                           >
-                            <td className="ta-l">{p.province}</td>
+                            <td className="ta-l">
+                              <span className="dash-row-prov-name">
+                                {isLocked && <span className="dash-row-lock-icon">🔒</span>}
+                                {p.province}
+                              </span>
+                            </td>
                             <td className="ta-r">{p.count}</td>
                             <td className="ta-r">{p.received ?? 0}</td>
                             <td className="ta-r">{p.in_transit ?? 0}</td>
