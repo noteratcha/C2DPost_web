@@ -38,7 +38,7 @@ except Exception as e:
     print(f"Error registering fonts: {e}")
     FONT_REGISTERED = False
 
-__version__ = "2026.0924.2340"
+__version__ = "2026.0925.0145"
 
 # Thailand Post API Credentials
 API_KEY = "V9JN25IFH5hdZYc1k8NNRVgnLYXyQLzc"
@@ -238,12 +238,54 @@ def parse_address_components(address_text):
             
     return amphur, province, zipcode
 
+_THAI_POSTCODES_CACHE = None
+
+def lookup_thai_zipcode(province="", amphur="", tambon=""):
+    """
+    Look up Thai postal code from (province, amphur, tambon) using standard database.
+    """
+    global _THAI_POSTCODES_CACHE
+    if _THAI_POSTCODES_CACHE is None:
+        try:
+            curr_dir = os.path.dirname(os.path.abspath(__file__))
+            p_file = os.path.join(curr_dir, "thai_postcodes.json")
+            if os.path.exists(p_file):
+                import json
+                with open(p_file, "r", encoding="utf-8") as f:
+                    _THAI_POSTCODES_CACHE = json.load(f)
+            else:
+                _THAI_POSTCODES_CACHE = {}
+        except Exception:
+            _THAI_POSTCODES_CACHE = {}
+
+    clean_p = re.sub(r'^(?:จังหวัด|จ\.)\s*', '', province or "").strip()
+    clean_a = re.sub(r'^(?:อำเภอ/เขต|อำเภอ|อ\.)\s*', '', amphur or "").strip()
+    clean_t = re.sub(r'^(?:ตำบล/แขวง|ตำบล|ต\.)\s*', '', tambon or "").strip()
+
+    # 1. Try exact match: province|amphoe|district
+    if clean_p and clean_a and clean_t:
+        key = f"{clean_p}|{clean_a}|{clean_t}"
+        if key in _THAI_POSTCODES_CACHE:
+            return _THAI_POSTCODES_CACHE[key]
+
+    # 2. Try: province|amphoe
+    if clean_p and clean_a:
+        key = f"{clean_p}|{clean_a}"
+        if key in _THAI_POSTCODES_CACHE:
+            return _THAI_POSTCODES_CACHE[key]
+
+    # 3. Try amphoe alone
+    if clean_a and clean_a in _THAI_POSTCODES_CACHE:
+        return _THAI_POSTCODES_CACHE[clean_a]
+
+    return ""
+
 def parse_receiver_label(text):
     """
     Parse the receiver label block:
     เรียน <Name>
     <Address lines>
-    <5-digit zipcode>
+    <5-digit zipcode or Province>
     """
     text = normalize_pdf_text(text)
     lines = [line.strip() for line in text.split('\n') if line.strip()]
@@ -294,24 +336,47 @@ def parse_receiver_label(text):
                 zipcode = zip_match.group(1)
                 end_idx = i
                 break
+
+    # Fallback: If no 5-digit zipcode line was found, look for line ending with province or district
+    if end_idx == -1:
+        for i in range(start_idx + 1, len(lines)):
+            if any(k in lines[i] for k in ['โฉนด', 'ที่ดิน', 'หน้าสำรวจ', 'ระวาง', 'คำขอ']):
+                continue
+            line_conv = clean_thai_digits(lines[i])
+            if re.search(r'^(?:จังหวัด|จ\.)\s*[\u0e00-\u0e7f]+', line_conv):
+                end_idx = i
+                break
+
+    # Second Fallback: Scan up to 6 lines after start_idx for amphur/district lines
+    if end_idx == -1:
+        for i in range(start_idx + 1, min(start_idx + 7, len(lines))):
+            line_conv = clean_thai_digits(lines[i])
+            if any(k in line_conv for k in ['ที่', 'เรื่อง', 'เรียน', 'วันที่', 'ผู้ขอรังวัด', 'โฉนด', 'คำขอ']):
+                break
+            if re.search(r'(?:อำเภอ/เขต|อำเภอ|อ\.|จังหวัด|จ\.)\s*[\u0e00-\u0e7f]+', line_conv):
+                end_idx = i
                 
     if end_idx == -1:
-        return None # Could not find valid zipcode boundary
+        return None # Could not find valid address boundary
         
     # Address lines are between start_idx+1 and end_idx (inclusive if zip was at the end of a line)
     raw_address_lines = lines[start_idx + 1 : end_idx]
     # If the end line had text before zip, append the text part
     end_line_clean = lines[end_idx]
-    if len(clean_thai_digits(end_line_clean)) > 5:
+    if len(clean_thai_digits(end_line_clean)) > 5 and zipcode:
         # Remove zipcode from the line
         text_before_zip = re.sub(r'[๐-๙0-9]{5}\s*$', '', end_line_clean).strip()
         if text_before_zip:
             raw_address_lines.append(text_before_zip)
+    elif not zipcode and end_line_clean:
+        # If no zipcode, the end line itself is part of address (e.g. "จังหวัด นครพนม")
+        raw_address_lines.append(end_line_clean)
             
     # Clean address lines (e.g. replace ตำบล/แขวง with ต. , อำเภอ/เขต with อ.)
     cleaned_address_lines = []
     amphur = ""
     province = ""
+    tambon = ""
     
     for line in raw_address_lines:
         line_conv = clean_thai_digits(line)
@@ -319,7 +384,8 @@ def parse_receiver_label(text):
         # Check for tambon
         t_match = re.search(r'^(?:ตำบล/แขวง|ตำบล|ต\.)\s*(.+)$', line_conv)
         if t_match:
-            cleaned_address_lines.append(f"ต.{t_match.group(1).strip()}")
+            tambon = t_match.group(1).strip()
+            cleaned_address_lines.append(f"ต.{tambon}")
             continue
             
         # Check for amphur
@@ -347,6 +413,10 @@ def parse_receiver_label(text):
             amphur = ext_amphur
         if not province:
             province = ext_province
+
+    # Auto-resolve missing zipcode from Thai postal code database
+    if not zipcode and (province or amphur):
+        zipcode = lookup_thai_zipcode(province, amphur, tambon)
             
     # Post-processing cleanup: Remove amphur, province, and zipcode from receiver_address if present
     if amphur:
@@ -837,8 +907,11 @@ def process_pdf(pdf_path):
         if (not receiver_info or not receiver_info.get('RECEIVER') or not receiver_info.get('RECEIVER ZIPCODE')) and layout_text:
             if "เรียน" in layout_text and any(char.isdigit() or char in "๐๑๒๓๔๕๖๗๘๙" for char in layout_text):
                 l_rec = parse_receiver_label(layout_text)
-                if l_rec and l_rec.get('RECEIVER') and l_rec.get('RECEIVER ZIPCODE'):
-                    receiver_info = l_rec
+                if l_rec and l_rec.get('RECEIVER'):
+                    if not l_rec.get('RECEIVER ZIPCODE') and receiver_info and receiver_info.get('RECEIVER ZIPCODE'):
+                        l_rec['RECEIVER ZIPCODE'] = receiver_info['RECEIVER ZIPCODE']
+                    if not receiver_info or (l_rec.get('RECEIVER ZIPCODE') and not receiver_info.get('RECEIVER ZIPCODE')):
+                        receiver_info = l_rec
                     page_shipper = parse_shipper_label(layout_text)
                     if not ref_no:
                         ref_no = page_shipper.get('REF NO', '')
@@ -869,6 +942,16 @@ def process_pdf(pdf_path):
                     break
 
         if receiver_info and receiver_info.get('RECEIVER'):
+            if not receiver_info.get('RECEIVER ZIPCODE'):
+                if (receiver_info.get('RECEIVER PROVINCE') == final_shipper_info.get('SHIPPER PROVINCE')
+                        and receiver_info.get('RECEIVER AMPHUR') == final_shipper_info.get('SHIPPER AMPHUR')
+                        and final_shipper_info.get('SHIPPER ZIPCODE')):
+                    receiver_info['RECEIVER ZIPCODE'] = final_shipper_info['SHIPPER ZIPCODE']
+                elif receiver_info.get('RECEIVER PROVINCE') or receiver_info.get('RECEIVER AMPHUR'):
+                    receiver_info['RECEIVER ZIPCODE'] = lookup_thai_zipcode(
+                        receiver_info.get('RECEIVER PROVINCE', ''),
+                        receiver_info.get('RECEIVER AMPHUR', '')
+                    )
             record = {
                 **final_shipper_info,
                 **receiver_info,
