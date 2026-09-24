@@ -679,6 +679,10 @@ def _fetch_received_report_payload(req_date, req_end_date, req_username, req_pas
                 {
                     "name": "นายไชยญา พ่อป้องขวา", "addr": "47 หมู่ที่ 6 ต.ท่าลาด", "amphur": "เรณูนคร", "prov": "นครพนม", "zip": "48170", "wt": 10.0, "price": 21.0,
                     "status": "502", "status_desc": "ส่งคืน (ติดต่อผู้รับไม่ได้)", "time_offset": "16:55:00", "station": "ศป.นครพนม", "sig": "เจ้าหน้าที่ส่งคืน"
+                },
+                {
+                    "name": "นายสมศักดิ์ วงศ์สวรรค์", "addr": "12 หมู่ที่ 2 ต.โพนทอง", "amphur": "เรณูนคร", "prov": "นครพนม", "zip": "48170", "wt": 10.0, "price": 21.0,
+                    "status": "301", "status_desc": "นำจ่ายไม่สำเร็จ (บ้านปิด)", "time_offset": "17:10:00", "station": "ปณ.เรณูนคร", "sig": "เจ้าหน้าที่นำจ่าย"
                 }
             ]
             for day_idx, d_str in enumerate(target_dates):
@@ -882,13 +886,15 @@ def _classify_failure_reason(raw_desc):
     """
     norm = " ".join(str(raw_desc or "").split()).lower()
     buckets = [
-        ("ผู้รับย้ายที่อยู่", ["ผู้รับย้ายที่อยู่", "ย้ายที่อยู่", "ย้ายบ้าน", "ย้ายออก", "ย้าย"]),
+        ("บ้านปิด", ["บ้านปิด", "ปิดบ้าน", "ไม่มีผู้อยู่", "ไม่มีคนอยู่", "ไม่มีผู้พักอาศัย"]),
+        ("ผู้รับไม่อยู่", ["ผู้รับไม่อยู่", "ไม่อยู่", "ไม่อยู่บ้าน"]),
+        ("ออกใบแจ้ง", ["ออกใบแจ้ง", "หยอดใบแจ้ง", "ใบแจ้ง"]),
         ("ติดต่อผู้รับไม่ได้", ["ติดต่อผู้รับ", "ติดต่อไม่ได้", "ติดต่อไม่", "โทรติดต่อ", "โทรไม่ติด", "ติดต่อไม่ได้เพราะ", "ไม่สามารถติดต่อ", "โทรศัพท์ไม่", "เจ้าหน้าที่ติดต่อ"]),
         ("ไม่มีผู้รับตามจ่าหน้า", ["ไม่มีผู้รับ", "ไม่พบผู้รับ", "ไม่มีผู้มารับ", "ไม่เจอผู้รับ", "ไม่พบตัวผู้รับ", "บุคคลตามจ่าหน้า"]),
-        ("บ้านปิด / ผู้รับไม่อยู่", ["บ้านปิด", "ปิดบ้าน", "ไม่มีผู้อยู่", "ไม่มีคนอยู่", "ไม่มีผู้พักอาศัย", "ผู้รับไม่อยู่", "ไม่อยู่", "ไม่อยู่บ้าน"]),
-        ("ไม่มารับตามกำหนด", ["ไม่มารับตามกำหนด", "ไม่มารับ", "ไม่มารับของ", "ยังไม่รับ", "รอผู้รับ", "รอจ่าย"]),
-        ("จ่าหน้าไม่ชัดเจน / ที่อยู่ไม่ครบ", ["จ่าหน้าไม่", "หน้าจ่าไม่", "จ่าหน้าสลับ", "ไม่ชัดเจน", "ไม่ชัด", "ที่อยู่ไม่", "ที่อยู่ไม่ครบ", "ไม่พบที่อยู่", "จ่าหน้าผิด", "จ่าหน้าเปลี่ยน"]),
-        ("ปฏิเสธการรับ", ["ปฏิเสธ", "ไม่ยอมรับ", "ไม่ยอมรับพัสดุ"]),
+        ("ผู้รับย้ายที่อยู่", ["ผู้รับย้ายที่อยู่", "ย้ายที่อยู่", "ย้ายบ้าน", "ย้ายออก", "ย้าย"]),
+        ("ไม่มารับตามกำหนด / รอจ่าย", ["ไม่มารับตามกำหนด", "ไม่มารับ", "ไม่มารับของ", "ยังไม่รับ", "รอผู้รับ", "รอจ่าย", "เกินกำหนด"]),
+        ("จ่าหน้าไม่ชัดเจน / ที่อยู่ไม่ครบ", ["จ่าหน้าไม่", "หน้าจ่าไม่", "จ่าหน้าสลับ", "ไม่ชัดเจน", "ไม่ชัด", "ที่อยู่ไม่", "ที่อยู่ไม่ครบ", "ไม่พบที่อยู่", "จ่าหน้าผิด", "จ่าหน้าเปลี่ยน", "ไม่มีเลขที่"]),
+        ("ปฏิเสธการรับ", ["ปฏิเสธ", "ไม่ยอมรับ", "ไม่ยอมรับพัสดุ", "ไม่รับพัสดุ"]),
         ("พัสดุเสียหาย / ชำรุด", ["เสียหาย", "ชำรุด", "เปียกชื้น", "เปียก", "บุบสลาย", "สินค้าเสียหาย"]),
         ("อื่น ๆ", []),
     ]
@@ -1014,15 +1020,26 @@ def get_dashboard_report(req: DashboardRequest):
         if not province:
             zipcode = (rec.get("receiver_zipcode") or "").strip()
             province = f"ZIP:{zipcode}" if zipcode else "(ไม่ระบุ)"
+        desc_full = str(rec.get("status_description_raw") or rec.get("status_description") or rec.get("status_label") or "").strip()
+        code_str = str(rec.get("status") or rec.get("statusCode") or "").strip()
+
+        has_failure_or_return = (
+            key == "returned"
+            or code_str in ["301", "302", "401", "402", "502", "503"]
+            or any(k in desc_full for k in ["ส่งคืน", "คืนต้นทาง", "ตีกลับ", "นำจ่ายไม่สำเร็จ", "ไม่สามารถนำจ่าย", "ไม่สามารถส่งมอบ", "บ้านปิด", "ออกใบแจ้ง", "ผู้รับไม่อยู่", "ติดต่อไม่ได้", "ไม่มารับตามกำหนด"])
+        )
+
         reason = ""
+        if has_failure_or_return and key != "delivered":
+            reason = _classify_failure_reason(desc_full)
+            reason_counts[reason] = reason_counts.get(reason, 0) + 1
+
+        is_failed_item = (key == "returned") or (has_failure_or_return and any(k in desc_full for k in ["ส่งคืน", "คืนต้นทาง", "ตีกลับ", "502", "503", "401", "402", "นำจ่ายไม่สำเร็จ", "บ้านปิด"]))
+
         if key == "delivered":
             delivered += 1
-        elif key == "returned":
+        elif is_failed_item:
             failed += 1
-            reason = _classify_failure_reason(
-                rec.get("status_description_raw") or rec.get("status_description") or rec.get("status_label")
-            )
-            reason_counts[reason] = reason_counts.get(reason, 0) + 1
         elif key == "received":
             received += 1
             pending += 1
@@ -1036,7 +1053,7 @@ def get_dashboard_report(req: DashboardRequest):
         st["count"] += 1
         if key == "delivered":
             st["delivered"] += 1
-        elif key == "returned":
+        elif is_failed_item:
             st["failed"] += 1
         elif key == "received":
             st["received"] += 1

@@ -49,7 +49,7 @@ function normalizeProvinceName(name) {
   return norm;
 }
 
-// Legende-based success-rate coloring
+// Legend-based success-rate coloring
 function successColor(rate) {
   if (rate === null || rate === undefined || Number.isNaN(Number(rate))) return '#9aa6b2';
   if (rate >= 90) return '#22c55e';
@@ -58,14 +58,6 @@ function successColor(rate) {
   if (rate >= 20) return '#f97316';
   return '#ef4444';
 }
-
-const STATUS_META = {
-  delivered: { label: 'นำจ่ายสำเร็จ', className: 'dash-badge-success' },
-  returned: { label: 'ส่งคืน / ไม่สำเร็จ', className: 'dash-badge-danger' },
-  received: { label: 'รับฝากแล้ว', className: 'dash-badge-info' },
-  in_transit: { label: 'อยู่ระหว่างการนำจ่าย', className: 'dash-badge-warn' },
-  pending: { label: 'อยู่ระหว่างการนำจ่าย', className: 'dash-badge-warn' }
-};
 
 export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
   const AUTO_FETCH = useMemo(
@@ -104,12 +96,6 @@ export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
   const [error, setError] = useState('');
   const [data, setData] = useState(() => cachedState?.data || null);
   const [selectedProvince, setSelectedProvince] = useState(null);
-
-  // Parcels sub-list filters
-  const [parcelTab, setParcelTab] = useState('all');
-  const [parcelSearch, setParcelSearch] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
-  const PAGE_SIZE = 20;
 
   useEffect(() => {
     setCachedDashboardState({ startDate, endDate, data, updatedAt: Date.now() });
@@ -158,7 +144,6 @@ export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
       if (result && result.success) {
         setData(result);
         setSelectedProvince(null);
-        setCurrentPage(1);
       } else {
         setData(null);
         setError((result && result.message) || 'ไม่พบข้อมูลสำหรับช่วงวันที่ที่เลือก');
@@ -182,7 +167,6 @@ export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
   };
   const reasons = Array.isArray(data?.reasons) ? data.reasons : [];
   const provinces = Array.isArray(data?.provinces) ? data.provinces : [];
-  const parcels = Array.isArray(data?.parcels) ? data.parcels : [];
 
   // Build lookup from normalized province name -> stats
   const provinceStatsByKey = useMemo(() => {
@@ -201,44 +185,16 @@ export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
     return provinceStatsByKey[normalizeProvinceName(selectedProvince)] || null;
   }, [selectedProvince, provinceStatsByKey]);
 
-  // Filtered parcels
-  const filteredParcels = useMemo(() => {
-    let list = parcels;
-    if (parcelTab !== 'all') {
-      list = list.filter((r) => r.status_key === parcelTab);
-    }
-    const q = (parcelSearch || '').trim().toLowerCase();
-    if (q) {
-      list = list.filter((r) =>
-        String(r.barcode || '').toLowerCase().includes(q) ||
-        String(r.receiver_name || '').toLowerCase().includes(q) ||
-        String(r.receiver_province || '').toLowerCase().includes(q))
-      ;
-    }
-    return list;
-  }, [parcels, parcelTab, parcelSearch]);
-
-  const totalPages = Math.max(1, Math.ceil(filteredParcels.length / PAGE_SIZE));
-
-  useEffect(() => {
-    if (currentPage > totalPages) setCurrentPage(totalPages);
-  }, [currentPage, totalPages]);
-
-  const paginatedParcels = useMemo(() => {
-    const startIdx = (currentPage - 1) * PAGE_SIZE;
-    return filteredParcels.slice(startIdx, startIdx + PAGE_SIZE);
-  }, [filteredParcels, currentPage]);
-
-  const dateDisplay = data?.date_display || (startDate === endDate
-    ? toApiDateFormat(startDate)
-    : `${toApiDateFormat(startDate)} ถึง ${toApiDateFormat(endDate)}`);
+  const totalReasonsCount = useMemo(() => {
+    return reasons.reduce((acc, r) => acc + (r.count || 0), 0);
+  }, [reasons]);
 
   const statCards = [
     {
       label: 'รับฝาก (ทั้งหมด)',
       value: summary.total_items,
       unit: '',
-      className: 'dash-stat-blue',
+      className: 'icon-total',
       icon: (
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
           <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
@@ -251,7 +207,7 @@ export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
       label: 'รับฝากแล้ว',
       value: summary.received_count,
       unit: ` (${summary.received_pct_of_total ?? 0}% ของทั้งหมด)`,
-      className: 'dash-stat-blue',
+      className: 'icon-received-deposit',
       icon: (
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
           <path d="M22 12h-6l-2 3h-4l-2-3H2"></path>
@@ -263,7 +219,7 @@ export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
       label: 'อยู่ระหว่างการนำจ่าย',
       value: summary.in_transit_count,
       unit: ` (${summary.in_transit_pct_of_total ?? 0}% ของทั้งหมด)`,
-      className: 'dash-stat-warn',
+      className: 'icon-transit',
       icon: (
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
           <circle cx="12" cy="12" r="10"></circle>
@@ -275,7 +231,7 @@ export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
       label: 'นำจ่ายสำเร็จ',
       value: summary.delivered_count,
       unit: ` (${summary.delivered_pct_of_concluded ?? 0}% ของที่สรุปผล)`,
-      className: 'dash-stat-success',
+      className: 'icon-delivered',
       icon: (
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
           <path d="M20 6L9 17l-5-5"></path>
@@ -286,7 +242,7 @@ export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
       label: 'ส่งคืน / ไม่สำเร็จ',
       value: summary.failed_count,
       unit: ` (${summary.failed_pct_of_concluded ?? 0}% ของที่สรุปผล)`,
-      className: 'dash-stat-danger',
+      className: 'icon-returned',
       icon: (
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
           <path d="M18 6L6 18"></path>
@@ -297,8 +253,8 @@ export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
   ];
 
   return (
-    <main className="dash-page-main python-layout-main">
-      <div className="dash-page-container python-container">
+    <main className="deposit-page-main">
+      <div className="deposit-page-container">
 
         {/* Page Header */}
         <div className="deposit-page-header-card">
@@ -312,7 +268,7 @@ export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
               </svg>
             </div>
             <div>
-              <h2 className="deposit-page-title">สถิติการนำจ่าย &amp; แผนที่รายจังหวัด</h2>
+              <h2 className="deposit-page-title">สถิติ</h2>
               <p className="deposit-page-subtitle">
                 สรุปผลการรับฝากและการนำจ่าย ดูอัตราสำเร็จ/ไม่สำเร็จ และสาเหตุการส่งคืนตามจังหวัด
                 {currentPerson?.Organization ? ` • ${currentPerson.Organization}` : ''}
@@ -403,7 +359,7 @@ export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
 
         {data && (
           <>
-            {/* Summary Stat Cards */}
+            {/* 1. Summary Stat Cards */}
             <div className="deposit-stats-grid">
               {statCards.map((card, i) => (
                 <div className="deposit-stat-card" key={i}>
@@ -418,42 +374,16 @@ export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
               ))}
             </div>
 
-            {/* Failure Reasons */}
-            <div className="dash-section-card">
-              <div className="dash-section-title-row">
-                <h3 className="dash-section-title">สาเหตุการส่งคืน / นำจ่ายไม่สำเร็จ</h3>
-                <span className="dash-section-sub">(สรุปผลแล้ว {summary.concluded_count ?? 0} รายการ)</span>
-              </div>
-              {reasons.length === 0 ? (
-                <div className="dash-section-empty">ไม่มีรายการส่งคืนในข้อมูลที่เลือก</div>
-              ) : (
-                <div className="dash-reasons-list">
-                  {reasons.map((r) => (
-                    <div className="dash-reason-row" key={r.reason}>
-                      <div className="dash-reason-top">
-                        <div className="dash-reason-name">{r.reason}</div>
-                        <div className="dash-reason-nums">
-                          <span className="dash-reason-count">{r.count}</span>
-                          <span className="dash-reason-pct">{r.pct_of_failed}%</span>
-                        </div>
-                      </div>
-                      <div className="dash-reason-bar-track">
-                        <div className={`dash-reason-bar ${r.count > 0 ? 'has' : ''}`} style={{ width: `${Math.min(100, Math.max(4, r.pct_of_failed))}%` }}></div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Map + Province ranking */}
+            {/* 2. Map + Province ranking layout */}
             <div className="dash-map-layout">
               <div className="dash-section-card dash-map-card">
                 <div className="dash-section-title-row">
-                  <h3 className="dash-section-title">แผนที่อัตราการนำจ่ายสำเร็จตามจังหวัด</h3>
-                  <span className="dash-section-sub">
-                    ครอบคลุม {provinceCount} จังหวัด{data?.is_mock ? ' • ข้อมูลตัวอย่าง (Demo)' : ''}
-                  </span>
+                  <div className="dash-section-title-group">
+                    <h3 className="dash-section-title">แผนที่อัตราการนำจ่ายสำเร็จตามจังหวัด</h3>
+                    <span className="dash-section-sub">
+                      ครอบคลุม {provinceCount} จังหวัด{data?.is_mock ? ' • ข้อมูลตัวอย่าง (Demo)' : ''}
+                    </span>
+                  </div>
                 </div>
                 <div className="dash-map-body">
                   <div className="dash-map-svg-wrap" onMouseLeave={() => setSelectedProvince(null)}>
@@ -501,7 +431,6 @@ export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
                       <div className="dash-province-detail-inner">
                         <div className="dash-pd-name">
                           <strong>{selectedProvinceDetail.province}</strong>
-                          {selectedProvinceDetail.province !== provinces.find((p) => p.province === selectedProvinceDetail.province)?.province ? '' : ''}
                         </div>
                         <div className="dash-pd-rate">
                           อัตราสำเร็จ <span className={selectedProvinceDetail.success_rate == null ? 'muted' : selectedProvinceDetail.success_rate >= 50 ? 'good' : 'bad'}>{selectedProvinceDetail.success_rate == null ? 'ไม่มีข้อมูล' : `${selectedProvinceDetail.success_rate}%`}</span>
@@ -527,12 +456,14 @@ export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
 
               <div className="dash-section-card dash-ranking-card">
                 <div className="dash-section-title-row">
-                  <h3 className="dash-section-title">จัดอันดับจังหวัด ({provinceCount})</h3>
+                  <div className="dash-section-title-group">
+                    <h3 className="dash-section-title">จัดอันดับจังหวัด ({provinceCount})</h3>
+                  </div>
                 </div>
                 <div className="dash-ranking-table-wrap">
                   <table className="dash-table">
                     <thead>
-<tr>
+                      <tr>
                         <th>จังหวัด</th>
                         <th className="ta-r">รวม</th>
                         <th className="ta-r">รับฝากแล้ว</th>
@@ -574,88 +505,54 @@ export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
               </div>
             </div>
 
-            {/* Parcels detail */}
-            <div className="dash-section-card">
-              <div className="dash-section-title-row dash-section-title-row-wrap">
-                <h3 className="dash-section-title">รายการพัสดุ ({parcels.length} รายการ{data?.parcels_truncated ? ' — แสดงบางส่วน' : ''})</h3>
-                <div className="dash-parcel-controls">
-                  <div className="dash-parcel-tabs">
-                    {[['all', 'ทั้งหมด'], ['received', 'รับฝากแล้ว'], ['in_transit', 'อยู่ระหว่างการนำจ่าย'], ['delivered', 'สำเร็จ'], ['returned', 'ส่งคืน']].map(([key, label]) => (
-                      <button
-                        type="button"
-                        key={key}
-                        className={`btn-quick-date ${parcelTab === key ? 'active' : ''}`}
-                        onClick={() => { setParcelTab(key); setCurrentPage(1); }}
-                      >
-                        {label}
-                      </button>
-                    ))}
+            {/* 3. Failure Reasons Card - Moved to the very bottom */}
+            <div className="dash-section-card dash-reasons-card">
+              <div className="dash-section-title-row">
+                <div className="dash-section-title-group">
+                  <div className="stat-card-icon icon-returned dash-mini-icon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                      <path d="M18 6L6 18"></path>
+                      <path d="M6 6l12 12"></path>
+                    </svg>
                   </div>
-                  <input
-                    type="search"
-                    className="dash-parcel-search"
-                    placeholder="ค้นหาบาร์โค้ด / ชื่อ / จังหวัด"
-                    value={parcelSearch}
-                    onChange={(e) => { setParcelSearch(e.target.value); setCurrentPage(1); }}
-                  />
+                  <div>
+                    <h3 className="dash-section-title">สาเหตุการส่งคืน / นำจ่ายไม่สำเร็จ</h3>
+                    <span className="dash-section-sub">
+                      {totalReasonsCount > 0
+                        ? `พบสาเหตุทั้งหมด ${totalReasonsCount} รายการ (${summary.failed_count ?? 0} พัสดุส่งคืน/ไม่สำเร็จ)`
+                        : `สรุปผลแล้ว ${summary.concluded_count ?? 0} รายการ`}
+                    </span>
+                  </div>
                 </div>
               </div>
-              <div className="dash-table-wrap">
-                <table className="dash-table">
-                  <thead>
-                    <tr>
-                      <th className="ta-l">ลำดับ</th>
-                      <th className="ta-l">บาร์โค้ด</th>
-                      <th className="ta-l">ผู้รับ</th>
-                      <th className="ta-l">จังหวัด</th>
-                      <th className="ta-l">สถานะ</th>
-                      <th className="ta-l">สาเหตุ (ถ้าส่งคืน)</th>
-                      <th className="ta-l">จุดที่ระบุล่าสุด</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {paginatedParcels.map((p) => (
-                      <tr key={p.seq}>
-                        <td className="ta-l muted">{p.seq}</td>
-                        <td className="ta-l">{p.barcode}</td>
-                        <td className="ta-l">{p.receiver_name || '-'}</td>
-                        <td className="ta-l">{p.receiver_province || '-'}</td>
-                        <td className="ta-l">
-                          <span className={`dash-badge ${STATUS_META[p.status_key]?.className || 'dash-badge-warn'}`}>
-                            {STATUS_META[p.status_key]?.label || p.status_label || 'อยู่ระหว่างการนำจ่าย'}
-                          </span>
-                        </td>
-                        <td className="ta-l">{p.reason || '-'}</td>
-                        <td className="ta-l">{p.latest_station || p.latest_date || '-'}</td>
-                      </tr>
-                    ))}
-                    {paginatedParcels.length === 0 && (
-                      <tr><td colSpan="7" className="dash-section-empty">ไม่มีรายการที่ตรงตามเงื่อนไข</td></tr>
-                    )}
-                  </tbody>
-                </table>
-                {filteredParcels.length > PAGE_SIZE && (
-                  <div className="dash-pagination">
-                    <button
-                      type="button"
-                      className="btn-quick-date"
-                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                      disabled={currentPage <= 1}
-                    >
-                      ก่อนหน้า
-                    </button>
-                    <span className="dash-page-info">หน้า {currentPage} / {totalPages}</span>
-                    <button
-                      type="button"
-                      className="btn-quick-date"
-                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                      disabled={currentPage >= totalPages}
-                    >
-                      ถัดไป
-                    </button>
-                  </div>
-                )}
-              </div>
+              {reasons.length === 0 ? (
+                <div className="dash-section-empty">
+                  <p>ไม่พบรายการส่งคืนหรือนำจ่ายไม่สำเร็จในช่วงวันที่ที่เลือก</p>
+                </div>
+              ) : (
+                <div className="dash-reasons-list">
+                  {reasons.map((r) => (
+                    <div className="dash-reason-row" key={r.reason}>
+                      <div className="dash-reason-top">
+                        <div className="dash-reason-name">
+                          <span className="dash-reason-dot"></span>
+                          <span>{r.reason}</span>
+                        </div>
+                        <div className="dash-reason-nums">
+                          <span className="dash-reason-count">{r.count} <span className="stat-unit">รายการ</span></span>
+                          <span className="dash-reason-pct-chip">{r.pct_of_failed}%</span>
+                        </div>
+                      </div>
+                      <div className="dash-reason-bar-track">
+                        <div
+                          className={`dash-reason-bar ${r.count > 0 ? 'has' : ''}`}
+                          style={{ width: `${Math.min(100, Math.max(5, r.pct_of_failed))}%` }}
+                        ></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </>
         )}
