@@ -217,64 +217,90 @@ export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
     return reasons.reduce((acc, r) => acc + (r.count || 0), 0);
   }, [reasons]);
 
+  const totalItems = summary.total_items || 0;
+  const receivedCount = summary.received_count || 0;
+  const inTransitCount = summary.in_transit_count || 0;
+  const deliveredCount = summary.delivered_count || 0;
+  const returnedCount = summary.failed_count || 0;
+
+  const receivedRate = totalItems > 0 ? ((receivedCount / totalItems) * 100).toFixed(2) : '0.00';
+  const inTransitRate = totalItems > 0 ? ((inTransitCount / totalItems) * 100).toFixed(2) : '0.00';
+  const deliveredRate = totalItems > 0 ? ((deliveredCount / totalItems) * 100).toFixed(2) : '0.00';
+  const returnedRate = totalItems > 0 ? ((returnedCount / totalItems) * 100).toFixed(2) : '0.00';
+
   const statCards = [
-    {
-      label: 'รับฝาก (ทั้งหมด)',
-      value: summary.total_items,
-      unit: '',
-      className: 'icon-total',
-      icon: (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-          <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
-          <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
-          <line x1="12" y1="22.08" x2="12" y2="12"></line>
-        </svg>
-      )
-    },
+    // 1. รับฝากแล้ว
     {
       label: 'รับฝากแล้ว',
-      value: summary.received_count,
-      unit: ` (${formatPct(summary.received_pct_of_total)}% ของทั้งหมด)`,
+      value: receivedCount,
+      unit: `(${receivedRate}%)`,
+      valueColorClass: 'text-blue',
       className: 'icon-received-deposit',
       icon: (
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-          <path d="M22 12h-6l-2 3h-4l-2-3H2"></path>
-          <path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"></path>
+          <polyline points="20 12 20 22 4 22 4 12"></polyline>
+          <rect x="2" y="7" width="20" height="5"></rect>
+          <line x1="12" y1="22" x2="12" y2="7"></line>
+          <path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"></path>
+          <path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"></path>
         </svg>
       )
     },
+    // 2. อยู่ระหว่างการนำจ่าย
     {
       label: 'อยู่ระหว่างการนำจ่าย',
-      value: summary.in_transit_count,
-      unit: ` (${formatPct(summary.in_transit_pct_of_total)}% ของทั้งหมด)`,
+      value: inTransitCount,
+      unit: `(${inTransitRate}%)`,
+      valueColorClass: 'text-amber',
       className: 'icon-transit',
       icon: (
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-          <circle cx="12" cy="12" r="10"></circle>
-          <polyline points="12 6 12 12 16 14"></polyline>
+          <rect x="1" y="3" width="15" height="13"></rect>
+          <polygon points="16 8 20 8 23 11 23 16 16 8"></polygon>
+          <circle cx="5.5" cy="18.5" r="2.5"></circle>
+          <circle cx="18.5" cy="18.5" r="2.5"></circle>
         </svg>
       )
     },
+    // 3. นำจ่ายสำเร็จ
     {
       label: 'นำจ่ายสำเร็จ',
-      value: summary.delivered_count,
-      unit: ` (${formatPct(summary.delivered_pct_of_concluded)}% ของที่สรุปผล)`,
+      value: deliveredCount,
+      unit: `(${deliveredRate}%)`,
+      valueColorClass: 'text-emerald',
       className: 'icon-delivered',
       icon: (
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-          <path d="M20 6L9 17l-5-5"></path>
+          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+          <polyline points="22 4 12 14.01 9 11.01"></polyline>
         </svg>
       )
     },
+    // 4. ส่งคืน
     {
-      label: 'ส่งคืน / ไม่สำเร็จ',
-      value: summary.failed_count,
-      unit: ` (${formatPct(summary.failed_pct_of_concluded)}% ของที่สรุปผล)`,
+      label: 'ส่งคืน',
+      value: returnedCount,
+      unit: `(${returnedRate}%)`,
+      valueColorClass: 'text-rose',
       className: 'icon-returned',
       icon: (
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-          <path d="M18 6L6 18"></path>
-          <path d="M6 6l12 12"></path>
+          <polyline points="9 14 4 9 9 4"></polyline>
+          <path d="M20 20v-7a4 4 0 0 0-4-4H4"></path>
+        </svg>
+      )
+    },
+    // 5. รายการทั้งหมด
+    {
+      label: 'รายการทั้งหมด',
+      value: totalItems,
+      unit: 'ฉบับ',
+      valueColorClass: '',
+      className: 'icon-total',
+      icon: (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+          <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
+          <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
         </svg>
       )
     }
@@ -412,8 +438,9 @@ export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
                   <div className={`stat-card-icon ${card.className}`}>{card.icon}</div>
                   <div className="stat-card-content">
                     <div className="stat-label">{card.label}</div>
-                    <div className="stat-value">
-                      {card.value} <span className="stat-unit">{card.unit}</span>
+                    <div className={`stat-value ${card.valueColorClass || ''}`}>
+                      {card.value}{' '}
+                      <span className="stat-unit">{card.unit}</span>
                     </div>
                   </div>
                 </div>

@@ -2580,10 +2580,18 @@ Each bug recorded must adhere to the standardized structure:
    - Multi-file version bump synchronization (`config.js`, `package.json`, `convert_dpost.py`, `PROJECT_DOCUMENTATION.md`, `ROADMAP_REPORT_FEATURE.md`, `SKILL.md`).
    - Production deployment verification (`GET /api/health`).
 
+---
 
+## 94. Dashboard and Deposit Report KPI Stat Cards Synchronization (v2026.0924.1945)
 
-
-
-
-
-
+### 1. Architectural & UX Alignment
+- **Problem**: The Dashboard ("สถิติ") page previously used a legacy stat cards order starting with Total Items, worded "รับฝาก (ทั้งหมด)" and "ส่งคืน / ไม่สำเร็จ", with complex text formatting like `60 (96.80% ของที่สรุปผล)`. Meanwhile, "รายงานสถานะ" (`DepositReportView.jsx`) displays process stages chronologically ending with total items, using clean `({rate}%)` format and designated accent colors (`text-blue`, `text-amber`, `text-emerald`, `text-rose`).
+- **Solution**:
+  1. Standardize stat card order across both views:
+     - Card 1: `รับฝากแล้ว` (`icon-received-deposit`, `text-blue`)
+     - Card 2: `อยู่ระหว่างการนำจ่าย` (`icon-transit`, `text-amber`)
+     - Card 3: `นำจ่ายสำเร็จ` (`icon-delivered`, `text-emerald`)
+     - Card 4: `ส่งคืน` (`icon-returned`, `text-rose`)
+     - Card 5: `รายการทั้งหมด` (`icon-total`, neutral)
+  2. Rates are calculated uniformly against `totalItems` with 2 decimal precision (`((count / totalItems) * 100).toFixed(2)`).
+  3. Icons use the identical SVG vectors and background accent classes.
