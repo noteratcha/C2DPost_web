@@ -90,8 +90,20 @@ export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
 
   const cachedState = useMemo(() => getCachedDashboardState(), []);
 
-  const [startDate, setStartDate] = useState(() => cachedState?.startDate || todayIso);
-  const [endDate, setEndDate] = useState(() => cachedState?.endDate || todayIso);
+  // เฉพาะที่หน้านี้: ตัวกรองค่าเริ่มต้นคือ "เดือนนี้" (monthStartIso -> todayIso)
+  const defaultStartDate = useMemo(() => {
+    if (cachedState?.startDate && cachedState.startDate !== todayIso) {
+      return cachedState.startDate;
+    }
+    return monthStartIso;
+  }, [cachedState, todayIso, monthStartIso]);
+
+  const defaultEndDate = useMemo(() => {
+    return cachedState?.endDate || todayIso;
+  }, [cachedState, todayIso]);
+
+  const [startDate, setStartDate] = useState(defaultStartDate);
+  const [endDate, setEndDate] = useState(defaultEndDate);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [data, setData] = useState(() => cachedState?.data || null);
@@ -100,24 +112,6 @@ export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
   useEffect(() => {
     setCachedDashboardState({ startDate, endDate, data, updatedAt: Date.now() });
   }, [startDate, endDate, data]);
-
-  // Dev/testing hook: auto-fetch today's report when ?autofetch=1 (headless smoke)
-  const startedAutoFetch = useRef(false);
-  useEffect(() => {
-    if (AUTO_FETCH && !startedAutoFetch.current && currentPerson) {
-      startedAutoFetch.current = true;
-      handleFetchReport(startDate, endDate);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [AUTO_FETCH, currentPerson]);
-
-  const handleSetQuickDate = useCallback((kind) => {
-    if (kind === 'today') { setStartDate(todayIso); setEndDate(todayIso); }
-    else if (kind === 'yesterday') { setStartDate(yesterdayIso); setEndDate(yesterdayIso); }
-    else if (kind === 'last7days') { setStartDate(last7DaysIso); setEndDate(todayIso); }
-    else if (kind === 'thisMonth') { setStartDate(monthStartIso); setEndDate(todayIso); }
-    else if (kind === 'lastMonth') { setStartDate(lastMonthStartIso); setEndDate(lastMonthEndIso); }
-  }, [todayIso, yesterdayIso, last7DaysIso, monthStartIso, lastMonthStartIso, lastMonthEndIso]);
 
   const handleFetchReport = useCallback(async (startToFetch, endToFetch) => {
     const sIso = startToFetch || startDate;
@@ -154,6 +148,34 @@ export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
       setLoading(false);
     }
   }, [startDate, endDate, currentPerson]);
+
+  const handleSetQuickDate = useCallback((kind) => {
+    let s = todayIso;
+    let e = todayIso;
+    if (kind === 'today') { s = todayIso; e = todayIso; }
+    else if (kind === 'yesterday') { s = yesterdayIso; e = yesterdayIso; }
+    else if (kind === 'last7days') { s = last7DaysIso; e = todayIso; }
+    else if (kind === 'thisMonth') { s = monthStartIso; e = todayIso; }
+    else if (kind === 'lastMonth') { s = lastMonthStartIso; e = lastMonthEndIso; }
+    setStartDate(s);
+    setEndDate(e);
+    // อัปเดตข้อมูลอัตโนมัติทันทีที่คลิกเลือกช่วงเวลา
+    handleFetchReport(s, e);
+  }, [todayIso, yesterdayIso, last7DaysIso, monthStartIso, lastMonthStartIso, lastMonthEndIso, handleFetchReport]);
+
+  // อัปเดตข้อมูลอัตโนมัติเมื่อเปิดหน้านี้ (เริ่มต้นที่ "เดือนนี้")
+  const hasAutoFetchedRef = useRef(false);
+  useEffect(() => {
+    const isDemoMode =
+      typeof window !== 'undefined' &&
+      new URLSearchParams(window.location.search).get('demo') === '1';
+
+    if (hasAutoFetchedRef.current) return;
+    if (!currentPerson && !isDemoMode && !AUTO_FETCH) return;
+
+    hasAutoFetchedRef.current = true;
+    handleFetchReport(startDate, endDate);
+  }, [currentPerson, AUTO_FETCH, startDate, endDate, handleFetchReport]);
 
   const summary = data?.summary || {
     total_items: 0,
@@ -297,7 +319,18 @@ export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
             </div>
           </div>
           <div className="deposit-control-actions">
-            <button type="button" className="btn-reset-deposit" onClick={() => { setStartDate(todayIso); setEndDate(todayIso); setError(''); }} disabled={loading} title="คืนค่าวันที่เป็นวันนี้">
+            <button
+              type="button"
+              className="btn-reset-deposit"
+              onClick={() => {
+                setStartDate(monthStartIso);
+                setEndDate(todayIso);
+                setError('');
+                handleFetchReport(monthStartIso, todayIso);
+              }}
+              disabled={loading}
+              title="คืนค่าเป็นเดือนนี้"
+            >
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
                 <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
                 <path d="M3 3v5h5" />
@@ -342,6 +375,13 @@ export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
               <line x1="12" y1="8" x2="12.01" y2="8"></line>
             </svg>
             <span>{data.api_notice}</span>
+          </div>
+        )}
+
+        {loading && !data && (
+          <div className="dash-empty dash-loading-state">
+            <span className="spinner-medium"></span>
+            <p>กำลังดึงข้อมูลสถิติประจำเดือนนี้...</p>
           </div>
         )}
 

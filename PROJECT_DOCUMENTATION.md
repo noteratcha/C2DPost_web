@@ -155,7 +155,7 @@ node C2DPost_web/capture_screenshot.cjs
      `https://canva.link/dyl3brb47lyph8r`
    - **ติดต่อเจ้าหน้าที่**: ลิงก์ติดต่อเจ้าหน้าที่ส่วน ทข.ปข.10 ผ่าน LINE Official:
      `https://lin.ee/UzWqlKP`
-   - **เลขเวอร์ชันเว็บ**: แสดง `v2026.0924.1825 (เวอร์ชันล่าสุด)` ด้านล่างการ์ด เชื่อมต่อโฟลเดอร์ Google Drive รวมตัวติดตั้ง:
+   - **เลขเวอร์ชันเว็บ**: แสดง `v2026.0924.1925 (เวอร์ชันล่าสุด)` ด้านล่างการ์ด เชื่อมต่อโฟลเดอร์ Google Drive รวมตัวติดตั้ง:
      `https://drive.google.com/drive/folders/1ksrVAQVwkHDBE7qiqLT2ndyPHPQhz6vZ`
 
 2. **ระบบลงทะเบียนขอสิทธิ์การใช้งาน (Registration Window Flow)**:
