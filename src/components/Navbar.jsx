@@ -717,112 +717,80 @@ export default function Navbar({
                     </a>
                   </div>
 
-                  {/* Section Label: ข้อมูลระบบ & จัดการระบบ */}
-                  <div className="menu-section-label">{isAdmin ? 'การจัดการ & ข้อมูลระบบ' : 'ข้อมูลระบบ'}</div>
+                  {/* Section Label & Links: การจัดการระบบ (Admin Only) */}
+                  {isAdmin && (
+                    <>
+                      <div className="menu-section-label">การจัดการระบบ</div>
+                      <div className="menu-nav-links">
+                        {onNavigate && (
+                          <button
+                            type="button"
+                            className={`menu-link-card btn-card ${activePage === 'admin' ? 'active-menu-item' : ''}`}
+                            onClick={() => {
+                              setIsNavMenuOpen(false);
+                              onNavigate('admin');
+                            }}
+                            title="ระบบจัดการผู้ใช้งานและ API (Admin Portal)"
+                          >
+                            <div className="link-card-left">
+                              <div className="link-avatar-icon icon-admin" style={{ background: 'rgba(99, 102, 241, 0.15)', color: '#6366f1' }}>
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                                </svg>
+                              </div>
+                              <div className="link-text-meta">
+                                <div className="link-title-row">
+                                  <span className="link-title">จัดการระบบ</span>
+                                  <span className="link-tag-ext" style={{ background: 'rgba(99, 102, 241, 0.12)', color: '#6366f1', borderColor: 'rgba(99, 102, 241, 0.25)' }}>Admin</span>
+                                </div>
+                                <span className="link-subtitle">จัดการสิทธิ์ผู้ใช้งานและตรวจสอบสุขภาพ API</span>
+                              </div>
+                            </div>
+                            <div className="link-chevron-action">
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                                <polyline points="9 18 15 12 9 6"></polyline>
+                              </svg>
+                            </div>
+                          </button>
+                        )}
 
-                  {/* 3. Admin & About Links in Menu */}
-                  <div className="menu-nav-links">
-
-                    {isAdmin && onNavigate && (
-                      <button
-                        type="button"
-                        className={`menu-link-card btn-card ${activePage === 'admin' ? 'active-menu-item' : ''}`}
-                        onClick={() => {
-                          setIsNavMenuOpen(false);
-                          onNavigate('admin');
-                        }}
-                        title="ระบบจัดการผู้ใช้งานและ API (Admin Portal)"
-                      >
-                        <div className="link-card-left">
-                          <div className="link-avatar-icon icon-admin" style={{ background: 'rgba(99, 102, 241, 0.15)', color: '#6366f1' }}>
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-                              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                        <a
+                          href="https://chrome.google.com/webstore/devconsole/"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="menu-link-card btn-card"
+                          onClick={() => setIsNavMenuOpen(false)}
+                          title="เปิด Chrome Web Store Developer Console เพื่ออัปโหลด Extension ZIP เวอร์ชันใหม่"
+                        >
+                          <div className="link-card-left">
+                            <div className="link-avatar-icon icon-webstore" style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#10b981' }}>
+                              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                                <circle cx="12" cy="12" r="10"/>
+                                <circle cx="12" cy="12" r="4"/>
+                                <line x1="21.17" y1="8" x2="12" y2="8"/>
+                                <line x1="3.95" y1="6.06" x2="8.54" y2="14"/>
+                                <line x1="10.88" y1="21.94" x2="15.46" y2="14"/>
+                              </svg>
+                            </div>
+                            <div className="link-text-meta">
+                              <div className="link-title-row">
+                                <span className="link-title">อัปเดต Extension (Chrome Web Store)</span>
+                                <span className="link-tag-ext" style={{ background: 'rgba(16, 185, 129, 0.12)', color: '#10b981', borderColor: 'rgba(16, 185, 129, 0.25)' }}>Dev Console</span>
+                              </div>
+                              <span className="link-subtitle">เปิด Developer Console เพื่ออัปโหลด ZIP เวอร์ชันใหม่</span>
+                            </div>
+                          </div>
+                          <div className="link-chevron-action">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                              <polyline points="15 3 21 3 21 9"></polyline>
+                              <line x1="10" y1="14" x2="21" y2="3"></line>
                             </svg>
                           </div>
-                          <div className="link-text-meta">
-                            <div className="link-title-row">
-                              <span className="link-title">จัดการระบบ</span>
-                              <span className="link-tag-ext" style={{ background: 'rgba(99, 102, 241, 0.12)', color: '#6366f1', borderColor: 'rgba(99, 102, 241, 0.25)' }}>Admin</span>
-                            </div>
-                            <span className="link-subtitle">จัดการสิทธิ์ผู้ใช้งานและตรวจสอบสุขภาพ API</span>
-                          </div>
-                        </div>
-                        <div className="link-chevron-action">
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                            <polyline points="9 18 15 12 9 6"></polyline>
-                          </svg>
-                        </div>
-                      </button>
-                    )}
-
-                    {isAdmin && (
-                      <a
-                        href="https://chrome.google.com/webstore/devconsole/"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="menu-link-card btn-card"
-                        onClick={() => setIsNavMenuOpen(false)}
-                        title="เปิด Chrome Web Store Developer Console เพื่ออัปโหลด Extension ZIP เวอร์ชันใหม่"
-                      >
-                        <div className="link-card-left">
-                          <div className="link-avatar-icon icon-webstore" style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#10b981' }}>
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                              <circle cx="12" cy="12" r="10"/>
-                              <circle cx="12" cy="12" r="4"/>
-                              <line x1="21.17" y1="8" x2="12" y2="8"/>
-                              <line x1="3.95" y1="6.06" x2="8.54" y2="14"/>
-                              <line x1="10.88" y1="21.94" x2="15.46" y2="14"/>
-                            </svg>
-                          </div>
-                          <div className="link-text-meta">
-                            <div className="link-title-row">
-                              <span className="link-title">อัปเดต Extension (Chrome Web Store)</span>
-                              <span className="link-tag-ext" style={{ background: 'rgba(16, 185, 129, 0.12)', color: '#10b981', borderColor: 'rgba(16, 185, 129, 0.25)' }}>Dev Console</span>
-                            </div>
-                            <span className="link-subtitle">เปิด Developer Console เพื่ออัปโหลด ZIP เวอร์ชันใหม่</span>
-                          </div>
-                        </div>
-                        <div className="link-chevron-action">
-                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
-                            <polyline points="15 3 21 3 21 9"></polyline>
-                            <line x1="10" y1="14" x2="21" y2="3"></line>
-                          </svg>
-                        </div>
-                      </a>
-                    )}
-
-                    <button
-                      type="button"
-                      className="menu-link-card btn-card"
-                      onClick={() => {
-                        setIsNavMenuOpen(false);
-                        setShowAboutModal(true);
-                      }}
-                      title="ข้อมูลเกี่ยวกับระบบ C2DPost Web"
-                    >
-                      <div className="link-card-left">
-                        <div className="link-avatar-icon icon-about">
-                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                            <circle cx="12" cy="12" r="10"></circle>
-                            <line x1="12" y1="16" x2="12" y2="12"></line>
-                            <line x1="12" y1="8" x2="12.01" y2="8"></line>
-                          </svg>
-                        </div>
-                        <div className="link-text-meta">
-                          <div className="link-title-row">
-                            <span className="link-title">About</span>
-                          </div>
-                          <span className="link-subtitle">เกี่ยวกับระบบ & รูปแบบเอกสารที่รองรับ</span>
-                        </div>
+                        </a>
                       </div>
-                      <div className="link-chevron-action">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                          <polyline points="9 18 15 12 9 6"></polyline>
-                        </svg>
-                      </div>
-                    </button>
-                  </div>
+                    </>
+                  )}
 
                   {/* 4. Theme Toggle Segmented Control (Crystal clear UX) */}
                   <div className="theme-toggle-panel">
