@@ -353,7 +353,7 @@
 
 ---
 
-## 12. ตรวจสอบโค้ดเชิงลึกและแก้ไขบั๊กจากการทำงานของ AI ตัวก่อนหน้า (`v2026.0924.0845`)
+## 12. ตรวจสอบโค้ดเชิงลึกและแก้ไขบั๊กจากการทำงานของ AI ตัวก่อนหน้า (`v2026.0924.0915`)
 
 ### 12.1 บริบท
 - มีการนำ AI ตัวอื่นมาร่วมพัฒนาฟีเจอร์ e-AR Batch Download, Extension Bridge v1.4.0 และการตรวจสอบความปลอดภัยของ Session
@@ -375,10 +375,13 @@
 5. **บั๊ก #36 (MEDIUM) — Temporal Dead Zone (TDZ) และ Missing Dependencies ใน `handleLogout` (`src/App.jsx`)**:
    - **สาเหตุ**: `resetInactivityTimer` อ้างอิงถึง `handleLogout` แต่ลำดับการประกาศตัวแปรและการจัดการ Reference อาจก่อให้เกิดปัญหา TDZ เมื่อ Component Re-render และเมื่อผู้ใช้ออกจากระบบ ไม่มีการล้างแคช Session Storage ของรายงานสถานะและแดชบอร์ด
    - **แก้ไข**: ห่อหุ้ม `handleLogout` ด้วย `useCallback`, ย้ายตำแหน่งการประกาศให้อยู่ก่อนหน้า `resetInactivityTimer`, และเพิ่ม `sessionStorage.removeItem('c2dpost_date_range_cache')` พร้อม `sessionStorage.removeItem('c2dpost_dashboard_cache')` เพื่อความปลอดภัยด้านข้อมูลเมื่อเปลี่ยนผู้ใช้งาน
+6. **บั๊ก #37 (HIGH) — `checkEarCapability` ไม่ถูก Import ใน `App.jsx` ทำให้เกิด `ReferenceError` ส่งผลให้สถานะ e-AR Connection แสดงผลเป็น "เกิดข้อผิดพลาด" (`src/App.jsx`)**:
+   - **สาเหตุ**: AI ตัวก่อนหน้าได้เพิ่มการเรียกใช้ `checkEarCapability(1000)` ในฟังก์ชัน `checkEarConnection` แต่ไม่ได้ใส่ชื่อ `checkEarCapability` ไว้ในคำสั่ง `import { ... } from './utils/extensionBridge'` ที่ด้านบนสุดของไฟล์ ส่งผลให้เบราว์เซอร์โยนข้อผิดพลาด `ReferenceError: checkEarCapability is not defined` ทันทีที่ทำงาน และบล็อก `catch (err)` ดักจับแล้วเซ็ตสถานะเป็น `'error'` จนหน้าจอแสดงผลว่า "เกิดข้อผิดพลาด" สีแดง
+   - **แก้ไข**: เพิ่ม `checkEarCapability` ในคำสั่ง Import ของ `src/App.jsx` ให้ครบถ้วน, เชื่อมต่อ `onRefreshEar` เข้ากับปุ่มรีเฟรชใน `Navbar.jsx` เพื่อให้กดตรวจใหม่ได้ทันที และทดสอบการแปลงสถานะเป็น `'connected'` (สีเขียว "เชื่อมต่อแล้ว") ได้อย่างถูกต้อง
 
 ### 12.3 ผลลัพธ์การทดสอบและการ Build
 - ตรวจสอบความถูกต้องของสคริปต์ Python AST: ผ่าน 100%
 - ทดสอบระบบป้องกันสระวรรณยุกต์และตัวอักษรผิดเพี้ยน (`encoding_guard.mjs`): ผ่าน 56 ไฟล์ 100% (0 mojibake)
 - การคอมไพล์ Production Bundle (`npm run build`): สำเร็จไร้ข้อผิดพลาด
 - บรรจุแพ็กเกจ Chrome Extension WebStore (`sync_extension_webstore.py`): สำเร็จ สมบูรณ์ทั้งใน `extension_Webstore/` และ `public/`
-- ซิงก์เลขเวอร์ชัน 6 ตำแหน่งตรงกัน: `v2026.0924.0845`
+- ซิงก์เลขเวอร์ชัน 6 ตำแหน่งตรงกัน: `v2026.0924.0915`

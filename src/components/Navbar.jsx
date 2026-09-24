@@ -17,7 +17,8 @@ export default function Navbar({
   onNavigate,
   adminServices = null,
   onOpenDepositReport = null,
-  earStatus = 'unknown'
+  earStatus = 'unknown',
+  onRefreshEar = null
 }) {
   const [showAboutModal, setShowAboutModal] = useState(false);
   const [isNavMenuOpen, setIsNavMenuOpen] = useState(false);
@@ -82,6 +83,9 @@ export default function Navbar({
 
   const checkApis = useCallback(async () => {
     setIsChecking(true);
+    if (onRefreshEar) {
+      try { onRefreshEar(); } catch (e) { /* ignore */ }
+    }
     try {
       const res = await fetch('/api/check_status');
       if (res.ok) {

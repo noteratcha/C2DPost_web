@@ -12,7 +12,7 @@ import DepositReportModal from './components/DepositReportModal';
 import TrackingTimelineModal from './components/TrackingTimelineModal';
 import { parseCsv } from './utils/parseCsv';
 import { convertPdfs, exportAllFiles, exportExcel, exportPdf, reconcileRecords, logBarcodesToUseBarcode, updateEparcelStatusInSheet } from './utils/api';
-import { fetchBarcodesFromExtension, syncCredentialsToExtension, getExtensionVersion, subscribeExtensionReady, checkExtensionInstalled } from './utils/extensionBridge';
+import { fetchBarcodesFromExtension, syncCredentialsToExtension, getExtensionVersion, subscribeExtensionReady, checkExtensionInstalled, checkEarCapability } from './utils/extensionBridge';
 import { SPREADSHEET_ID } from './config';
 import './App.css';
 
@@ -1177,6 +1177,7 @@ export default function App() {
         adminServices={adminServices}
         onOpenDepositReport={() => setActivePage('deposit-report')}
         earStatus={earStatus}
+        onRefreshEar={checkEarConnection}
       />
 
       {/* 3. Dedicated Login Screen (Shown when NOT logged in) */}
