@@ -176,6 +176,17 @@ export default function TrackingTimelineModal({ isOpen, barcode, recInfo, curren
         };
       }
       if (rKey === 'returned' || rLabel === 'ส่งคืน') {
+        const fReason = recInfo?.failure_reason;
+        if (fReason && !/ส่งคืน|ปณ\./i.test(fReason)) {
+          return {
+            key: 'returned',
+            label: `นำจ่ายไม่สำเร็จ (${fReason})`,
+            badgeClass: 'exception',
+            dotClass: 'dot-amber',
+            isException: true,
+            rawDesc: `ส่งคืน: ${fReason}`
+          };
+        }
         return {
           key: 'returned',
           label: 'ส่งคืนต้นทาง',
@@ -197,6 +208,7 @@ export default function TrackingTimelineModal({ isOpen, barcode, recInfo, curren
 
     const rawDesc = latestEvent.status_description || '';
     const descNormalized = rawDesc.replace(/ํา/g, 'ำ');
+    const isReturned = latestEvent.status_key === 'returned' || /ส่งคืน|ตีกลับ/i.test(descNormalized);
     const exceptionDesc = checkException(descNormalized);
 
     const isDelivered = latestEvent.status_key === 'delivered' || 
@@ -223,6 +235,58 @@ export default function TrackingTimelineModal({ isOpen, barcode, recInfo, curren
       };
     }
 
+    // Helper to find the actual failure reason recorded before "ปณ.ปลายทางส่งคืน"
+    const extractFailureReason = (evs) => {
+      if (!evs || evs.length === 0) return null;
+      // 1. Look for 'ปณ.ปลายทางส่งคืน' or 'ปลายทางส่งคืน'
+      const destReturnIdx = evs.findIndex(ev => (ev.status_description || '').includes('ปลายทางส่งคืน'));
+      if (destReturnIdx > 0) {
+        const prev = evs[destReturnIdx - 1];
+        if (prev && prev.status_description && !/รับฝาก|ศป\.|ศูนย์คัดแยก/i.test(prev.status_description)) {
+          return prev.status_description;
+        }
+      }
+      // 2. Look for any step containing 'ส่งคืน' or 'ตีกลับ'
+      const retIdx = evs.findIndex(ev => /ส่งคืน|ตีกลับ/i.test(ev.status_description || ''));
+      if (retIdx > 0) {
+        const prev = evs[retIdx - 1];
+        if (prev && prev.status_description && !/รับฝาก|ศป\.|ศูนย์คัดแยก|เตรียมการนำจ่าย/i.test(prev.status_description)) {
+          return prev.status_description;
+        }
+      }
+      // 3. Look in reverse for explicit failure keywords
+      for (let i = evs.length - 1; i >= 0; i--) {
+        const d = evs[i].status_description || '';
+        if (/ย้าย|ไม่ทราบที่อยู่|บ้านปิด|ออกใบแจ้ง|ผู้รับไม่อยู่|ติดต่อไม่ได้|ไม่มีผู้รับ|จ่าหน้าไม่ชัดเจน|ปฏิเสธ|ไม่ยอมรับ|ไม่มารับ|เสียหาย/i.test(d)) {
+          return d;
+        }
+      }
+      return null;
+    };
+
+    if (isReturned) {
+      const returnCause = extractFailureReason(sortedEvents);
+      if (returnCause) {
+        const cleanCause = returnCause.replace(/^(นำจ่ายไม่สำเร็จ\s*\()|\)$/g, '');
+        return {
+          key: 'returned',
+          label: `นำจ่ายไม่สำเร็จ (${cleanCause})`,
+          badgeClass: 'exception',
+          dotClass: 'dot-amber',
+          isException: true,
+          rawDesc: `ส่งคืน: ${cleanCause}`
+        };
+      }
+      return {
+        key: 'returned',
+        label: 'ส่งคืนต้นทาง',
+        badgeClass: 'returned',
+        dotClass: 'dot-rose',
+        isException: false,
+        rawDesc
+      };
+    }
+
     if (exceptionDesc) {
       return {
         key: 'exception',
@@ -230,17 +294,6 @@ export default function TrackingTimelineModal({ isOpen, barcode, recInfo, curren
         badgeClass: 'exception',
         dotClass: 'dot-amber',
         isException: true,
-        rawDesc
-      };
-    }
-
-    if (latestEvent.status_key === 'returned' || /ส่งคืน|ตีกลับ/i.test(descNormalized)) {
-      return {
-        key: 'returned',
-        label: 'ส่งคืนต้นทาง',
-        badgeClass: 'returned',
-        dotClass: 'dot-rose',
-        isException: false,
         rawDesc
       };
     }

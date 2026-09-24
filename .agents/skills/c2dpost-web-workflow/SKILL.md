@@ -2595,3 +2595,12 @@ Each bug recorded must adhere to the standardized structure:
      - Card 5: `รายการทั้งหมด` (`icon-total`, neutral)
   2. Rates are calculated uniformly against `totalItems` with 2 decimal precision (`((count / totalItems) * 100).toFixed(2)`).
   3. Icons use the identical SVG vectors and background accent classes.
+
+---
+
+## 95. Thailand Post True Return Reason Extraction Protocol (v2026.0924.2005)
+
+### 1. Operational Logic of Postal Return Chronology
+- In Thailand Post's tracking lifecycle, when a delivery fails, the destination post office logs the specific reason (e.g. `ย้าย / ไม่ทราบที่อยู่ใหม่`, `บ้านปิด`, `ออกใบแจ้ง`) BEFORE initiating the return dispatch (`ปณ.ปลายทางส่งคืน`).
+- Querying only the latest status snapshot (`getOrderByBarcodes` or `events[-1]`) returns transportation milestones such as `ปณ.ต้นทางส่งคืนบริษัท`, masking the underlying failure cause.
+- Protocol: Always traverse the tracking event list to locate `ปณ.ปลายทางส่งคืน`, extract the event immediately prior (`events[dest_return_idx - 1]`), and normalize it through `_normalize_failure_reason`.

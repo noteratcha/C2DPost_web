@@ -318,15 +318,37 @@ def _build_demo_tracking(barcode, clean_date="14/09/2026"):
         "signature": "สมศรี (ผู้รับ)"
     }
 
-    ev_ret = {
+    ev_moved = {
         "seq": 4,
+        "status": "301",
+        "status_key": "in_transit",
+        "status_label": "นำจ่ายไม่สำเร็จ",
+        "status_description": "ย้าย / ไม่ทราบที่อยู่ใหม่",
+        "datetime": f"{clean_date} 19:49:15",
+        "location": "ปณ.เรณูนคร",
+        "signature": ""
+    }
+
+    ev_dest_ret = {
+        "seq": 5,
         "status": "502",
         "status_key": "returned",
         "status_label": "ส่งคืน",
-        "status_description": "ส่งคืน (ติดต่อผู้รับไม่ได้)",
-        "datetime": f"{clean_date} 16:55:00",
-        "location": "ศป.นครพนม",
-        "signature": "เจ้าหน้าที่ส่งคืน"
+        "status_description": "ปณ.ปลายทางส่งคืน",
+        "datetime": f"{clean_date} 16:07:59",
+        "location": "ปณ.เรณูนคร",
+        "signature": ""
+    }
+
+    ev_ret_origin = {
+        "seq": 6,
+        "status": "502",
+        "status_key": "returned",
+        "status_label": "ส่งคืน",
+        "status_description": "นำจ่ายไม่สำเร็จ (ปณ.ต้นทางส่งคืนบริษัท)",
+        "datetime": f"{clean_date} 11:44:29",
+        "location": "ปณ.เรณูนคร",
+        "signature": ""
     }
 
     # Customer 0 (ends in 9): Received only
@@ -345,8 +367,8 @@ def _build_demo_tracking(barcode, clean_date="14/09/2026"):
     if "982" in b_clean or digit in (3, 8):
         return [ev1, ev2, ev3, ev_deliv]
 
-    # Customer 4 (ends in 3): Returned
-    return [ev1, ev2, ev_ret]
+    # Customer 4 (ends in 3): Returned with true exception cause before ปณ.ปลายทางส่งคืน
+    return [ev1, ev2, ev3, ev_moved, ev_dest_ret, ev_ret_origin]
 
 @app.get("/api/health")
 def health_check():
@@ -677,8 +699,8 @@ def _fetch_received_report_payload(req_date, req_end_date, req_username, req_pas
                     "status": "501", "status_desc": "นำจ่ายสำเร็จ (ผู้รับได้รับเรียบร้อย)", "time_offset": "16:20:45", "station": "ปณ.สุไหงโก-ลก", "sig": "สมศรี (ผู้รับ)"
                 },
                 {
-                    "name": "นายไชยญา พ่อป้องขวา", "addr": "47 หมู่ที่ 6 ต.ท่าลาด", "amphur": "เรณูนคร", "prov": "นครพนม", "zip": "48170", "wt": 10.0, "price": 21.0,
-                    "status": "502", "status_desc": "ส่งคืน (ติดต่อผู้รับไม่ได้)", "time_offset": "16:55:00", "station": "ศป.นครพนม", "sig": "เจ้าหน้าที่ส่งคืน"
+                    "name": "นายจักรพงษ์ บัวสาย", "addr": "38 หมู่ที่ 4 ต.เรณู", "amphur": "เรณูนคร", "prov": "นครพนม", "zip": "48170", "wt": 10.0, "price": 21.0,
+                    "status": "502", "status_desc": "ย้าย / ไม่ทราบที่อยู่ใหม่", "time_offset": "19:49:15", "station": "ปณ.เรณูนคร", "sig": "เจ้าหน้าที่ส่งคืน"
                 },
                 {
                     "name": "นายสมศักดิ์ วงศ์สวรรค์", "addr": "12 หมู่ที่ 2 ต.โพนทอง", "amphur": "เรณูนคร", "prov": "นครพนม", "zip": "48170", "wt": 10.0, "price": 21.0,
@@ -843,6 +865,13 @@ def _fetch_received_report_payload(req_date, req_end_date, req_username, req_pas
                             rec["status_description_raw"] = latest["status_description"]
                         if latest.get("signature"):
                             rec["signature"] = latest["signature"]
+
+                        # If parcel is returned or has failure, extract true cause before 'ปณ.ปลายทางส่งคืน'
+                        if latest.get("status_key") == "returned" or any("ส่งคืน" in str(ev.get("status_description") or "") for ev in events):
+                            fail_reason = _extract_failure_reason_from_events(events)
+                            if fail_reason:
+                                rec["status_description_raw"] = fail_reason
+                                rec["failure_reason"] = fail_reason
             except Exception:
                 pass
             return rec
@@ -879,31 +908,121 @@ def _fetch_received_report_payload(req_date, req_end_date, req_username, req_pas
     }
 
 
+def _normalize_failure_reason(raw_text):
+    """
+    Normalizes Thai failure descriptions into standard recognizable labels.
+    Preserves exact Thailand Post operational categories:
+    'ย้าย / ไม่ทราบที่อยู่ใหม่', 'บ้านปิด', 'ออกใบแจ้ง', 'ผู้รับไม่อยู่', etc.
+    """
+    if not raw_text:
+        return "อื่น ๆ (ไม่ระบุสาเหตุ)"
+    
+    t = str(raw_text).strip()
+    
+    # Strip wrapping parentheses e.g. "นำจ่ายไม่สำเร็จ (ย้าย / ไม่ทราบที่อยู่ใหม่)"
+    m = re.search(r'\(([^)]+)\)', t)
+    if m:
+        inner = m.group(1).strip()
+        if inner and not any(k in inner for k in ["ปณ.", "บริษัท", "ต้นทางส่งคืน", "ปลายทางส่งคืน"]):
+            t = inner
+
+    norm = t.lower()
+    
+    # Specific Thailand Post failure reasons
+    if "ย้าย" in norm or "ไม่ทราบที่อยู่" in norm:
+        return "ย้าย / ไม่ทราบที่อยู่ใหม่"
+    if "บ้านปิด" in norm or "ปิดบ้าน" in norm:
+        return "บ้านปิด"
+    if "ออกใบแจ้ง" in norm or "หยอดใบแจ้ง" in norm:
+        return "ออกใบแจ้ง"
+    if "ผู้รับไม่อยู่" in norm or "ไม่อยู่บ้าน" in norm:
+        return "ผู้รับไม่อยู่"
+    if "ติดต่อผู้รับไม่ได้" in norm or "ติดต่อไม่ได้" in norm or "โทรไม่ติด" in norm:
+        return "ติดต่อผู้รับไม่ได้"
+    if "ไม่มีผู้รับ" in norm or "ไม่พบผู้รับ" in norm:
+        return "ไม่มีผู้รับตามจ่าหน้า"
+    if "จ่าหน้าไม่ชัดเจน" in norm or "ที่อยู่ไม่ครบ" in norm or "ไม่พบที่อยู่" in norm or "ไม่มีเลขที่" in norm:
+        return "จ่าหน้าไม่ชัดเจน / ที่อยู่ไม่ครบ"
+    if "ปฏิเสธ" in norm or "ไม่ยอมรับ" in norm:
+        return "ปฏิเสธการรับ"
+    if "ไม่มารับ" in norm or "รอจ่าย" in norm or "เกินกำหนด" in norm:
+        return "ไม่มารับตามกำหนด / รอจ่าย"
+    if "ชำรุด" in norm or "เสียหาย" in norm:
+        return "พัสดุเสียหาย / ชำรุด"
+
+    # Avoid returning transport steps as reason
+    if any(k in norm for k in ["ปณ.ต้นทางส่งคืน", "ปณ.ปลายทางส่งคืน", "ส่งคืนต้นทาง", "ส่งมอบคืน"]):
+        return "อื่น ๆ (ส่งคืนต้นทาง)"
+
+    return t
+
+
+def _extract_failure_reason_from_events(events):
+    """
+    Extracts the true failure reason from tracking timeline events.
+    Per Thailand Post workflow:
+    When a delivery attempt fails at destination, an exception step is recorded
+    (e.g., 'ย้าย / ไม่ทราบที่อยู่ใหม่', 'บ้านปิด', 'ออกใบแจ้ง', 'ผู้รับไม่อยู่').
+    The destination office subsequently registers 'ปณ.ปลายทางส่งคืน'.
+    Therefore, the event IMMEDIATELY BEFORE 'ปณ.ปลายทางส่งคืน' contains the actual cause of return.
+    """
+    if not events:
+        return ""
+
+    def _get_desc(ev):
+        return str(ev.get("status_description") or ev.get("status_label") or "").strip()
+
+    # 1. Look for 'ปณ.ปลายทางส่งคืน' or 'ปลายทางส่งคืน'
+    dest_return_idx = -1
+    for i, ev in enumerate(events):
+        d = _get_desc(ev)
+        if "ปลายทางส่งคืน" in d:
+            dest_return_idx = i
+            break
+
+    if dest_return_idx > 0:
+        prev_desc = _get_desc(events[dest_return_idx - 1])
+        if prev_desc and not any(k in prev_desc for k in ["รับฝาก", "ศป.", "ศูนย์คัดแยก"]):
+            return _normalize_failure_reason(prev_desc)
+
+    # 2. Look for first return step ('ส่งคืน', 'คืนต้นทาง', 'ตีกลับ')
+    first_return_idx = -1
+    for i, ev in enumerate(events):
+        d = _get_desc(ev)
+        if any(k in d for k in ["ส่งคืน", "คืนต้นทาง", "ตีกลับ"]) and not any(k in d for k in ["รับฝาก"]):
+            first_return_idx = i
+            break
+
+    if first_return_idx > 0:
+        prev_desc = _get_desc(events[first_return_idx - 1])
+        if prev_desc and not any(k in prev_desc for k in ["รับฝาก", "ศป.", "ศูนย์คัดแยก", "เตรียมการนำจ่าย", "เตรียมนำจ่าย"]):
+            return _normalize_failure_reason(prev_desc)
+
+    # 3. Look in reverse for any event with known failure keywords
+    failure_keywords = [
+        "ย้าย", "ไม่ทราบที่อยู่", "บ้านปิด", "ออกใบแจ้ง", "ผู้รับไม่อยู่", "ติดต่อไม่ได้",
+        "ไม่มีผู้รับ", "จ่าหน้าไม่ชัดเจน", "ปฏิเสธ", "ไม่ยอมรับ", "ไม่มารับ", "เสียหาย", "ชำรุด"
+    ]
+    for ev in reversed(events):
+        d = _get_desc(ev)
+        if any(kw in d for kw in failure_keywords):
+            return _normalize_failure_reason(d)
+
+    # 4. Fallback to latest event description if not pure generic return
+    if events:
+        latest = _get_desc(events[-1])
+        if latest and not any(k in latest for k in ["ส่งคืน", "ปณ.ต้นทางส่งคืนบริษัท"]):
+            return _normalize_failure_reason(latest)
+
+    return "อื่น ๆ (ไม่ระบุสาเหตุ)"
+
+
 def _classify_failure_reason(raw_desc):
     """
     Classifies the reason a parcel was not successfully delivered (returned)
-    into a friendly Thai bucket, based on the description text from tracking events.
+    into standard recognizable Thailand Post failure buckets.
     """
-    norm = " ".join(str(raw_desc or "").split()).lower()
-    buckets = [
-        ("บ้านปิด", ["บ้านปิด", "ปิดบ้าน", "ไม่มีผู้อยู่", "ไม่มีคนอยู่", "ไม่มีผู้พักอาศัย"]),
-        ("ผู้รับไม่อยู่", ["ผู้รับไม่อยู่", "ไม่อยู่", "ไม่อยู่บ้าน"]),
-        ("ออกใบแจ้ง", ["ออกใบแจ้ง", "หยอดใบแจ้ง", "ใบแจ้ง"]),
-        ("ติดต่อผู้รับไม่ได้", ["ติดต่อผู้รับ", "ติดต่อไม่ได้", "ติดต่อไม่", "โทรติดต่อ", "โทรไม่ติด", "ติดต่อไม่ได้เพราะ", "ไม่สามารถติดต่อ", "โทรศัพท์ไม่", "เจ้าหน้าที่ติดต่อ"]),
-        ("ไม่มีผู้รับตามจ่าหน้า", ["ไม่มีผู้รับ", "ไม่พบผู้รับ", "ไม่มีผู้มารับ", "ไม่เจอผู้รับ", "ไม่พบตัวผู้รับ", "บุคคลตามจ่าหน้า"]),
-        ("ผู้รับย้ายที่อยู่", ["ผู้รับย้ายที่อยู่", "ย้ายที่อยู่", "ย้ายบ้าน", "ย้ายออก", "ย้าย"]),
-        ("ไม่มารับตามกำหนด / รอจ่าย", ["ไม่มารับตามกำหนด", "ไม่มารับ", "ไม่มารับของ", "ยังไม่รับ", "รอผู้รับ", "รอจ่าย", "เกินกำหนด"]),
-        ("จ่าหน้าไม่ชัดเจน / ที่อยู่ไม่ครบ", ["จ่าหน้าไม่", "หน้าจ่าไม่", "จ่าหน้าสลับ", "ไม่ชัดเจน", "ไม่ชัด", "ที่อยู่ไม่", "ที่อยู่ไม่ครบ", "ไม่พบที่อยู่", "จ่าหน้าผิด", "จ่าหน้าเปลี่ยน", "ไม่มีเลขที่"]),
-        ("ปฏิเสธการรับ", ["ปฏิเสธ", "ไม่ยอมรับ", "ไม่ยอมรับพัสดุ", "ไม่รับพัสดุ"]),
-        ("พัสดุเสียหาย / ชำรุด", ["เสียหาย", "ชำรุด", "เปียกชื้น", "เปียก", "บุบสลาย", "สินค้าเสียหาย"]),
-        ("อื่น ๆ", []),
-    ]
-    if not norm or len(norm) < 3:
-        return "อื่น ๆ (ไม่ระบุสาเหตุ)"
-    for name, kws in buckets:
-        if any(kw in norm for kw in kws):
-            return name
-    return "อื่น ๆ"
+    return _normalize_failure_reason(raw_desc)
 
 
 @app.post("/api/reports/dashboard")
@@ -1003,6 +1122,41 @@ def get_dashboard_report(req: DashboardRequest):
                         rec["status_key"] = "in_transit"
                         rec["status_label"] = sl or rec.get("status_label") or "อยู่ระหว่างนำจ่าย"
 
+    # Enrich returned/failed records with the exact failure cause recorded BEFORE "ปณ.ปลายทางส่งคืน"
+    returned_or_failed = [
+        rec for rec in records
+        if rec.get("status_key") == "returned"
+        or str(rec.get("status") or "") in ["301", "302", "401", "402", "502", "503"]
+        or any(k in str(rec.get("status_description_raw") or rec.get("status_label") or "")
+               for k in ["ส่งคืน", "คืนต้นทาง", "ตีกลับ", "นำจ่ายไม่สำเร็จ", "ไม่สามารถนำจ่าย", "ไม่สามารถส่งมอบ", "บ้านปิด", "ออกใบแจ้ง", "ย้าย"])
+    ]
+    if is_live and returned_or_failed:
+        def _fetch_failed_reason(rec):
+            bcode = rec.get("barcode")
+            if not bcode:
+                return
+            try:
+                hurl = f"https://r_dservice.thailandpost.com/webservice/getHistoryStatus?barcode={bcode}"
+                hr = requests.get(hurl, headers={"Content-Type": "application/json"},
+                                  auth=HTTPBasicAuth(username, password), timeout=10, verify=False)
+                if hr.status_code == 200:
+                    try:
+                        hraw = hr.json()
+                    except Exception:
+                        hraw = hr.text
+                    evs = _parse_tracking_events(hraw, bcode)
+                    if evs:
+                        extracted_reason = _extract_failure_reason_from_events(evs)
+                        if extracted_reason:
+                            rec["status_description_raw"] = extracted_reason
+                            rec["failure_reason"] = extracted_reason
+            except Exception:
+                pass
+
+        max_fw = min(len(returned_or_failed), 10)
+        with ThreadPoolExecutor(max_workers=max_fw) as ex:
+            list(ex.map(_fetch_failed_reason, returned_or_failed))
+
     total = len(records)
     delivered = 0
     failed = 0
@@ -1026,12 +1180,12 @@ def get_dashboard_report(req: DashboardRequest):
         has_failure_or_return = (
             key == "returned"
             or code_str in ["301", "302", "401", "402", "502", "503"]
-            or any(k in desc_full for k in ["ส่งคืน", "คืนต้นทาง", "ตีกลับ", "นำจ่ายไม่สำเร็จ", "ไม่สามารถนำจ่าย", "ไม่สามารถส่งมอบ", "บ้านปิด", "ออกใบแจ้ง", "ผู้รับไม่อยู่", "ติดต่อไม่ได้", "ไม่มารับตามกำหนด"])
+            or any(k in desc_full for k in ["ส่งคืน", "คืนต้นทาง", "ตีกลับ", "นำจ่ายไม่สำเร็จ", "ไม่สามารถนำจ่าย", "ไม่สามารถส่งมอบ", "บ้านปิด", "ออกใบแจ้ง", "ผู้รับไม่อยู่", "ติดต่อไม่ได้", "ไม่มารับตามกำหนด", "ย้าย"])
         )
 
         reason = ""
         if has_failure_or_return and key != "delivered":
-            reason = _classify_failure_reason(desc_full)
+            reason = rec.get("failure_reason") or _classify_failure_reason(desc_full)
             reason_counts[reason] = reason_counts.get(reason, 0) + 1
 
         is_failed_item = (key == "returned") or (has_failure_or_return and any(k in desc_full for k in ["ส่งคืน", "คืนต้นทาง", "ตีกลับ", "502", "503", "401", "402", "นำจ่ายไม่สำเร็จ", "บ้านปิด"]))
