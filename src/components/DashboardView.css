@@ -247,9 +247,15 @@
 /* 2. Map Layout (Map + Province Ranking) */
 .dash-map-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1.25rem;
   align-items: start;
+}
+
+.dash-map-card,
+.dash-ranking-card {
+  min-width: 0;
+  width: 100%;
 }
 
 .dash-map-card {

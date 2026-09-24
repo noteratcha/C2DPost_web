@@ -2622,3 +2622,25 @@ Each bug recorded must adhere to the standardized structure:
     <div className="deposit-alert info">...</div>
   )}
   ```
+
+---
+
+## 97. Balanced Dual-Card Layout for Thailand Map and Province Ranking (v2026.0924.2025)
+
+### 1. Symmetric Grid Configuration
+- The dashboard layout for geographic performance previously used an asymmetrical column ratio `1.35fr : 1fr`, causing the map card to appear noticeably wider than the province ranking table.
+- Standardized to symmetric 50/50 split:
+  ```css
+  .dash-map-layout {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1.25rem;
+    align-items: start;
+  }
+  .dash-map-card,
+  .dash-ranking-card {
+    min-width: 0;
+    width: 100%;
+  }
+  ```
+- Retains `@media (max-width: 1100px)` single column fallback (`grid-template-columns: 1fr`).
