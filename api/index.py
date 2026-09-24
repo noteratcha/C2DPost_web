@@ -1090,17 +1090,17 @@ def get_dashboard_report(req: DashboardRequest):
         "pending_count": pending,
         "unknown_count": unknown,
         "concluded_count": concluded,
-        "delivered_pct_of_concluded": round(delivered * 100 / concluded, 1) if concluded else 0.0,
-        "failed_pct_of_concluded": round(failed * 100 / concluded, 1) if concluded else 0.0,
-        "delivered_pct_of_total": round(delivered * 100 / total, 1) if total else 0.0,
-        "failed_pct_of_total": round(failed * 100 / total, 1) if total else 0.0,
-        "received_pct_of_total": round(received * 100 / total, 1) if total else 0.0,
-        "in_transit_pct_of_total": round(in_transit * 100 / total, 1) if total else 0.0,
-        "pending_pct_of_total": round(pending * 100 / total, 1) if total else 0.0,
+        "delivered_pct_of_concluded": round(delivered * 100 / concluded, 2) if concluded else 0.0,
+        "failed_pct_of_concluded": round(failed * 100 / concluded, 2) if concluded else 0.0,
+        "delivered_pct_of_total": round(delivered * 100 / total, 2) if total else 0.0,
+        "failed_pct_of_total": round(failed * 100 / total, 2) if total else 0.0,
+        "received_pct_of_total": round(received * 100 / total, 2) if total else 0.0,
+        "in_transit_pct_of_total": round(in_transit * 100 / total, 2) if total else 0.0,
+        "pending_pct_of_total": round(pending * 100 / total, 2) if total else 0.0,
     }
 
     reasons = [
-        {"reason": r, "count": c, "pct_of_failed": round(c * 100 / failed, 1) if failed else 0.0}
+        {"reason": r, "count": c, "pct_of_failed": round(c * 100 / failed, 2) if failed else 0.0}
         for r, c in sorted(reason_counts.items(), key=lambda kv: -kv[1])
     ]
 
@@ -1116,7 +1116,7 @@ def get_dashboard_report(req: DashboardRequest):
             "in_transit": st["in_transit"],
             "pending": st["pending"],
             "concluded": conc,
-            "success_rate": round(st["delivered"] * 100 / conc, 1) if conc else None,
+            "success_rate": round(st["delivered"] * 100 / conc, 2) if conc else None,
         })
     provinces.sort(key=lambda p: (-p["count"], p["province"]))
 

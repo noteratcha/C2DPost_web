@@ -700,20 +700,20 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
   };
 
   const receivedRate = summary.total_items > 0
-    ? Math.round((receivedCount / summary.total_items) * 100)
-    : 0;
+    ? ((receivedCount / summary.total_items) * 100).toFixed(2)
+    : '0.00';
 
   const inTransitRate = summary.total_items > 0
-    ? Math.round((inTransitCount / summary.total_items) * 100)
-    : 0;
+    ? ((inTransitCount / summary.total_items) * 100).toFixed(2)
+    : '0.00';
 
   const deliveredRate = summary.total_items > 0
-    ? Math.round((deliveredCount / summary.total_items) * 100)
-    : 0;
+    ? ((deliveredCount / summary.total_items) * 100).toFixed(2)
+    : '0.00';
 
   const returnedRate = summary.total_items > 0
-    ? Math.round((returnedCount / summary.total_items) * 100)
-    : 0;
+    ? ((returnedCount / summary.total_items) * 100).toFixed(2)
+    : '0.00';
 
   return (
     <main className="deposit-page-main python-layout-main">

@@ -59,6 +59,12 @@ function successColor(rate) {
   return '#ef4444';
 }
 
+// Helper: Format percentage value to 2 decimal places
+function formatPct(val) {
+  if (val === null || val === undefined || isNaN(val)) return '0.00';
+  return Number(val).toFixed(2);
+}
+
 export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
   const AUTO_FETCH = useMemo(
     () => typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('autofetch') === '1',
@@ -228,7 +234,7 @@ export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
     {
       label: 'รับฝากแล้ว',
       value: summary.received_count,
-      unit: ` (${summary.received_pct_of_total ?? 0}% ของทั้งหมด)`,
+      unit: ` (${formatPct(summary.received_pct_of_total)}% ของทั้งหมด)`,
       className: 'icon-received-deposit',
       icon: (
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
@@ -240,7 +246,7 @@ export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
     {
       label: 'อยู่ระหว่างการนำจ่าย',
       value: summary.in_transit_count,
-      unit: ` (${summary.in_transit_pct_of_total ?? 0}% ของทั้งหมด)`,
+      unit: ` (${formatPct(summary.in_transit_pct_of_total)}% ของทั้งหมด)`,
       className: 'icon-transit',
       icon: (
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
@@ -252,7 +258,7 @@ export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
     {
       label: 'นำจ่ายสำเร็จ',
       value: summary.delivered_count,
-      unit: ` (${summary.delivered_pct_of_concluded ?? 0}% ของที่สรุปผล)`,
+      unit: ` (${formatPct(summary.delivered_pct_of_concluded)}% ของที่สรุปผล)`,
       className: 'icon-delivered',
       icon: (
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
@@ -263,7 +269,7 @@ export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
     {
       label: 'ส่งคืน / ไม่สำเร็จ',
       value: summary.failed_count,
-      unit: ` (${summary.failed_pct_of_concluded ?? 0}% ของที่สรุปผล)`,
+      unit: ` (${formatPct(summary.failed_pct_of_concluded)}% ของที่สรุปผล)`,
       className: 'icon-returned',
       icon: (
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
@@ -449,7 +455,7 @@ export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
                               onMouseEnter={() => setSelectedProvince(prov.name)}
                               onClick={() => setSelectedProvince(prov.name)}
                             >
-                              <title>{`${prov.name}: ${stat ? `สำเร็จ ${stat.success_rate}% (รวม ${stat.count}, อยู่ระหว่างการนำจ่าย ${stat.in_transit ?? 0}, รับฝากแล้ว ${stat.received ?? 0}, สำเร็จ ${stat.delivered}, ส่งคืน ${stat.failed})` : 'ไม่มีข้อมูล'}`}</title>
+                              <title>{`${prov.name}: ${stat ? `สำเร็จ ${formatPct(stat.success_rate)}% (รวม ${stat.count}, อยู่ระหว่างการนำจ่าย ${stat.in_transit ?? 0}, รับฝากแล้ว ${stat.received ?? 0}, สำเร็จ ${stat.delivered}, ส่งคืน ${stat.failed})` : 'ไม่มีข้อมูล'}`}</title>
                             </path>
                           );
                         })}
@@ -473,7 +479,7 @@ export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
                           <strong>{selectedProvinceDetail.province}</strong>
                         </div>
                         <div className="dash-pd-rate">
-                          อัตราสำเร็จ <span className={selectedProvinceDetail.success_rate == null ? 'muted' : selectedProvinceDetail.success_rate >= 50 ? 'good' : 'bad'}>{selectedProvinceDetail.success_rate == null ? 'ไม่มีข้อมูล' : `${selectedProvinceDetail.success_rate}%`}</span>
+                          อัตราสำเร็จ <span className={selectedProvinceDetail.success_rate == null ? 'muted' : selectedProvinceDetail.success_rate >= 50 ? 'good' : 'bad'}>{selectedProvinceDetail.success_rate == null ? 'ไม่มีข้อมูล' : `${formatPct(selectedProvinceDetail.success_rate)}%`}</span>
                         </div>
                         <div className="dash-pd-stats">
                           <div className="dash-pd-stat"><span className="dot t-blue"></span> รับฝากแล้ว <strong>{selectedProvinceDetail.received ?? 0}</strong></div>
@@ -515,7 +521,7 @@ export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
                     </thead>
                     <tbody>
                       {provinces.map((p) => {
-                        const rate = p.success_rate == null ? '' : `${p.success_rate}%`;
+                        const rate = p.success_rate == null ? '' : `${formatPct(p.success_rate)}%`;
                         return (
                           <tr
                             key={p.province}
@@ -580,13 +586,13 @@ export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
                         </div>
                         <div className="dash-reason-nums">
                           <span className="dash-reason-count">{r.count} <span className="stat-unit">รายการ</span></span>
-                          <span className="dash-reason-pct-chip">{r.pct_of_failed}%</span>
+                          <span className="dash-reason-pct-chip">{formatPct(r.pct_of_failed)}%</span>
                         </div>
                       </div>
                       <div className="dash-reason-bar-track">
                         <div
                           className={`dash-reason-bar ${r.count > 0 ? 'has' : ''}`}
-                          style={{ width: `${Math.min(100, Math.max(5, r.pct_of_failed))}%` }}
+                          style={{ width: `${Math.min(100, Math.max(5, Number(r.pct_of_failed) || 0))}%` }}
                         ></div>
                       </div>
                     </div>

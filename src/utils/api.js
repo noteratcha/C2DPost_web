@@ -43,10 +43,10 @@ export async function convertPdfs(fileList, onProgress) {
   for (let i = 0; i < total; i++) {
     const file = fileList[i];
     const current = i + 1;
-    const startPercent = Math.round((i / total) * 100);
+    const startPercent = ((i / total) * 100).toFixed(2);
 
     if (onProgress) {
-      onProgress(i, total, startPercent, `กำลังแปลงไฟล์... ${i}/${total} (${startPercent}%)`);
+      onProgress(i, total, Number(startPercent), `กำลังแปลงไฟล์... ${i}/${total} (${startPercent}%)`);
     }
 
     try {
@@ -74,9 +74,9 @@ export async function convertPdfs(fileList, onProgress) {
       errorFiles.push({ filename: file.name, error: e.message || 'การเชื่อมต่อล้มเหลว' });
     }
 
-    const endPercent = Math.round((current / total) * 100);
+    const endPercent = ((current / total) * 100).toFixed(2);
     if (onProgress) {
-      onProgress(current, total, endPercent, `กำลังแปลงไฟล์... ${current}/${total} (${endPercent}%)`);
+      onProgress(current, total, Number(endPercent), `กำลังแปลงไฟล์... ${current}/${total} (${endPercent}%)`);
     }
   }
 

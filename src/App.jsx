@@ -425,7 +425,7 @@ export default function App() {
     uploadLockRef.current = true;
     setIsProcessing(true);
     setProgress({ val: 0, current: 0, total: newFiles.length, percent: 0 });
-    setStatusText(`กำลังแปลงไฟล์... 0/${newFiles.length} (0%)`);
+    setStatusText(`กำลังแปลงไฟล์... 0/${newFiles.length} (0.00%)`);
 
     try {
       const result = await convertPdfs(newFiles, (current, total, percent, status) => {
