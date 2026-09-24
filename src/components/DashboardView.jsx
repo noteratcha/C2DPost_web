@@ -801,28 +801,6 @@ export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
                   <div className="dash-province-detail">
                     {activeProvinceDetail ? (
                       <div className={`dash-province-detail-inner ${lockedProvince ? 'is-locked' : ''}`}>
-                        {lockedProvince ? (
-                          <div className="dash-pd-lock-banner">
-                            <div className="dash-pd-lock-status">
-                              <span className="dash-pd-lock-icon">🔒</span>
-                              <span>ล็อคข้อมูลจังหวัด</span>
-                            </div>
-                            <button
-                              type="button"
-                              className="dash-pd-unlock-btn"
-                              onClick={() => setLockedProvince(null)}
-                              title="คลิกเพื่อปลดล็อคการแสดงผล"
-                            >
-                              ปลดล็อค ✕
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="dash-pd-hover-hint">
-                            <span className="dash-pd-hint-icon">👆</span>
-                            <span>คลิกที่แผนที่เพื่อล็อคข้อมูลจังหวัดนี้</span>
-                          </div>
-                        )}
-
                         <div className="dash-pd-name-row">
                           <div className="dash-pd-name">
                             <strong>{activeProvinceDetail.province}</strong>
@@ -834,6 +812,16 @@ export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
                               </span>
                             ) : (
                               <span className="dash-pd-rate-pill muted">ไม่มีข้อมูล</span>
+                            )}
+                            {lockedProvince && (
+                              <button
+                                type="button"
+                                className="dash-pd-close-btn"
+                                onClick={() => setLockedProvince(null)}
+                                title="ปลดล็อคการแสดงผล"
+                              >
+                                ✕
+                              </button>
                             )}
                           </div>
                         </div>

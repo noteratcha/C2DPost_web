@@ -654,6 +654,44 @@
   color: var(--text-main, #0f172a);
 }
 
+.dash-pd-rate-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dash-pd-close-btn {
+  background: rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  color: var(--text-muted, #64748b);
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 3px 8px;
+  border-radius: 6px;
+  line-height: 1;
+  transition: all 0.15s ease;
+  font-family: inherit;
+}
+
+.dash-pd-close-btn:hover {
+  background: #ef4444;
+  border-color: #ef4444;
+  color: #ffffff;
+}
+
+[data-theme='dark'] .dash-pd-close-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: #94a3b8;
+}
+
+[data-theme='dark'] .dash-pd-close-btn:hover {
+  background: #ef4444;
+  border-color: #ef4444;
+  color: #ffffff;
+}
+
 .dash-pd-rate-pill {
   font-size: 0.78rem;
   font-weight: 700;
