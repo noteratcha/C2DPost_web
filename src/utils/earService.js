@@ -76,7 +76,40 @@ export async function fetchEarDetailsClient(barcode, force = false) {
     }
 
     if (!pdfBlob) {
-      return null;
+      // Check if extension is available but not responding
+      const extInfo = await checkEarCapability(500).catch(() => ({ supported: false, installed: false, version: '' }));
+      if (!extInfo.installed) {
+        throw new Error(
+          '❌ ไม่พบส่วนขยาย C2DPost Helper\n\n' +
+          '📥 วิธีติดตั้ง:\n' +
+          '1. ดาวน์โหลดไฟล์ ZIP: /C2DPost_Helper_v1.4.0_WebStore.zip\n' +
+          '2. แตกไฟล์ (Extract) ไว้ในโฟลเดอร์\n' +
+          '3. เปิด chrome://extensions → เปิด "โหมดนักพัฒนา" (Developer mode)\n' +
+          '4. กด "โหลดส่วนขยายที่ไม่ได้บีบอัด" (Load unpacked) → เลือกโฟลเดอร์ที่แตกไฟล์\n' +
+          '5. Refresh (F5) หน้านี้\n\n' +
+          '🔗 หรือติดตั้งจาก Chrome Web Store (เมื่ออนุมัติแล้ว): https://chromewebstore.google.com/detail/cdkmibacceaacdiopcekkmfifaocapgk'
+        );
+      }
+      if (!extInfo.supported) {
+        throw new Error(
+          `❌ ส่วนขยาย C2DPost Helper เวอร์ชันเก่า (v${extInfo.version || 'ไม่ทราบ'})\n` +
+          `ต้องการ v${extInfo.latestVersion || '1.4.0'} ขึ้นไป\n\n` +
+          `📥 วิธีอัปเดต:\n` +
+          `1. ดาวน์โหลดเวอร์ชันล่าสุด: ${extInfo.updateUrl || '/C2DPost_Helper_v1.4.0_WebStore.zip'}\n` +
+          `2. แตกไฟล์ แล้วเข้า chrome://extensions\n` +
+          `3. กด "รีเฟรช" (🔄) ที่ส่วนขยาย C2DPost Helper\n` +
+          `4. Refresh (F5) หน้านี้\n\n` +
+          `🔗 Chrome Web Store: ${extInfo.storeUrl || 'https://chromewebstore.google.com/detail/cdkmibacceaacdiopcekkmfifaocapgk'}`
+        );
+      }
+      throw new Error(
+        '❌ ไม่สามารถดึง PDF e-AR จากระบบไปรษณีย์ไทยได้\n\n' +
+        '🔧 วิธีแก้ไข:\n' +
+        '1. ตรวจสอบว่าส่วนขยาย C2DPost Helper เปิดใช้งานอยู่ (v1.3.0+)\n' +
+        '2. หากเพิ่งติดตั้ง/อัปเดต ให้กด Refresh (F5) หน้านี้\n' +
+        '3. ตรวจสอบการเชื่อมต่ออินเทอร์เน็ต\n' +
+        '4. หากยังไม่ได้ ให้ลองปิด/เปิด Extension ใน chrome://extensions แล้ว Refresh อีกครั้ง'
+      );
     }
 
     const blobUrl = URL.createObjectURL(pdfBlob);
@@ -347,51 +380,78 @@ export async function downloadBatchEar({ records, format = 'pdf', onProgress }) 
     });
   };
 
+  // Retry helper with exponential backoff
+  const fetchWithRetry = async (fn, maxRetries = 2, baseDelay = 800) => {
+    let lastErr;
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        return await fn();
+      } catch (err) {
+        lastErr = err;
+        if (attempt === maxRetries) throw err;
+        const delay = Math.min(baseDelay * Math.pow(2, attempt) + Math.random() * 500, 10000);
+        await new Promise(r => setTimeout(r, delay));
+      }
+    }
+    throw lastErr;
+  };
+
   // Helper to fetch individual e-AR PDF (extension first, then direct fetch)
   const fetchSinglePdfBlob = async (item) => {
     const bcode = item.barcode;
     try {
-      // Strategy 1: Extension Bridge (Domestic Thai IP)
-      try {
-        const extRes = await fetchEarPdfFromExtension(bcode);
-        if (extRes && extRes.success && extRes.pdfBase64) {
-          return {
-            barcode: bcode,
-            receiver: item.receiver,
-            inv_no: item.inv_no,
-            base64: extRes.pdfBase64
-          };
+      // Strategy 1: Extension Bridge (Domestic Thai IP) - with retry
+      let extRes = await fetchWithRetry(async () => {
+        const res = await fetchEarPdfFromExtension(bcode);
+        if (!res || !res.success || !res.pdfBase64) {
+          throw new Error('Extension fetch failed');
         }
-      } catch (extErr) {
-        // Continue to strategy 2
+        return res;
+      }, 2, 800).catch(() => null);
+
+      if (extRes && extRes.success && extRes.pdfBase64) {
+        return {
+          barcode: bcode,
+          receiver: item.receiver,
+          inv_no: item.inv_no,
+          base64: extRes.pdfBase64
+        };
       }
 
-      // Strategy 2: Direct browser fetch
-      try {
+      // Strategy 2: Direct browser fetch (with retry)
+      let directRes = await fetchWithRetry(async () => {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
         const res = await fetch('https://e-ar.thailandpost.com/ear-api/print/e-ar', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify([bcode])
+          body: JSON.stringify([bcode]),
+          signal: controller.signal
         });
-        if (res.ok) {
-          const contentType = res.headers.get('content-type') || '';
-          if (contentType.includes('application/pdf')) {
-            const blob = await res.blob();
-            if (blob.size >= 500) {
-              const b64 = await blobToBase64(blob);
-              if (b64) {
-                return {
-                  barcode: bcode,
-                  receiver: item.receiver,
-                  inv_no: item.inv_no,
-                  base64: b64
-                };
-              }
-            }
-          }
+        clearTimeout(timeoutId);
+        
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}`);
         }
-      } catch (directErr) {
-        // Direct fetch failed
+        
+        const contentType = res.headers.get('content-type') || '';
+        if (!contentType.includes('application/pdf')) {
+          throw new Error('Not a PDF response');
+        }
+        
+        const blob = await res.blob();
+        if (blob.size < 500) {
+          throw new Error('PDF too small');
+        }
+        
+        const b64 = await blobToBase64(blob);
+        if (!b64) throw new Error('Base64 conversion failed');
+        
+        return { barcode: bcode, receiver: item.receiver, inv_no: item.inv_no, base64: b64 };
+      }, 2, 1000).catch(() => null);
+
+      if (directRes) {
+        return directRes;
       }
     } catch (err) {
       console.warn(`[downloadBatchEar] Failed fetching ${bcode}:`, err);
@@ -406,8 +466,10 @@ export async function downloadBatchEar({ records, format = 'pdf', onProgress }) 
     };
   };
 
-  // 2. Fetch in concurrency batches (4 concurrent requests)
-  const CONCURRENCY = 4;
+  // 2. Fetch in concurrency batches (adaptive concurrency)
+  // Start with 4, reduce if many items, increase if few
+  const BASE_CONCURRENCY = 4;
+  const CONCURRENCY = Math.min(BASE_CONCURRENCY, Math.max(2, Math.floor(validItems.length / 3)));
   for (let i = 0; i < validItems.length; i += CONCURRENCY) {
     const chunk = validItems.slice(i, i + CONCURRENCY);
     const chunkResults = await Promise.all(
@@ -421,11 +483,27 @@ export async function downloadBatchEar({ records, format = 'pdf', onProgress }) 
       })
     );
     clientBlobs.push(...chunkResults);
+    
+    // Small delay between chunks to avoid rate limiting
+    if (i + CONCURRENCY < validItems.length) {
+      await new Promise(r => setTimeout(r, 300));
+    }
   }
 
-  // Filter out items that have valid base64
-  const validBlobs = clientBlobs.filter((b) => b && b.base64);
-  if (validBlobs.length === 0) {
+  // 3. Format Thai timestamp for page footer
+  const now = new Date();
+  const d = String(now.getDate()).padStart(2, '0');
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const yBe = now.getFullYear() + 543;
+  const timeStr = now.toTimeString().split(' ')[0]; // "HH:MM:SS"
+  const downloadedAtStr = `${d}/${m}/${yBe} ${timeStr} น.`;
+
+  // Track results for partial success reporting
+  const successfulBlobs = clientBlobs.filter((b) => b && b.base64);
+  const failedItems = clientBlobs.filter((b) => !b || !b.base64).map(b => b?.barcode).filter(Boolean);
+  
+  // If no successful blobs, throw appropriate error
+  if (successfulBlobs.length === 0) {
     if (!cap.supported) {
       const error = new Error(
         cap.installed
@@ -439,23 +517,18 @@ export async function downloadBatchEar({ records, format = 'pdf', onProgress }) 
     throw new Error('ไม่พบข้อมูลเอกสาร e-AR จากไปรษณีย์ไทยสำหรับรายการที่เลือก (ไปรษณีย์ไทยอาจยังไม่ได้สแกนอัปโหลดภาพใบตอบรับเข้าระบบ หรือเพิ่งนำจ่ายสำเร็จวันนี้)');
   }
 
-  // 3. Format Thai timestamp for page footer
-  const now = new Date();
-  const d = String(now.getDate()).padStart(2, '0');
-  const m = String(now.getMonth() + 1).padStart(2, '0');
-  const yBe = now.getFullYear() + 543;
-  const timeStr = now.toTimeString().split(' ')[0]; // "HH:MM:SS"
-  const downloadedAtStr = `${d}/${m}/${yBe} ${timeStr} น.`;
+  // 4. Send all gathered e-AR PDFs to backend for combination (PDF merge or ZIP archive)
+  if (onProgress) {
+    onProgress(completed, total, 'กำลังประมวลผลและจัดทำเอกสารรวม...');
+  }
 
-  // 4. Call backend /api/reports/batch-ear-pdf
-  const barcodesList = validItems.map((v) => v.barcode);
   const response = await fetch(`${API_BASE}/reports/batch-ear-pdf`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      barcodes: barcodesList,
+      barcodes: validItems.map((v) => v.barcode),
       format: format,
-      client_blobs: validBlobs,
+      client_blobs: successfulBlobs,
       downloaded_at: downloadedAtStr
     })
   });
@@ -471,7 +544,7 @@ export async function downloadBatchEar({ records, format = 'pdf', onProgress }) 
     throw new Error(errorDetail);
   }
 
-  // 4. Download file
+  // 5. Download file
   const blob = await response.blob();
   const disposition = response.headers.get('content-disposition') || '';
   let filename = '';
@@ -484,7 +557,7 @@ export async function downloadBatchEar({ records, format = 'pdf', onProgress }) 
   }
 
   const countHeader = response.headers.get('x-total-count');
-  const actualCount = countHeader ? parseInt(countHeader, 10) : validBlobs.length || total;
+  const actualCount = countHeader ? parseInt(countHeader, 10) : successfulBlobs.length;
 
   const url = window.URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -495,10 +568,28 @@ export async function downloadBatchEar({ records, format = 'pdf', onProgress }) 
   document.body.removeChild(a);
   setTimeout(() => window.URL.revokeObjectURL(url), 2000);
 
-  return {
+  // Prepare detailed result with partial success info
+  const result = {
     success: true,
     count: actualCount,
-    filename: filename
+    filename: filename,
+    requested: total,
+    successful: successfulBlobs.length,
+    failed: failedItems.length,
+    failedBarcodes: failedItems
   };
+
+  // Show warning if partial success
+  if (failedItems.length > 0) {
+    let warningMsg = `ดาวน์โหลดเสร็จสิ้น (สำเร็จ ${successfulBlobs.length}/${total} รายการ)`;
+    warningMsg += `\n❌ ไม่พบข้อมูล e-AR ในระบบ: ${failedItems.slice(0, 5).join(', ')}${failedItems.length > 5 ? '...' : ''}`;
+    console.warn('[downloadBatchEar] Partial success:', warningMsg);
+    // Show user-friendly alert for partial success
+    if (typeof window !== 'undefined' && window.alert) {
+      setTimeout(() => alert(warningMsg), 100);
+    }
+  }
+
+  return result;
 }
 

@@ -19,6 +19,9 @@ import './App.css';
 const STORAGE_USER_KEY = 'c2dpost_web_user';
 const STORAGE_THEME_KEY = 'c2dpost_theme';
 
+// Session timeout: 1 hour (3600000 ms)
+const SESSION_TIMEOUT_MS = 60 * 60 * 1000;
+
 export default function App() {
   const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
   const isDemo = urlParams && urlParams.get('demo') === '1';
@@ -71,6 +74,7 @@ export default function App() {
   const [isReconciling, setIsReconciling] = useState(false);
   const [reconcileNotice, setReconcileNotice] = useState(null);
   const [trackingInfo, setTrackingInfo] = useState(null); // { barcode, receiver, invNo }
+  const [earStatus, setEarStatus] = useState('unknown'); // 'connected' | 'outdated' | 'checking' | 'disconnected' | 'error' | 'unknown'
 
   // Stable identity เพื่อไม่ให้ ExtensionGate effect รี-รันทุก render (บั๊ก #23)
   const handleExtensionUnlocked = useCallback((ver) => {
@@ -133,6 +137,37 @@ export default function App() {
       window.removeEventListener('message', handlePong);
     };
   }, []);
+
+  // e-AR connection status check
+  const earCheckIntervalRef = useRef(null);
+  const checkEarConnection = useCallback(async () => {
+    try {
+      const cap = await checkEarCapability(1000);
+      console.log('[e-AR Status Check] Result:', cap);
+      if (cap.installed && cap.supported) {
+        setEarStatus('connected');
+      } else if (cap.installed && !cap.supported) {
+        setEarStatus('outdated');
+      } else {
+        setEarStatus('disconnected');
+      }
+    } catch (err) {
+      console.error('[e-AR Status Check] Unexpected error:', err);
+      setEarStatus('error');
+    }
+  }, []);
+
+  useEffect(() => {
+    // Initial check
+    checkEarConnection();
+    // Check every 30 seconds
+    earCheckIntervalRef.current = setInterval(checkEarConnection, 30000);
+    return () => {
+      if (earCheckIntervalRef.current) {
+        clearInterval(earCheckIntervalRef.current);
+      }
+    };
+  }, [checkEarConnection]);
 
   // Workspace Drag & Drop State
   const [isWorkspaceDragOver, setIsWorkspaceDragOver] = useState(false);
@@ -223,6 +258,56 @@ export default function App() {
   const [isSendingApi, setIsSendingApi] = useState(false);
   const [manifestCounter, setManifestCounter] = useState(1);
 
+  // Handle Logout with complete session cleanup
+  const handleLogout = useCallback(() => {
+    localStorage.removeItem(STORAGE_USER_KEY);
+    sessionStorage.removeItem('c2dpost_deposit_report_cache');
+    sessionStorage.removeItem('c2dpost_date_range_cache');
+    sessionStorage.removeItem('c2dpost_dashboard_cache');
+    syncCredentialsToExtension('', '', '');
+    setUser('');
+    setActivePage('workspace');
+    setSelectedFiles([]);
+    setFileStatuses({});
+    setRecords([]);
+    setStatusText('ยังไม่ได้เลือกไฟล์');
+    setProgress(null);
+  }, []);
+
+  // Session timeout: auto-logout after 1 hour of inactivity
+  const inactivityTimeoutRef = useRef(null);
+  const lastActivityRef = useRef(Date.now());
+
+  const resetInactivityTimer = useCallback(() => {
+    lastActivityRef.current = Date.now();
+    if (inactivityTimeoutRef.current) {
+      clearTimeout(inactivityTimeoutRef.current);
+    }
+    if (user) {
+      inactivityTimeoutRef.current = setTimeout(() => {
+        handleLogout();
+        alert('เซสชันหมดอายุจากการไม่ได้ใช้งานเกิน 1 ชั่วโมง กรุณาเข้าสู่ระบบใหม่');
+      }, SESSION_TIMEOUT_MS);
+    }
+  }, [user, handleLogout]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const events = ['mousedown', 'keydown', 'click', 'scroll', 'touchstart'];
+    const handler = () => resetInactivityTimer();
+
+    events.forEach((evt) => window.addEventListener(evt, handler, { passive: true }));
+    resetInactivityTimer();
+
+    return () => {
+      events.forEach((evt) => window.removeEventListener(evt, handler));
+      if (inactivityTimeoutRef.current) {
+        clearTimeout(inactivityTimeoutRef.current);
+      }
+    };
+  }, [user, resetInactivityTimer]);
+
   // Load user data from Google Sheets
   const loadPeople = useCallback(async () => {
     setLoadingSheet(true);
@@ -305,19 +390,6 @@ export default function App() {
     } else {
       setActivePage('workspace');
     }
-  };
-
-  const handleLogout = () => {
-    localStorage.removeItem(STORAGE_USER_KEY);
-    sessionStorage.removeItem('c2dpost_deposit_report_cache');
-    syncCredentialsToExtension('', '', '');
-    setUser('');
-    setActivePage('workspace');
-    setSelectedFiles([]);
-    setFileStatuses({});
-    setRecords([]);
-    setStatusText('ยังไม่ได้เลือกไฟล์');
-    setProgress(null);
   };
 
   // 1. Handle File Selection and Parsing
@@ -1104,6 +1176,7 @@ export default function App() {
         onNavigate={setActivePage}
         adminServices={adminServices}
         onOpenDepositReport={() => setActivePage('deposit-report')}
+        earStatus={earStatus}
       />
 
       {/* 3. Dedicated Login Screen (Shown when NOT logged in) */}

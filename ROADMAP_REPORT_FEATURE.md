@@ -333,4 +333,12 @@
   - **Frontend** (`DashboardView.jsx` + CSS): เพิ่ม card **"รับฝากแล้ว"** (info) และ **"อยู่ระหว่างการนำจ่าย"** (warn) เป็น 5 ใบ (รวม, รับฝากแล้ว, อยู่ระหว่างการนำจ่าย, นำจ่ายสำเร็จ, ส่งคืน/ไม่สำเร็จ) เทียบเท่าหน้า รายงานสถานะ; STATUS_META เพิ่ม `received`/`in_transit` badge (`dash-badge-info`); tooltip แผนที่ + panel รายจังหวัด + ตารางจัดอันดับโชว์ทั้ง รับฝากแล้ว/อยู่ระหว่างการนำจ่าย; tab ตารางพัสดุแยก `รับฝากแล้ว`/`อยู่ระหว่างการนำจ่าย`
   - ผลลัพธ์: API demo summary = received 1, in_transit 2, delivered 1, returned 1, pending(merged) 3; smoke headless (dev + prod bundle) แผนที่ 77 จังหวัด + 5 stat cards + badge info/warn ครบไม่มี ErrorBoundary; `npm run build` ผ่าน
 
+- [x] **4.67 ตรวจสอบละเอียดทุกฟังก์ชันและแก้ไขบั๊ก (e-AR Batch Download, Extension Bridge, และ Session Inactivity) (v2026.0924.0845)**
+  - **Extension Bridge** (`src/utils/extensionBridge.js`): แก้ไขฟังก์ชัน `getExtensionVersion()` ที่ตกหล่นคำสั่ง `return installedVersionCache || '';` จากการแก้ไขของ AI ตัวก่อนหน้า ทำให้ฟังก์ชันคืนค่า `undefined` เสมอแม้ติดตั้ง Extension แล้ว
+  - **e-AR Batch Service** (`src/utils/earService.js`): ถอด Loop แบ่ง Chunk เทียมที่ตัดข้อมูล chunk ที่ 2+ ทิ้ง และแก้ไขการเข้าถึง Header จากออบเจ็กต์ `Blob` ที่ผิดพลาด ให้ส่งข้อมูล Base64 ทั้งหมดไปยัง `/api/reports/batch-ear-pdf` โดยตรง พร้อมดึงชื่อไฟล์จาก Header จริง และเพิ่มการเคลือบ Blob URL ด้วย `URL.revokeObjectURL()` ป้องกัน Memory Leak
+  - **Deposit Report View** (`src/components/DepositReportView.jsx`): ซิงก์เงื่อนไขการเลือกรายการนำจ่ายสำเร็จทั้งหมดบนหน้าปัจจุบันด้วย `getDeliveryStatusInfo(r).key === 'delivered' && r.barcode` แก้ปัญหา Checkbox ที่หัวตารางไม่ตรงกับแถวข้อมูล, ปรับปรุงปุ่มดาวน์โหลด e-AR ให้กดดาวน์โหลดได้ทันทีโดยไม่ต้องติ๊กเลือกก่อน (เลือก 20 รายการแรกอัตโนมัติ), และตั้งค่าเริ่มต้น `startDate` ให้ตรงกับ `todayIso`
+  - **App Session & Logout** (`src/App.jsx`): จัดลำดับการประกาศ `handleLogout` ด้วย `useCallback` ป้องกันปัญหา Temporal Dead Zone (TDZ) และเพิ่มการล้างแคช Session Storage (`c2dpost_date_range_cache`, `c2dpost_dashboard_cache`) เมื่อออกจากระบบอย่างสมบูรณ์
+  - **Extension Packaging**: ซิงก์แพ็กเกจ `C2DPost_Helper_v1.4.0_WebStore.zip` และอัปเดตไฟล์ใน `public/` ให้พร้อมใช้งาน
+
+
 

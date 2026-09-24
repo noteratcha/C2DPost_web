@@ -6,7 +6,29 @@ import TrackingTimelineModal from './TrackingTimelineModal';
 import ThaiDateInput from './ThaiDateInput';
 import './DepositReportView.css';
 
+// Shared cache key for date range sync across pages
+const DATE_RANGE_CACHE_KEY = 'c2dpost_date_range_cache';
+
 const DEPOSIT_REPORT_CACHE_KEY = 'c2dpost_deposit_report_cache';
+
+function getCachedDateRange() {
+  try {
+    const raw = sessionStorage.getItem('c2dpost_date_range_cache');
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch (err) {
+    console.warn('Error reading date range cache:', err);
+    return null;
+  }
+}
+
+function setCachedDateRange(data) {
+  try {
+    sessionStorage.setItem('c2dpost_date_range_cache', JSON.stringify(data));
+  } catch (err) {
+    console.warn('Error writing date range cache:', err);
+  }
+}
 
 function getCachedDepositState() {
   try {
@@ -161,6 +183,10 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
     const d = new Date();
     return toInputDateFormat(new Date(d.getFullYear(), d.getMonth(), 1));
   }, []);
+  const yearStartIso = useMemo(() => {
+    const d = new Date();
+    return toInputDateFormat(new Date(d.getFullYear(), 0, 1));
+  }, []);
   const lastMonthStartIso = useMemo(() => {
     const d = new Date();
     return toInputDateFormat(new Date(d.getFullYear(), d.getMonth() - 1, 1));
@@ -174,8 +200,14 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
   const cachedState = useMemo(() => getCachedDepositState(), []);
 
   // Date Range state (restored from cache if available)
-  const [startDate, setStartDate] = useState(() => cachedState?.startDate || todayIso);
-  const [endDate, setEndDate] = useState(() => cachedState?.endDate || todayIso);
+  const [startDate, setStartDate] = useState(() => {
+    const shared = getCachedDateRange();
+    return cachedState?.startDate || shared?.startDate || todayIso;
+  });
+  const [endDate, setEndDate] = useState(() => {
+    const shared = getCachedDateRange();
+    return cachedState?.endDate || shared?.endDate || todayIso;
+  });
 
   // Pagination state (20 records per page)
   const PAGE_SIZE = 20;
@@ -201,6 +233,11 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
     currentVersion: '',
     message: ''
   });
+
+  // Clear selection when page changes
+  useEffect(() => {
+    setSelectedBarcodes(new Set());
+  }, [currentPage]);
 
   // Handle live tracking update from modal when viewed
   const handleTrackingUpdated = useCallback((bcode, trackResult) => {
@@ -259,6 +296,7 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
       currentPage,
       updatedAt: Date.now()
     });
+    setCachedDateRange({ startDate, endDate, updatedAt: Date.now() });
   }, [startDate, endDate, reportData, searchQuery, filterTab, currentPage]);
 
   // Fetch report function (accepts start & end dates)
@@ -379,6 +417,9 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
       e = todayIso;
     } else if (type === 'thisMonth') {
       s = monthStartIso;
+      e = todayIso;
+    } else if (type === 'thisYear') {
+      s = yearStartIso;
       e = todayIso;
     } else if (type === 'lastMonth') {
       s = lastMonthStartIso;
@@ -568,22 +609,27 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
     return filteredDeliveredRecords.filter((r) => selectedBarcodes.has(r.barcode));
   }, [selectedBarcodes, filteredDeliveredRecords]);
 
+  const currentPageDeliveredRecords = useMemo(() => {
+    return paginatedRecords.filter((r) => getDeliveryStatusInfo(r).key === 'delivered' && r.barcode);
+  }, [paginatedRecords]);
+
   const isAllDeliveredSelected = useMemo(() => {
-    if (filteredDeliveredRecords.length === 0) return false;
-    return filteredDeliveredRecords.every((r) => selectedBarcodes.has(r.barcode));
-  }, [filteredDeliveredRecords, selectedBarcodes]);
+    if (currentPageDeliveredRecords.length === 0) return false;
+    return currentPageDeliveredRecords.every((r) => selectedBarcodes.has(r.barcode));
+  }, [currentPageDeliveredRecords, selectedBarcodes]);
 
   const handleToggleSelectAllDelivered = () => {
+    // Only select/deselect items on the current page (max 20 items)
     if (isAllDeliveredSelected) {
       setSelectedBarcodes((prev) => {
         const next = new Set(prev);
-        filteredDeliveredRecords.forEach((r) => next.delete(r.barcode));
+        currentPageDeliveredRecords.forEach((r) => next.delete(r.barcode));
         return next;
       });
     } else {
       setSelectedBarcodes((prev) => {
         const next = new Set(prev);
-        filteredDeliveredRecords.forEach((r) => next.add(r.barcode));
+        currentPageDeliveredRecords.forEach((r) => next.add(r.barcode));
         return next;
       });
     }
@@ -602,18 +648,30 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
   };
 
   const handleBatchDownloadEar = async (format = 'pdf') => {
+    // Use selected records if any, otherwise use filtered delivered records
+    // Limit to max 20 items per download
+    const MAX_DOWNLOAD_LIMIT = 20;
     const targetRecords = selectedBarcodes.size > 0 ? selectedDeliveredRecords : filteredDeliveredRecords;
+    
     if (!targetRecords || targetRecords.length === 0) {
       alert('ไม่พบรายการที่นำจ่ายสำเร็จสำหรับดาวน์โหลด e-AR');
       return;
     }
 
+    // Limit to max 20 items
+    const limitedRecords = targetRecords.slice(0, MAX_DOWNLOAD_LIMIT);
+    if (targetRecords.length > MAX_DOWNLOAD_LIMIT) {
+      if (!confirm(`สามารถดาวน์โหลดได้สูงสุด ${MAX_DOWNLOAD_LIMIT} รายการต่อครั้ง\nต้องการดาวน์โหลด ${MAX_DOWNLOAD_LIMIT} รายการแรกหรือไม่?`)) {
+        return;
+      }
+    }
+
     setIsDownloadingEar(true);
-    setEarProgressText(`กำลังเตรียมการดาวน์โหลด e-AR (0/${targetRecords.length})...`);
+    setEarProgressText(`กำลังเตรียมการดาวน์โหลด e-AR (0/${limitedRecords.length})...`);
 
     try {
       const result = await downloadBatchEar({
-        records: targetRecords,
+        records: limitedRecords,
         format: format,
         onProgress: (current, total, currentBcode) => {
           setEarProgressText(`กำลังรวบรวม e-AR (${current}/${total}) • ${currentBcode}`);
@@ -1004,16 +1062,16 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
                     <input
                       type="checkbox"
                       title={
-                        filteredDeliveredRecords.length === 0
-                          ? 'ไม่มีรายการนำจ่ายสำเร็จ'
+                        currentPageDeliveredRecords.length === 0
+                          ? 'ไม่มีรายการนำจ่ายสำเร็จในหน้านี้'
                           : isAllDeliveredSelected
-                          ? 'ยกเลิกการเลือกทั้งหมด'
-                          : `เลือกรายการนำจ่ายสำเร็จทั้งหมด (${filteredDeliveredRecords.length})`
+                          ? 'ยกเลิกการเลือกทั้งหมดในหน้านี้'
+                          : `เลือกรายการนำจ่ายสำเร็จหน้านี้ (${currentPageDeliveredRecords.length})`
                       }
                       checked={isAllDeliveredSelected}
                       onChange={handleToggleSelectAllDelivered}
-                      disabled={filteredDeliveredRecords.length === 0}
-                      style={{ cursor: filteredDeliveredRecords.length > 0 ? 'pointer' : 'not-allowed' }}
+                      disabled={currentPageDeliveredRecords.length === 0}
+                      style={{ cursor: currentPageDeliveredRecords.length > 0 ? 'pointer' : 'not-allowed' }}
                     />
                   </th>
                   <th style={{ width: '45px', textAlign: 'center' }}>#</th>
@@ -1225,7 +1283,7 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
                     ? 'ไม่มีรายการที่นำจ่ายสำเร็จสำหรับดาวน์โหลด e-AR'
                     : selectedBarcodes.size > 0
                     ? `คลิกดาวน์โหลด PDF รวม e-AR ที่เลือก (${selectedDeliveredRecords.length} รายการ)`
-                    : `คลิกดาวน์โหลด PDF รวม e-AR นำจ่ายสำเร็จ (${filteredDeliveredRecords.length} รายการ)`
+                    : `คลิกดาวน์โหลด PDF รวม e-AR นำจ่ายสำเร็จ (${Math.min(filteredDeliveredRecords.length, 20)} รายการ)`
                 }
               >
                 {isDownloadingEar ? (

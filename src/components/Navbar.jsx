@@ -16,7 +16,8 @@ export default function Navbar({
   activePage = 'workspace',
   onNavigate,
   adminServices = null,
-  onOpenDepositReport = null
+  onOpenDepositReport = null,
+  earStatus = 'unknown'
 }) {
   const [showAboutModal, setShowAboutModal] = useState(false);
   const [isNavMenuOpen, setIsNavMenuOpen] = useState(false);
@@ -109,6 +110,61 @@ export default function Navbar({
     const interval = setInterval(checkApis, 30000);
     return () => clearInterval(interval);
   }, [checkApis]);
+
+  // e-AR connection status helpers
+  const getEarStatusClass = (status) => {
+    switch (status) {
+      case 'connected': return 'success';
+      case 'outdated': return 'warning';
+      case 'checking': return 'warning';
+      case 'disconnected': return 'danger';
+      case 'error': return 'danger';
+      default: return 'danger';
+    }
+  };
+
+  const getEarStatusTitle = (status) => {
+    switch (status) {
+      case 'connected': return 'เชื่อมต่อ e-AR สำเร็จ';
+      case 'outdated': return 'Extension เวอร์ชันเก่า กรุณาอัปเดต';
+      case 'checking': return 'กำลังตรวจสอบ...';
+      case 'disconnected': return 'ไม่ได้เชื่อมต่อ Extension';
+      case 'error': return 'เกิดข้อผิดพลาด';
+      default: return 'ไม่ทราบสถานะ';
+    }
+  };
+
+  const getEarStatusContent = (status) => {
+    switch (status) {
+      case 'connected':
+        return (
+          <>
+            <span className="chip-dot"></span>
+            <span>เชื่อมต่อแล้ว</span>
+          </>
+        );
+      case 'outdated':
+        return (
+          <>
+            <span className="chip-dot"></span>
+            <span>Extension เก่า</span>
+          </>
+        );
+      case 'checking':
+        return (
+          <>
+            <span className="chip-dot"></span>
+            <span>กำลังตรวจสอบ...</span>
+          </>
+        );
+      case 'disconnected':
+        return 'ไม่ได้เชื่อมต่อ';
+      case 'error':
+        return 'เกิดข้อผิดพลาด';
+      default:
+        return 'ไม่ทราบสถานะ';
+    }
+  };
 
   // Click outside and Escape key to close hamburger and user dropdown menus
   useEffect(() => {
@@ -571,6 +627,21 @@ export default function Navbar({
                           ) : (
                             'ไม่พบ'
                           )}
+                        </span>
+                      </div>
+
+                      {/* e-AR Connection */}
+                      <div className="status-service-item">
+                        <div className="service-name-group">
+                          <svg className="service-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                            <line x1="8" y1="21" x2="16" y2="21"></line>
+                            <line x1="12" y1="17" x2="12" y2="21"></line>
+                          </svg>
+                          <span>e-AR Connection</span>
+                        </div>
+                        <span className={`status-badge-chip ${getEarStatusClass(earStatus)}`} title={getEarStatusTitle(earStatus)}>
+                          {getEarStatusContent(earStatus)}
                         </span>
                       </div>
                     </div>

@@ -25,6 +25,45 @@ export function getExtensionVersion() {
 }
 
 /**
+ * Get extension status with update info for UI display
+ * @returns {Promise<{installed: boolean, version: string, supported: boolean, latestVersion: string, updateUrl: string, storeUrl: string, message: string}>}
+ */
+export async function getExtensionStatus() {
+  const cap = await checkEarCapability(1000);
+  const MIN_VERSION = '1.3.0';
+  const LATEST_VERSION = '1.4.0';
+  const EXTENSION_STORE_URL = 'https://chromewebstore.google.com/detail/cdkmibacceaacdiopcekkmfifaocapgk';
+  const ZIP_DOWNLOAD_URL = '/C2DPost_Helper_v1.4.0_WebStore.zip';
+
+  if (!cap.installed) {
+    return {
+      installed: false,
+      version: '',
+      supported: false,
+      latestVersion: LATEST_VERSION,
+      updateUrl: '/C2DPost_Helper_v1.4.0_WebStore.zip',
+      storeUrl: EXTENSION_STORE_URL,
+      message: 'ไม่พบส่วนขยาย C2DPost Helper'
+    };
+  }
+
+  const supported = cap.supported;
+  const needsUpdate = !supported;
+
+  return {
+    installed: true,
+    version: cap.version || 'unknown',
+    supported,
+    latestVersion: LATEST_VERSION,
+    updateUrl: needsUpdate ? '/C2DPost_Helper_v1.4.0_WebStore.zip' : '',
+    storeUrl: EXTENSION_STORE_URL,
+    message: supported
+      ? `C2DPost Helper v${cap.version} พร้อมใช้งาน`
+      : `ต้องอัปเดต: v${cap.version} → v${LATEST_VERSION}`
+  };
+}
+
+/**
  * Check if the C2DPost Helper Extension is installed
  * @param {number} timeoutMs
  * @returns {Promise<boolean>}
@@ -222,9 +261,14 @@ export function compareVersions(a, b) {
 /**
  * Check if the installed extension supports FETCH_EAR_PDF (requires v1.3.0+)
  * @param {number} timeoutMs
- * @returns {Promise<{supported: boolean, installed: boolean, version: string}>}
+ * @returns {Promise<{supported: boolean, installed: boolean, version: string, updateUrl?: string, latestVersion?: string}>}
  */
 export async function checkEarCapability(timeoutMs = 600) {
+  const MIN_VERSION = '1.3.0';
+  const LATEST_VERSION = '1.4.0';
+  const EXTENSION_STORE_URL = 'https://chromewebstore.google.com/detail/cdkmibacceaacdiopcekkmfifaocapgk';
+  const ZIP_DOWNLOAD_URL = '/C2DPost_Helper_v1.4.0_WebStore.zip';
+
   // 1. Check synchronous DOM attributes
   if (typeof document !== 'undefined' && document.documentElement) {
     const domVer = document.documentElement.getAttribute('data-c2dpost-version');
@@ -232,8 +276,15 @@ export async function checkEarCapability(timeoutMs = 600) {
     if (domVer) {
       installedVersionCache = domVer;
       isInstalledCache = true;
-      const isSupp = compareVersions(domVer, '1.3.0') >= 0;
-      return { supported: isSupp, installed: true, version: domVer };
+      const isSupp = compareVersions(domVer, MIN_VERSION) >= 0;
+      return { 
+        supported: isSupp, 
+        installed: true, 
+        version: domVer,
+        updateUrl: isSupp ? null : ZIP_DOWNLOAD_URL,
+        latestVersion: isSupp ? null : LATEST_VERSION,
+        storeUrl: EXTENSION_STORE_URL
+      };
     }
   }
 
@@ -248,8 +299,15 @@ export async function checkEarCapability(timeoutMs = 600) {
           const ver = event.data.version || document.documentElement.getAttribute('data-c2dpost-version') || '1.0.0';
           installedVersionCache = ver;
           isInstalledCache = true;
-          const isSupp = compareVersions(ver, '1.3.0') >= 0;
-          resolve({ supported: isSupp, installed: true, version: ver });
+          const isSupp = compareVersions(ver, MIN_VERSION) >= 0;
+          resolve({ 
+            supported: isSupp, 
+            installed: true, 
+            version: ver,
+            updateUrl: isSupp ? null : ZIP_DOWNLOAD_URL,
+            latestVersion: isSupp ? null : LATEST_VERSION,
+            storeUrl: EXTENSION_STORE_URL
+          });
         }
       }
     };
@@ -263,8 +321,15 @@ export async function checkEarCapability(timeoutMs = 600) {
         window.removeEventListener('message', handlePong);
         const ver = getExtensionVersion();
         const isInst = isInstalledCache || !!ver;
-        const isSupp = isInst && compareVersions(ver, '1.3.0') >= 0;
-        resolve({ supported: isSupp, installed: isInst, version: ver || '' });
+        const isSupp = isInst && compareVersions(ver, MIN_VERSION) >= 0;
+        resolve({ 
+          supported: isSupp, 
+          installed: isInst, 
+          version: ver || '',
+          updateUrl: isSupp ? null : ZIP_DOWNLOAD_URL,
+          latestVersion: isSupp ? null : LATEST_VERSION,
+          storeUrl: EXTENSION_STORE_URL
+        });
       }
     }, timeoutMs);
   });

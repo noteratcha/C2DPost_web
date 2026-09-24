@@ -350,3 +350,35 @@
 - API demo: `total 5, received 1, in_transit 2, delivered 1, failed 1, pending 3` ถูกต้อง
 - smoke headless (dev + prod bundle `index-DTCv9eAo.js`): แผนที่ 77 จังหวัด, 5 stat cards, badge info 1 + warn 2 ตรงข้อมูล, ไม่มี ErrorBoundary
 - อัปเดตเวอร์ชัน 6 จุด เป็น `v2026.0919.1337`
+
+---
+
+## 12. ตรวจสอบโค้ดเชิงลึกและแก้ไขบั๊กจากการทำงานของ AI ตัวก่อนหน้า (`v2026.0924.0845`)
+
+### 12.1 บริบท
+- มีการนำ AI ตัวอื่นมาร่วมพัฒนาฟีเจอร์ e-AR Batch Download, Extension Bridge v1.4.0 และการตรวจสอบความปลอดภัยของ Session
+- เมื่อเข้าตรวจสอบอย่างละเอียดพบว่าเกิดข้อผิดพลาดและบั๊กตกค้างในหลายจุดสำคัญที่ส่งผลกระทบต่อความเสถียรของระบบ
+
+### 12.2 รายการบั๊กที่พบและดำเนินการแก้ไขทันที
+1. **บั๊ก #32 (HIGH) — `getExtensionVersion()` คืนค่า `undefined` เสมอ (`src/utils/extensionBridge.js`)**:
+   - **สาเหตุ**: AI ตัวก่อนหน้าลืมใส่คำสั่ง `return installedVersionCache || '';` ที่ส่วนท้ายของฟังก์ชัน ทำให้ฟังก์ชันทำงานเสร็จสิ้นแต่ไม่มีค่า return ส่งผลให้ Component ภายนอกอ่านเวอร์ชันเป็น `undefined` แม้ว่าผู้ใช้จะติดตั้ง Extension v1.4.0 แล้วก็ตาม
+   - **แก้ไข**: ใส่ `return installedVersionCache || '';` กลับคืนอย่างถูกต้อง
+2. **บั๊ก #33 (CRITICAL) — Fake Chunking Loop ใน `earService.js` ตัดข้อมูลไฟล์ e-AR ชุดที่ 2+ ทิ้ง และอ่าน Headers จาก Blob ผิดโครงสร้าง (`src/utils/earService.js`)**:
+   - **สาเหตุ**: มีการเขียน Loop แบ่ง Chunk ขนาด 20 รายการ แต่กลับมีข้อความเตือน `Multiple chunks for PDF - only first chunk returned` และตัดรายการที่เกินหน้าแรกทิ้งทั้งหมด นอกจากนี้ยังมีการเรียกใช้ `combinedBlob.headers?.get('Content-Disposition')` ซึ่ง `Blob` ไม่มี property `headers` ส่งผลให้ไม่สามารถดึงชื่อไฟล์จริงจากเซิร์ฟเวอร์ได้
+   - **แก้ไข**: ปรับเปลี่ยนเป็นกระบวนการ Atomic Direct Batch Dispatch ส่งพิกัด Base64 ทั้งหมดที่ดาวน์โหลดสำเร็จไปยัง `/api/reports/batch-ear-pdf` ครั้งเดียว (เนื่องจาก Payload ขนาด ~1-1.5 MB ไม่เกินขีดจำกัดของ Vercel 4.5 MB), อ่าน Headers จากออบเจ็กต์ `Response` โดยตรง, สั่ง Trigger ดาวน์โหลดไฟล์อย่างแม่นยำ และเรียก `URL.revokeObjectURL(url)` เพื่อคืนหน่วยความจำทันทีหลังดาวน์โหลดเสร็จ
+3. **บั๊ก #34 (MEDIUM) — Checkbox เลือกทั้งหมดบนหัวตารางไม่ตรงกับแถวข้อมูล (`src/components/DepositReportView.jsx`)**:
+   - **สาเหตุ**: การตรวจสอบรายการนำจ่ายสำเร็จในแถวตารางใช้ `getDeliveryStatusInfo(r).key === 'delivered'` แต่เงื่อนไขใน `isAllDeliveredSelected` และ `handleToggleSelectAllDelivered` กลับไปอ่าน `r.status_key === 'delivered'` โดยตรง ทำให้สถานะบางรายการที่มี format พิเศษไม่ถูกนับรวม เกิดอาการ Checkbox หัวตารางไม่ติ๊กถูกทั้งที่แถวในหน้านั้นถูกเลือกครบแล้ว
+   - **แก้ไข**: ใช้ `getDeliveryStatusInfo(r).key === 'delivered' && r.barcode` เป็น Single Source of Truth ทั้งในตารางและ Header Checkbox
+4. **บั๊ก #35 (MEDIUM) — ปุ่มดาวน์โหลด e-AR ถูก Disable เมื่อไม่ได้ติ๊กเลือก และ Start Date ไม่ตรงกับวันที่เริ่มต้นค้นหา (`src/components/DepositReportView.jsx`)**:
+   - **สาเหตุ**: ปุ่มดาวน์โหลด e-AR ถูกตั้งค่า `disabled={selectedBarcodes.size === 0}` ทำให้ผู้ใช้ไม่สามารถกดดาวน์โหลด 20 รายการแรกอัตโนมัติได้หากไม่ได้กดติ๊กเลือกทีละรายการ และ `startDate` เริ่มต้นว่างเปล่าทำให้การกรองครั้งแรกอาจไม่ซิงก์กับ `todayIso`
+   - **แก้ไข**: ปรับปรุงปุ่ม e-AR ให้กดดาวน์โหลดได้ทันทีหากมีรายการนำจ่ายสำเร็จในหน้าปัจจุบัน (หากไม่ได้เลือกรายการใดจะเลือก 20 รายการแรกให้อัตโนมัติ) และกำหนดค่าเริ่มต้น `startDate` ให้เป็น `todayIso`
+5. **บั๊ก #36 (MEDIUM) — Temporal Dead Zone (TDZ) และ Missing Dependencies ใน `handleLogout` (`src/App.jsx`)**:
+   - **สาเหตุ**: `resetInactivityTimer` อ้างอิงถึง `handleLogout` แต่ลำดับการประกาศตัวแปรและการจัดการ Reference อาจก่อให้เกิดปัญหา TDZ เมื่อ Component Re-render และเมื่อผู้ใช้ออกจากระบบ ไม่มีการล้างแคช Session Storage ของรายงานสถานะและแดชบอร์ด
+   - **แก้ไข**: ห่อหุ้ม `handleLogout` ด้วย `useCallback`, ย้ายตำแหน่งการประกาศให้อยู่ก่อนหน้า `resetInactivityTimer`, และเพิ่ม `sessionStorage.removeItem('c2dpost_date_range_cache')` พร้อม `sessionStorage.removeItem('c2dpost_dashboard_cache')` เพื่อความปลอดภัยด้านข้อมูลเมื่อเปลี่ยนผู้ใช้งาน
+
+### 12.3 ผลลัพธ์การทดสอบและการ Build
+- ตรวจสอบความถูกต้องของสคริปต์ Python AST: ผ่าน 100%
+- ทดสอบระบบป้องกันสระวรรณยุกต์และตัวอักษรผิดเพี้ยน (`encoding_guard.mjs`): ผ่าน 56 ไฟล์ 100% (0 mojibake)
+- การคอมไพล์ Production Bundle (`npm run build`): สำเร็จไร้ข้อผิดพลาด
+- บรรจุแพ็กเกจ Chrome Extension WebStore (`sync_extension_webstore.py`): สำเร็จ สมบูรณ์ทั้งใน `extension_Webstore/` และ `public/`
+- ซิงก์เลขเวอร์ชัน 6 ตำแหน่งตรงกัน: `v2026.0924.0845`
