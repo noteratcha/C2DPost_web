@@ -241,6 +241,18 @@ def classify_delivery_status(status_code, status_desc):
     # Normalize decomposed Thai vowels (e.g. น + ำ vs อำ)
     desc_norm = desc.replace("\u0e4d\u0e32", "\u0e33")
 
+    # 0. Temporary delivery attempt / "บ้านปิด" (House closed - Thailand Post code 301)
+    # Strictly belongs to "อยู่ระหว่างการนำจ่าย" (in_transit), unless explicitly returned to sender
+    is_explicit_return = (
+        any(k in desc_norm for k in [
+            "ส่งคืน", "คืนต้นทาง", "ส่งคืนผู้ส่ง", "ตีกลับ", "คืนผู้ฝาก", "คืนสู่ผู้ฝาก",
+            "ปลายทางส่งคืน", "ส่งมอบคืน", "นำจ่ายคืน"
+        ])
+        or code in ["502", "503"]
+    )
+    if ("บ้านปิด" in desc_norm or code == "301") and not is_explicit_return:
+        return "in_transit", "อยู่ระหว่างการนำจ่าย"
+
     # 1. Returned / ส่งคืน / คืนต้นทาง (Must check before delivered to avoid false-positive on "นำจ่ายคืน...")
     if (
         any(k in desc_norm for k in [
@@ -1187,8 +1199,25 @@ def get_dashboard_report(req: DashboardRequest):
         desc_full = str(rec.get("status_description_raw") or rec.get("status_description") or rec.get("status_label") or "").strip()
         code_str = str(rec.get("status") or rec.get("statusCode") or "").strip()
 
+        # Determine if this item is an actual return or an in-transit delivery attempt
+        is_house_closed = ("บ้านปิด" in desc_full) or (code_str == "301")
+        is_actual_return = (
+            (key == "returned")
+            or code_str in ["502", "503", "401", "402"]
+            or any(k in desc_full for k in ["ส่งคืน", "คืนต้นทาง", "ตีกลับ", "ปลายทางส่งคืน", "คืนผู้ฝาก", "คืนสู่ผู้ฝาก", "ส่งมอบคืน", "นำจ่ายคืน"])
+        )
+
+        # "สถานะ บ้านปิด จะต้องอยู่ในค่าของ อยู่ระหว่างการนำจ่าย"
+        # Unless the parcel was explicitly sent back to origin, "บ้านปิด" is strictly in_transit
+        if is_house_closed and not any(k in desc_full for k in ["ส่งคืน", "คืนต้นทาง", "ตีกลับ", "ปลายทางส่งคืน"]):
+            key = "in_transit"
+            rec["status_key"] = "in_transit"
+            rec["status_label"] = "อยู่ระหว่างการนำจ่าย"
+            is_actual_return = False
+
         has_failure_or_return = (
-            key == "returned"
+            is_actual_return
+            or is_house_closed
             or code_str in ["301", "302", "401", "402", "502", "503"]
             or any(k in desc_full for k in ["ส่งคืน", "คืนต้นทาง", "ตีกลับ", "นำจ่ายไม่สำเร็จ", "ไม่สามารถนำจ่าย", "ไม่สามารถส่งมอบ", "บ้านปิด", "ออกใบแจ้ง", "ผู้รับไม่อยู่", "ติดต่อไม่ได้", "ไม่มารับตามกำหนด", "ย้าย"])
         )
@@ -1198,11 +1227,9 @@ def get_dashboard_report(req: DashboardRequest):
             reason = rec.get("failure_reason") or _classify_failure_reason(desc_full)
             reason_counts[reason] = reason_counts.get(reason, 0) + 1
 
-        is_failed_item = (key == "returned") or (has_failure_or_return and any(k in desc_full for k in ["ส่งคืน", "คืนต้นทาง", "ตีกลับ", "502", "503", "401", "402", "นำจ่ายไม่สำเร็จ", "บ้านปิด"]))
-
         if key == "delivered":
             delivered += 1
-        elif is_failed_item:
+        elif is_actual_return:
             failed += 1
         elif key == "received":
             received += 1
@@ -1217,7 +1244,7 @@ def get_dashboard_report(req: DashboardRequest):
         st["count"] += 1
         if key == "delivered":
             st["delivered"] += 1
-        elif is_failed_item:
+        elif is_actual_return:
             st["failed"] += 1
         elif key == "received":
             st["received"] += 1
@@ -1235,7 +1262,7 @@ def get_dashboard_report(req: DashboardRequest):
             "receiver_province": province,
             "receiver_zipcode": rec.get("receiver_zipcode") or "",
             "status_key": key,
-            "status_label": rec.get("status_label") or "",
+            "status_label": rec.get("status_label") or ("อยู่ระหว่างการนำจ่าย" if key == "in_transit" else ""),
             "reason": reason,
             "latest_date": rec.get("latest_date") or "",
             "latest_station": rec.get("latest_station") or "",
@@ -1263,8 +1290,9 @@ def get_dashboard_report(req: DashboardRequest):
         "pending_pct_of_total": round(pending * 100 / total, 2) if total else 0.0,
     }
 
+    total_reasons = sum(reason_counts.values())
     reasons = [
-        {"reason": r, "count": c, "pct_of_failed": round(c * 100 / failed, 2) if failed else 0.0}
+        {"reason": r, "count": c, "pct_of_failed": round(c * 100 / (failed if failed else total_reasons), 2) if (failed or total_reasons) else 0.0}
         for r, c in sorted(reason_counts.items(), key=lambda kv: -kv[1])
     ]
 

@@ -2644,3 +2644,16 @@ Each bug recorded must adhere to the standardized structure:
   }
   ```
 - Retains `@media (max-width: 1100px)` single column fallback (`grid-template-columns: 1fr`).
+
+## 98. Classification of "บ้านปิด" (Code 301) Under "อยู่ระหว่างการนำจ่าย" (In Transit) (v2026.0924.2045)
+
+- **Domain Rule**:
+  - In Thailand Post operations, status code 301 (`นำจ่ายไม่สำเร็จ (บ้านปิด)`) represents a temporary delivery attempt milestone where the recipient's house was closed.
+  - The parcel is held at the destination post office awaiting customer pickup or re-delivery. It is **NOT** a returned item (`ส่งคืน`).
+  - An item is only marked as returned when the destination office registers a formal return dispatch (e.g. `ปณ.ปลายทางส่งคืน`, code 502/503).
+- **Backend Rules (`api/index.py`)**:
+  - `classify_delivery_status(status_code, status_desc)`: If status text contains "บ้านปิด" or code is "301" without explicit return keywords/codes, always return `("in_transit", "อยู่ระหว่างการนำจ่าย")`.
+  - `get_dashboard_report`: Explicitly classify "บ้านปิด" records under `key: "in_transit"`, incrementing `in_transit_count` and province `st["in_transit"]`. Do NOT increment `failed` or `st["failed"]`.
+- **Frontend Rules (`DepositReportView.jsx`, `TrackingInquiryView.jsx`)**:
+  - `getDeliveryStatusInfo`: Intercept `/บ้านปิด/i` and code 301, returning `{ key: 'in_transit', label: 'อยู่ระหว่างการนำจ่าย', smartLabel: 'นำจ่ายไม่สำเร็จ (บ้านปิด)', className: 'exception' }`.
+

@@ -21,6 +21,20 @@ function getCardStatusInfo(latestEvent, item, earData) {
   const desc = String(latestEvent.status_description || '').trim();
   const code = String(latestEvent.status || '').trim();
 
+  // 0. สถานะ บ้านปิด / รหัส 301 จะต้องอยู่ในค่าของ อยู่ระหว่างการนำจ่าย (เว้นแต่มีการส่งคืนชัดเจน)
+  const isExplicitReturn = /ส่งคืน|คืนต้นทาง|ตีกลับ|คืนผู้ฝาก|คืนสู่ผู้ฝาก|ปลายทางส่งคืน|ส่งมอบคืน|นำจ่ายคืน/i.test(desc) || ['502', '503'].includes(code);
+  if ((/บ้านปิด/i.test(desc) || code === '301') && !isExplicitReturn) {
+    return {
+      key: 'in_transit',
+      label: 'อยู่ระหว่างการนำจ่าย',
+      smartLabel: desc || 'นำจ่ายไม่สำเร็จ (บ้านปิด)',
+      icon: '⚠️',
+      badgeClass: 'exception',
+      dotClass: 'dot-amber',
+      rawDesc: desc
+    };
+  }
+
   // 1. Returned / ส่งคืน / คืนต้นทาง (ตรวจก่อนนำจ่ายสำเร็จ)
   if (
     /ส่งคืน|คืนต้นทาง|ตีกลับ|คืนผู้ฝาก|คืนสู่ผู้ฝาก|ส่งคืนผู้ส่ง|ไม่สามารถส่งมอบ|ไม่สามารถนำจ่าย|ส่งมอบคืน|นำจ่ายคืน/i.test(desc) ||
