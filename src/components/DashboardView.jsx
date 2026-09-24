@@ -191,7 +191,8 @@ export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
     in_transit_count: 0,
     pending_count: 0,
     delivered_pct_of_concluded: 0,
-    failed_pct_of_concluded: 0
+    failed_pct_of_concluded: 0,
+    total_fee: 0
   };
   const reasons = Array.isArray(data?.reasons) ? data.reasons : [];
   const provinces = Array.isArray(data?.provinces) ? data.provinces : [];
@@ -222,6 +223,7 @@ export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
   const inTransitCount = summary.in_transit_count || 0;
   const deliveredCount = summary.delivered_count || 0;
   const returnedCount = summary.failed_count || 0;
+  const totalFee = summary.total_fee || 0;
 
   const receivedRate = totalItems > 0 ? ((receivedCount / totalItems) * 100).toFixed(2) : '0.00';
   const inTransitRate = totalItems > 0 ? ((inTransitCount / totalItems) * 100).toFixed(2) : '0.00';
@@ -301,6 +303,23 @@ export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
           <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
           <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
+        </svg>
+      )
+    },
+    // 6. ยอดรวมค่าบริการ
+    {
+      label: 'ยอดรวมค่าบริการ',
+      value: Number(totalFee || 0).toLocaleString('th-TH', {
+        minimumFractionDigits: Number(totalFee || 0) % 1 === 0 ? 0 : 2,
+        maximumFractionDigits: 2
+      }),
+      unit: '',
+      valueColorClass: 'text-gold',
+      className: 'icon-fee',
+      icon: (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+          <line x1="12" y1="1" x2="12" y2="23"></line>
+          <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
         </svg>
       )
     }
@@ -439,8 +458,13 @@ export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
                   <div className="stat-card-content">
                     <div className="stat-label">{card.label}</div>
                     <div className={`stat-value ${card.valueColorClass || ''}`}>
-                      {card.value}{' '}
-                      <span className="stat-unit">{card.unit}</span>
+                      {card.value}
+                      {card.unit ? (
+                        <>
+                          {' '}
+                          <span className="stat-unit">{card.unit}</span>
+                        </>
+                      ) : null}
                     </div>
                   </div>
                 </div>
@@ -604,26 +628,31 @@ export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
                 </div>
               ) : (
                 <div className="dash-reasons-list">
-                  {reasons.map((r) => (
-                    <div className="dash-reason-row" key={r.reason}>
-                      <div className="dash-reason-top">
-                        <div className="dash-reason-name">
-                          <span className="dash-reason-dot"></span>
-                          <span>{r.reason}</span>
+                  {reasons.map((r) => {
+                    const pct = totalReasonsCount > 0
+                      ? (r.count * 100 / totalReasonsCount)
+                      : (Number(r.pct ?? r.pct_of_failed) || 0);
+                    return (
+                      <div className="dash-reason-row" key={r.reason}>
+                        <div className="dash-reason-top">
+                          <div className="dash-reason-name">
+                            <span className="dash-reason-dot"></span>
+                            <span>{r.reason}</span>
+                          </div>
+                          <div className="dash-reason-nums">
+                            <span className="dash-reason-count">{r.count} <span className="stat-unit">รายการ</span></span>
+                            <span className="dash-reason-pct-chip">{formatPct(pct)}%</span>
+                          </div>
                         </div>
-                        <div className="dash-reason-nums">
-                          <span className="dash-reason-count">{r.count} <span className="stat-unit">รายการ</span></span>
-                          <span className="dash-reason-pct-chip">{formatPct(r.pct_of_failed)}%</span>
+                        <div className="dash-reason-bar-track">
+                          <div
+                            className={`dash-reason-bar ${r.count > 0 ? 'has' : ''}`}
+                            style={{ width: `${Math.min(100, Math.max(5, pct))}%` }}
+                          ></div>
                         </div>
                       </div>
-                      <div className="dash-reason-bar-track">
-                        <div
-                          className={`dash-reason-bar ${r.count > 0 ? 'has' : ''}`}
-                          style={{ width: `${Math.min(100, Math.max(5, Number(r.pct_of_failed) || 0))}%` }}
-                        ></div>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>

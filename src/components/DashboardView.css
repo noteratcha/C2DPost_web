@@ -112,6 +112,11 @@
   color: #e11d48;
 }
 
+.stat-card-icon.icon-fee {
+  background: rgba(245, 158, 11, 0.12);
+  color: #d97706;
+}
+
 .stat-label {
   font-size: 0.8rem;
   font-weight: 500;
@@ -162,6 +167,14 @@
 
 [data-theme='dark'] .text-rose {
   color: #fb7185 !important;
+}
+
+.text-gold {
+  color: #d97706 !important;
+}
+
+[data-theme='dark'] .text-gold {
+  color: #fbbf24 !important;
 }
 
 /* 1. Section cards matching DepositReportView card style */
