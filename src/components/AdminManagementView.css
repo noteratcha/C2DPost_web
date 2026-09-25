@@ -76,6 +76,10 @@
   color: var(--text-main, #0f172a);
 }
 
+:root[data-theme="dark"] .admin-bar-title {
+  color: #f8fafc;
+}
+
 .admin-badge-role {
   padding: 3px 10px;
   background: rgba(79, 70, 229, 0.1);
@@ -96,6 +100,10 @@
   margin: 2px 0 0;
   font-size: 0.8rem;
   color: var(--text-muted, #64748b);
+}
+
+:root[data-theme="dark"] .admin-bar-subtitle {
+  color: #94a3b8;
 }
 
 .admin-bar-right {
@@ -1317,7 +1325,7 @@
 
 :root[data-theme="dark"] .aem-input:disabled {
   background: rgba(255, 255, 255, 0.05);
-  color: #64748b;
+  color: #94a3b8;
 }
 
 /* Footer Actions */

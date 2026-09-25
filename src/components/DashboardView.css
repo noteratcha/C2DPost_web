@@ -124,6 +124,10 @@
   margin-bottom: 0.2rem;
 }
 
+[data-theme='dark'] .stat-label {
+  color: #94a3b8;
+}
+
 .stat-value {
   font-family: 'Prompt', sans-serif;
   font-size: 1.35rem;
@@ -131,10 +135,18 @@
   color: var(--text-main, #0f172a);
 }
 
+[data-theme='dark'] .stat-value {
+  color: #f8fafc;
+}
+
 .stat-unit {
   font-size: 0.82rem;
   font-weight: 500;
   color: var(--text-muted, #64748b);
+}
+
+[data-theme='dark'] .stat-unit {
+  color: #94a3b8;
 }
 
 .text-emerald {
@@ -220,6 +232,10 @@
   font-size: 1.05rem;
   font-weight: 700;
   color: var(--text-main, #0f172a);
+}
+
+[data-theme='dark'] .dash-section-title {
+  color: #f8fafc;
 }
 
 .dash-section-sub {
@@ -527,6 +543,10 @@
   margin-right: 0.2rem;
 }
 
+[data-theme='dark'] .dash-legend-title {
+  color: #f8fafc;
+}
+
 .dash-legend-item {
   display: flex;
   align-items: center;
@@ -654,6 +674,10 @@
   color: var(--text-main, #0f172a);
 }
 
+[data-theme='dark'] .dash-pd-name {
+  color: #f8fafc;
+}
+
 .dash-pd-rate-wrap {
   display: flex;
   align-items: center;
@@ -735,6 +759,11 @@
   color: #64748b;
 }
 
+[data-theme='dark'] .dash-pd-rate-pill.muted {
+  background: rgba(148, 163, 184, 0.22);
+  color: #94a3b8;
+}
+
 .dash-pd-stats {
   display: flex;
   flex-direction: column;
@@ -761,6 +790,10 @@
   font-family: 'Prompt', sans-serif;
   font-weight: 700;
   color: var(--text-main, #0f172a);
+}
+
+[data-theme='dark'] .dash-pd-stat strong {
+  color: #f8fafc;
 }
 
 .dash-pd-stat.total {
@@ -809,6 +842,10 @@
   font-size: 0.95rem;
   color: var(--text-main, #0f172a);
   margin-bottom: 0.3rem;
+}
+
+[data-theme='dark'] .dash-pd-placeholder-title {
+  color: #f8fafc;
 }
 
 .dash-pd-hint {
@@ -1110,6 +1147,10 @@
   color: var(--text-main, #0f172a);
 }
 
+[data-theme='dark'] .dash-reason-name {
+  color: #f8fafc;
+}
+
 .dash-reason-dot {
   width: 7px;
   height: 7px;
@@ -1129,6 +1170,10 @@
   font-size: 0.92rem;
   font-weight: 700;
   color: var(--text-main, #0f172a);
+}
+
+[data-theme='dark'] .dash-reason-count {
+  color: #f8fafc;
 }
 
 .dash-reason-pct-chip {

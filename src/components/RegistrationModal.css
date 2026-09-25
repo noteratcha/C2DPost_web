@@ -481,7 +481,7 @@
 [data-theme='dark'] .reg-input:disabled,
 [data-theme='dark'] .reg-input.readonly-input {
   background: rgba(15, 23, 42, 0.5) !important;
-  color: #64748b !important;
+  color: #94a3b8 !important;
   border-color: rgba(255, 255, 255, 0.06) !important;
 }
 

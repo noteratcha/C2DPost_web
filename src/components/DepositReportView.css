@@ -66,10 +66,18 @@
   margin: 0 0 0.2rem 0;
 }
 
+[data-theme='dark'] .deposit-page-title {
+  color: #f8fafc;
+}
+
 .deposit-page-subtitle {
   font-size: 0.875rem;
   color: var(--text-muted, #64748b);
   margin: 0;
+}
+
+[data-theme='dark'] .deposit-page-subtitle {
+  color: #94a3b8;
 }
 
 .btn-back-to-workspace {
@@ -146,11 +154,19 @@
   white-space: nowrap !important;
 }
 
+[data-theme='dark'] .deposit-date-sep {
+  color: #94a3b8;
+}
+
 .deposit-control-label {
   font-size: 0.88rem;
   font-weight: 600;
   color: var(--text-main, #334155);
   white-space: nowrap !important;
+}
+
+[data-theme='dark'] .deposit-control-label {
+  color: #cbd5e1;
 }
 
 .deposit-date-input {
@@ -214,8 +230,8 @@
 }
 
 [data-theme='dark'] .btn-quick-date.active {
-  background: #10b981;
-  color: #042f2e;
+  background: #059669;
+  color: #ffffff;
 }
 .deposit-control-actions {
   display: flex;
@@ -459,6 +475,10 @@
   margin-bottom: 0.2rem;
 }
 
+[data-theme='dark'] .stat-label {
+  color: #94a3b8;
+}
+
 .stat-value {
   font-family: 'Prompt', sans-serif;
   font-size: 1.35rem;
@@ -466,10 +486,18 @@
   color: var(--text-main, #0f172a);
 }
 
+[data-theme='dark'] .stat-value {
+  color: #f8fafc;
+}
+
 .stat-unit {
   font-size: 0.82rem;
   font-weight: 500;
   color: var(--text-muted, #64748b);
+}
+
+[data-theme='dark'] .stat-unit {
+  color: #94a3b8;
 }
 
 .text-emerald {
@@ -793,10 +821,18 @@
   color: var(--text-main, #0f172a);
 }
 
+[data-theme='dark'] .cell-receiver-name {
+  color: #f8fafc;
+}
+
 .cell-address {
   max-width: 280px;
   color: var(--text-muted, #475569);
   line-height: 1.4;
+}
+
+[data-theme='dark'] .cell-address {
+  color: #cbd5e1;
 }
 
 .timestamp-badge {
@@ -806,6 +842,10 @@
   font-size: 0.78rem;
   color: var(--text-muted, #64748b);
   white-space: nowrap !important;
+}
+
+[data-theme='dark'] .timestamp-badge {
+  color: #94a3b8;
 }
 
 .cell-fee {
@@ -1016,6 +1056,10 @@
   color: var(--text-muted, #64748b);
 }
 
+[data-theme='dark'] .footer-records-count {
+  color: #94a3b8;
+}
+
 .footer-page-indicator {
   font-weight: 600;
   color: var(--text-main, #334155);
@@ -1116,15 +1160,19 @@
 }
 
 [data-theme='dark'] .btn-pagination-page.active {
-  background: #10b981;
-  color: #042f2e;
-  border-color: #10b981;
+  background: #059669;
+  color: #ffffff;
+  border-color: #059669;
 }
 
 .pagination-ellipsis {
   padding: 0 0.3rem;
   color: var(--text-muted, #64748b);
   font-size: 0.9rem;
+}
+
+[data-theme='dark'] .pagination-ellipsis {
+  color: #94a3b8;
 }
 
 .deposit-footer-actions {
@@ -1244,11 +1292,20 @@
   color: var(--text-muted, #64748b);
 }
 
+[data-theme='dark'] .loading-spinner-wrap,
+[data-theme='dark'] .empty-state-wrap {
+  color: #94a3b8;
+}
+
 .empty-title {
   font-size: 1rem;
   font-weight: 600;
   color: var(--text-main, #334155);
   margin: 0.5rem 0 0.25rem 0;
+}
+
+[data-theme='dark'] .empty-title {
+  color: #f8fafc;
 }
 
 .empty-desc {
@@ -1439,6 +1496,10 @@
   color: var(--text-main, #1e293b);
 }
 
+[data-theme='dark'] .ear-menu-header strong {
+  color: #f8fafc;
+}
+
 .ear-menu-header span {
   font-size: 0.74rem;
   color: #7c3aed;
@@ -1491,10 +1552,18 @@
   color: var(--text-main, #1e293b);
 }
 
+[data-theme='dark'] .ear-menu-item .menu-item-title {
+  color: #f8fafc;
+}
+
 .ear-menu-item .menu-item-desc {
   font-size: 0.72rem;
   color: var(--text-muted, #64748b);
   line-height: 1.25;
+}
+
+[data-theme='dark'] .ear-menu-item .menu-item-desc {
+  color: #94a3b8;
 }
 
 .row-selected {
@@ -1608,6 +1677,10 @@
   color: var(--text-main, #0f172a);
 }
 
+[data-theme='dark'] .ear-help-icon-title h3 {
+  color: #f8fafc;
+}
+
 .ear-help-close-btn {
   background: transparent;
   border: none;
@@ -1662,6 +1735,10 @@
   color: var(--text-main, #334155);
 }
 
+[data-theme='dark'] .ear-help-alert-box p {
+  color: #cbd5e1;
+}
+
 .ear-help-ver-tag {
   font-size: 0.76rem;
   padding: 0.25rem 0.6rem;
@@ -1690,6 +1767,10 @@
   color: var(--text-main, #0f172a);
 }
 
+[data-theme='dark'] .ear-help-steps h4 {
+  color: #f8fafc;
+}
+
 .ear-help-steps ol {
   margin: 0;
   padding-left: 1.25rem;
@@ -1698,6 +1779,10 @@
   gap: 0.6rem;
   font-size: 0.84rem;
   color: var(--text-main, #334155);
+}
+
+[data-theme='dark'] .ear-help-steps ol {
+  color: #cbd5e1;
 }
 
 .ear-help-steps li strong {

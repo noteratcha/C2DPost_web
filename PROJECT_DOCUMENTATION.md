@@ -1391,3 +1391,37 @@ if any(k in desc for k in ["ถึงที่ทำการปลายทา�
    - เพิ่มสไตล์ `.dash-pd-close-btn` ให้เรียบหรู ดูสะอาดตา (Clean Minimalist) เมื่อชี้เมาส์เปลี่ยนเป็นสีแดงสดใส พร้อมรองรับ Dark Mode 100%
 
 
+
+
+## 64. การตรวจสอบและปรับปรุงความคมชัดของข้อความในโหมดมืดทั่วทั้งระบบ (Dark Mode Typography & Contrast Overhaul) (v2026.0925.0705)
+
+### 64.1 ปัญหาและความต้องการของผู้ใช้งาน
+- ผู้ใช้งานแจ้ง: **"เมื่อปรับโหมดเป็นมืด ปรากฎว่ามีข้อความบางอันสีเป็นโทนมืดเหมือนโหมด ต้องการให้ตรวจสอบทั้งหมดและปรับสีข้อความให้ดูง่ายขึ้นเมื่อปรับเป็นโหมดมืด"**
+- ปัญหาที่ตรวจพบ:
+  1. ในหน้าสถิติแดชบอร์ด (`DashboardView`): ป้ายกำกับการ์ดสถิติ (`.stat-label`), ชื่อหัวข้อส่วนวิเคราะห์ (`.dash-section-title`), ชื่อจังหวัดในการ์ดรายละเอียด (`.dash-pd-name`), และชื่อรายการสาเหตุ (`.dash-reason-name`, `.dash-reason-count`) แสดงสีเทาเข้มเกือบดำ (`#0f172a`, `#334155`) กลืนกับพื้นหลังสีเข้มของ Dark Mode ทำให้อ่านยากมาก
+  2. ในหน้ารายงานสถานะการฝากส่ง (`DepositReportView` / `DepositReportModal`): ข้อความระบุชื่อผู้รับ, ที่อยู่, วัน-เวลาล่าสุด, คำอธิบายสถานะ, ตัวเลขสรุปสถิติ, คำบรรยายในเมนู e-AR และกล่องช่วยเหลือ e-AR ปรากฏเป็นสีทึบ
+  3. ในหน้าตรวจสอบพัสดุและไทม์ไลน์ (`TrackingInquiryView` / `TrackingTimelineModal`): ป้ายกำกับชื่อผู้รับตามจ่าหน้า, ผู้ลงนาม, คำแนะนำ e-AR และจุดบอกสถานะ (Stepper Dots) แสดงสีตัวอักษรไม่ชัดเจน
+  4. ในหน้าจอแปลงไฟล์และอื่นๆ (`PreviewGrid`, `Navbar`, `SupportedDocsModal`, `RegistrationModal`, `AdminManagementView`): ป้ายสรุปสถิติเอกสาร, ป้ายข้อความคำแนะนำ และสถานะอินพุตที่ถูกปิดการใช้งานกลืนกับพื้นหลัง
+
+### 64.2 สาเหตุรากเหง้า (Root Cause)
+1. **การขาดตัวแปรแม่แบบใน `src/index.css`**:
+   - ในไฟล์ `src/index.css` มีการกำหนดตัวแปร `--color-text` และ `--color-text-muted` ไว้ แต่ในส่วนของคอมโพเนนต์ย่อยต่างๆ มีการเรียกใช้ตัวแปร CSS ที่ชื่อ `--text-main`, `--text-muted`, `--text-primary`, `--text-secondary`, `--bg-card`, `--border-color`
+   - เมื่อไม่มีการประกาศตัวแปรเหล่านี้ไว้ใน `:root[data-theme="dark"]` เบราว์เซอร์จึงหันไปใช้ค่า Fallback ที่กำหนดไว้ เช่น `color: var(--text-main, #0f172a)` หรือ `color: var(--text-muted, #64748b)` ซึ่งเป็นสีโทนเข้มสำหรับ Light Mode เสมอ
+2. **Hardcoded Micro-Contrast ในปุ่ม Active และ Badge**:
+   - ปุ่มเปลี่ยนหน้า Pagination ที่ถูกเลือก (`.btn-pagination-page.active`) และจุดสเต็ปนำจ่ายสำเร็จ มีการใส่ค่าสีตัวอักษร `#042f2e` (เขียวเข้มเกือบดำ) ซึ่งเมื่ออยู่ในโหมดมืดจะดูเหมือนตัวหนังสือมืดบนจุดสีมืด
+
+### 64.3 การแก้ไขที่ดำเนินการ (Implementation Details)
+1. **การยกเครื่องตัวแปรแม่แบบ CSS Tokens (`src/index.css`)**:
+   - ประกาศตัวแปรอย่างเป็นทางการใน `:root, :root[data-theme="light"]`:
+     - `--text-main: #0f172a`, `--text-primary: #0f172a`, `--text-muted: #64748b`, `--text-secondary: #475569`
+     - `--bg-card: #ffffff`, `--bg-card-sub: #f8fafc`, `--bg-hover: #f1f5f9`, `--bg-input: #ffffff`, `--border-color: rgba(0, 0, 0, 0.08)`
+   - ประกาศตัวแปรความสว่างสูงใน `:root[data-theme="dark"]`:
+     - `--text-main: #f8fafc`, `--text-primary: #f8fafc`, `--text-muted: #94a3b8`, `--text-secondary: #cbd5e1`
+     - `--bg-card: #1e293b`, `--bg-card-sub: #0f172a`, `--bg-hover: rgba(255, 255, 255, 0.06)`, `--bg-input: #0f172a`, `--border-color: rgba(255, 255, 255, 0.08)`
+2. **การเสริมกฎ Explicit Dark Mode Overrides ในทุกคอมโพเนนต์**:
+   - **`DashboardView.css`**: ปรับ `.stat-label` (`#94a3b8`), `.stat-value` (`#f8fafc`), `.dash-section-title` (`#f8fafc`), `.dash-pd-name` (`#f8fafc`), `.dash-reason-name` (`#f8fafc`), `.dash-reason-count` (`#f8fafc`), `.dash-pd-rate-pill.muted` (`#94a3b8`)
+   - **`DepositReportView.css`**: ปรับ `.deposit-page-title` (`#f8fafc`), `.deposit-page-subtitle` (`#94a3b8`), `.cell-receiver-name` (`#f8fafc`), `.cell-address` (`#cbd5e1`), `.timestamp-badge` (`#94a3b8`), `.ear-menu-item .menu-item-title` (`#f8fafc`), `.ear-menu-item .menu-item-desc` (`#94a3b8`), `.ear-help-icon-title h3` (`#f8fafc`), `.ear-help-alert-box p` (`#cbd5e1`), `.btn-quick-date.active` (`#ffffff`), `.btn-pagination-page.active` (`#ffffff`)
+   - **`TrackingInquiryView.css`**: ปรับ `.tracking-page-title` (`#f8fafc`), `.quick-barcodes-label` (`#94a3b8`), `.result-label` (`#94a3b8`), `.stepper-meta-row` (`#94a3b8`), `.stepper-dot.dot-success` (`#ffffff`)
+   - **`DepositReportModal.css` & `TrackingTimelineModal.css`**: ปรับ `.stat-card-unit` (`#94a3b8`), `.deposit-loading-cell p` (`#94a3b8`), `.empty-desc` (`#94a3b8`), จุดสเต็ปนำจ่ายสำเร็จ/รับฝากแล้ว/มีเหตุขัดข้องเป็นสีขาวสดใส
+   - **`PreviewGrid.css`**: ปรับ `.stat-label-item` (`#cbd5e1`), `.python-parity-table td` (`#cbd5e1`), `.empty-table-state h4` (`#f8fafc`), `.chk-box-badge` (`#94a3b8`)
+   - **`SupportedDocsModal.css`, `Navbar.css`, `ThailandMap.css`, `AdminManagementView.css`, `RegistrationModal.css`, `LoginModal.css`, `App.css`**: ปรับข้อความตัวอักษร ป้ายเมนู คำอธิบาย และข้อความตัวอย่างทั้งหมดให้มี Contrast สูง อ่านง่าย สบายตา

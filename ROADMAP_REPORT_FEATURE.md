@@ -455,3 +455,13 @@
     - ผู้ใช้สามารถปลดล็อคได้ด้วยการคลิกซ้ำที่จังหวัดเดิมบนแผนที่, คลิกที่แถวในตารางจัดอันดับ, หรือคลิกปุ่ม `✕` บนการ์ด
 
 
+
+- [x] **4.82 ปรับปรุงสีข้อความและ Contrast ในโหมดมืด (Dark Mode) ทั่วทั้งระบบ (v2026.0925.0705)**
+  - **ยกเครื่องตัวแปร Global Typography Tokens (`src/index.css`)**:
+    - นิยาม `--text-main`, `--text-primary`, `--text-muted`, `--text-secondary`, `--bg-card`, `--border-color` ใน `:root[data-theme="dark"]` อย่างสมบูรณ์ ขจัดปัญหา Fallback ไปใช้สีเข้มของโหมดสว่าง
+  - **ตรวจสอบและปรับจูนความคมชัด 12 โมดูล CSS ครบทุกมุมมอง**:
+    - `DashboardView.css`: ตัวเลขสถิติ, ชื่อการ์ดวิเคราะห์, ชื่อจังหวัด, รายการสาเหตุส่งคืนและนำจ่ายไม่สำเร็จ
+    - `DepositReportView.css` & `DepositReportModal.css`: ชื่อผู้รับ, ที่อยู่, วันที่, ข้อความเมนูและกล่องช่วยเหลือ e-AR
+    - `TrackingInquiryView.css` & `TrackingTimelineModal.css`: ป้ายกำกับไทม์ไลน์, ป้ายผู้ลงนาม, จุด Stepper Dots ไอคอนขาวบริสุทธิ์
+    - `PreviewGrid.css`, `Navbar.css`, `ThailandMap.css`, `SupportedDocsModal.css`, `RegistrationModal.css`, `LoginModal.css`, `AdminManagementView.css`, `App.css`
+  - **ปรับ Micro-Contrast ของปุ่ม Active และ Badge**: เปลี่ยนสีข้อความ/ไอคอนปุ่มแอคทีฟจาก `#042f2e` เป็น `#ffffff` ชัดเจนทุกสายตา

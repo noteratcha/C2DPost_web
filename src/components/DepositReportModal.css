@@ -183,6 +183,10 @@
   white-space: nowrap !important;
 }
 
+[data-theme='dark'] .deposit-date-sep {
+  color: #94a3b8;
+}
+
 .deposit-control-label {
   font-size: 0.85rem;
   font-weight: 500;
@@ -552,6 +556,10 @@
   color: #64748b;
 }
 
+[data-theme='dark'] .stat-card-unit {
+  color: #94a3b8;
+}
+
 /* Toolbar: Search and Filter Tabs */
 .deposit-table-toolbar {
   display: flex;
@@ -889,6 +897,10 @@
   font-size: 0.85rem;
 }
 
+[data-theme='dark'] .deposit-loading-cell p {
+  color: #94a3b8;
+}
+
 .deposit-empty-state {
   display: flex;
   flex-direction: column;
@@ -911,6 +923,10 @@
   font-size: 0.8rem;
   color: #64748b;
   margin: 0;
+}
+
+[data-theme='dark'] .empty-desc {
+  color: #94a3b8;
 }
 
 /* Footer Actions */
@@ -1024,6 +1040,10 @@
   padding: 0 0.2rem;
   color: #64748b;
   font-size: 0.85rem;
+}
+
+[data-theme='dark'] .deposit-modal-footer .pagination-ellipsis {
+  color: #94a3b8;
 }
 
 .footer-action-buttons {
@@ -1536,6 +1556,10 @@
   color: var(--text-main, #1e293b);
 }
 
+[data-theme='dark'] .ear-menu-header strong {
+  color: #f8fafc;
+}
+
 .ear-menu-header span {
   font-size: 0.74rem;
   color: #7c3aed;
@@ -1588,10 +1612,18 @@
   color: var(--text-main, #1e293b);
 }
 
+[data-theme='dark'] .ear-menu-item .menu-item-title {
+  color: #f8fafc;
+}
+
 .ear-menu-item .menu-item-desc {
   font-size: 0.72rem;
   color: var(--text-muted, #64748b);
   line-height: 1.25;
+}
+
+[data-theme='dark'] .ear-menu-item .menu-item-desc {
+  color: #94a3b8;
 }
 
 /* Floating Progress Toast in Modal */

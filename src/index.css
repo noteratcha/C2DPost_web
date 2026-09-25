@@ -33,6 +33,18 @@
   --color-input-text: #0f172a;
   
   --shadow-card: 0 4px 20px -2px rgba(0, 0, 0, 0.06);
+
+  /* Unified tokens across all views and modals */
+  --text-main: #0f172a;
+  --text-primary: #0f172a;
+  --text-muted: #64748b;
+  --text-secondary: #475569;
+  --bg-card: #ffffff;
+  --bg-card-sub: #f8fafc;
+  --bg-hover: #f1f5f9;
+  --bg-input: #ffffff;
+  --bg-row-even: #f8fafc;
+  --border-color: rgba(0, 0, 0, 0.08);
 }
 
 :root[data-theme="dark"] {
@@ -69,6 +81,18 @@
   --color-input-text: #f8fafc;
   
   --shadow-card: 0 10px 25px -5px rgba(0, 0, 0, 0.4);
+
+  /* Unified tokens across all views and modals */
+  --text-main: #f8fafc;
+  --text-primary: #f8fafc;
+  --text-muted: #94a3b8;
+  --text-secondary: #cbd5e1;
+  --bg-card: #1e293b;
+  --bg-card-sub: #0f172a;
+  --bg-hover: rgba(255, 255, 255, 0.06);
+  --bg-input: #0f172a;
+  --bg-row-even: rgba(15, 23, 42, 0.35);
+  --border-color: rgba(255, 255, 255, 0.08);
 }
 
 * {

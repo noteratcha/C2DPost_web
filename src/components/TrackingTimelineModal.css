@@ -570,6 +570,10 @@
   color: #64748b;
 }
 
+[data-theme='dark'] .track-loading-state p {
+  color: #94a3b8;
+}
+
 .track-empty-title {
   font-size: 0.95rem;
   font-weight: 600;
@@ -585,6 +589,10 @@
   font-size: 0.8rem;
   color: #64748b;
   margin: 0;
+}
+
+[data-theme='dark'] .track-empty-desc {
+  color: #94a3b8;
 }
 
 /* Spinner */
@@ -715,25 +723,25 @@
 [data-theme='dark'] .track-step-dot.delivered {
   background: #10b981;
   border-color: #10b981;
-  color: #0f172a;
+  color: #ffffff;
 }
 
 [data-theme='dark'] .track-step-dot.received {
   background: #14b8a6;
   border-color: #14b8a6;
-  color: #0f172a;
+  color: #ffffff;
 }
 
 [data-theme='dark'] .track-step-dot.exception {
   background: #f97316;
   border-color: #f97316;
-  color: #0f172a;
+  color: #ffffff;
 }
 
 [data-theme='dark'] .track-step-dot.in-transit-active {
   background: #38bdf8;
   border-color: #38bdf8;
-  color: #0f172a;
+  color: #ffffff;
 }
 
 .track-step-pulse-ring {

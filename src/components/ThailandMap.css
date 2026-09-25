@@ -1,0 +1,246 @@
+/* ThailandMap.css — Schematic Thailand Map with Province Dots */
+
+/* ── Wrapper ────────────────────────────────────────────────── */
+.th-map-wrapper {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-card, #ffffff);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+  height: 100%;
+  min-height: 320px;
+}
+
+[data-theme='dark'] .th-map-wrapper {
+  background: rgba(15, 23, 42, 0.9);
+  border-color: rgba(16, 185, 129, 0.25);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(16, 185, 129, 0.12);
+}
+
+/* ── Header ─────────────────────────────────────────────────── */
+.th-map-header {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.6rem 0.85rem;
+  background: rgba(16, 185, 129, 0.08);
+  border-bottom: 1px solid rgba(16, 185, 129, 0.15);
+  color: #059669;
+  flex-shrink: 0;
+}
+
+[data-theme='dark'] .th-map-header {
+  background: rgba(16, 185, 129, 0.1);
+  border-bottom-color: rgba(16, 185, 129, 0.2);
+  color: #34d399;
+}
+
+.th-map-title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  font-family: 'Prompt', 'Inter', sans-serif;
+  letter-spacing: 0.02em;
+}
+
+/* ── SVG Container ──────────────────────────────────────────── */
+.th-map-svg-container {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem;
+  overflow: hidden;
+  background: linear-gradient(135deg, rgba(248,250,252,0.8) 0%, rgba(240,249,255,0.6) 100%);
+}
+
+[data-theme='dark'] .th-map-svg-container {
+  background: linear-gradient(135deg, rgba(15,23,42,0.9) 0%, rgba(7,36,62,0.8) 100%);
+  --th-map-bg: rgba(30,41,59,0.5);
+  --th-map-border: rgba(71,85,105,0.7);
+}
+
+.th-map-svg {
+  width: 100%;
+  height: auto;
+  max-height: 360px;
+  display: block;
+}
+
+/* ── Province Dots ──────────────────────────────────────────── */
+.prov-dot-group {
+  cursor: default;
+}
+
+.prov-dot {
+  transition: r 0.2s ease, fill 0.2s ease;
+}
+
+.prov-dot-active {
+  filter: drop-shadow(0 0 4px rgba(16, 185, 129, 0.6));
+}
+
+/* ── Pulse Ring Animation ───────────────────────────────────── */
+.prov-pulse-ring-outer {
+  animation: provPulseOuter 2.2s ease-out infinite;
+  transform-origin: center;
+}
+
+.prov-pulse-ring-inner {
+  animation: provPulseInner 2.2s ease-out infinite 0.4s;
+  transform-origin: center;
+}
+
+@keyframes provPulseOuter {
+  0%   { opacity: 0.9; r: 14; }
+  60%  { opacity: 0.1; r: 28; }
+  100% { opacity: 0;   r: 32; }
+}
+
+@keyframes provPulseInner {
+  0%   { opacity: 0.9; r: 10; }
+  60%  { opacity: 0.2; r: 20; }
+  100% { opacity: 0;   r: 24; }
+}
+
+/* Safari: use transform-based animation instead of r attribute */
+@supports (animation-fill-mode: both) {
+  .prov-pulse-ring-outer,
+  .prov-pulse-ring-inner {
+    animation-fill-mode: both;
+  }
+}
+
+/* ── Info Bar ───────────────────────────────────────────────── */
+.th-map-info {
+  flex-shrink: 0;
+  padding: 0.55rem 0.85rem;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  min-height: 52px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+[data-theme='dark'] .th-map-info {
+  border-top-color: rgba(255, 255, 255, 0.07);
+}
+
+.th-map-info.active {
+  background: rgba(240, 253, 244, 0.9);
+}
+
+[data-theme='dark'] .th-map-info.active {
+  background: rgba(6, 78, 59, 0.2);
+}
+
+.th-map-info.idle {
+  background: rgba(248, 250, 252, 0.8);
+  align-items: center;
+  justify-content: center;
+}
+
+[data-theme='dark'] .th-map-info.idle {
+  background: rgba(30, 41, 59, 0.5);
+}
+
+.th-map-province-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.th-map-pin-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.25);
+  flex-shrink: 0;
+  animation: mapPinPulse 2s ease-in-out infinite;
+}
+
+@keyframes mapPinPulse {
+  0%, 100% { box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.25); }
+  50%       { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0.1); }
+}
+
+.th-map-province-name {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #065f46;
+  font-family: 'Prompt', 'Inter', sans-serif;
+}
+
+[data-theme='dark'] .th-map-province-name {
+  color: #34d399;
+}
+
+.th-map-location-text {
+  font-size: 0.72rem;
+  color: #64748b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+[data-theme='dark'] .th-map-location-text {
+  color: #94a3b8;
+}
+
+.th-map-status-tag {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #047857;
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  border-radius: 20px;
+  padding: 1px 8px;
+  align-self: flex-start;
+}
+
+[data-theme='dark'] .th-map-status-tag {
+  color: #6ee7b7;
+  background: rgba(16, 185, 129, 0.15);
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+.th-map-idle-text {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  font-style: italic;
+}
+
+/* ── Legend dots (optional future) ─────────────────────────── */
+.th-map-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  padding: 0.4rem 0.85rem 0.55rem;
+  border-top: 1px solid rgba(0, 0, 0, 0.05);
+  flex-shrink: 0;
+}
+
+.th-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.65rem;
+  color: #64748b;
+}
+
+[data-theme='dark'] .th-legend-item {
+  color: #94a3b8;
+}
+
+.th-legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
