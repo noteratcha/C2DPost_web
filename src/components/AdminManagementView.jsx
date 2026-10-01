@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { NO_EDIT_USERNAMES } from '../config';
 import { exportAdminUsersExcel } from '../utils/api';
+import { stripVendorZeros } from '../utils/parseCsv';
 import './AdminManagementView.css';
 
 export default function AdminManagementView({
@@ -99,7 +100,7 @@ export default function AdminManagementView({
     setEditModalData({
       UserName: person.UserName || '',
       Password: person.Password || '',
-      VendorID: person.VendorID || person['Vendor ID'] || person.vendor_id || person.vendorId || '',
+      VendorID: stripVendorZeros(person.VendorID || person['Vendor ID'] || person.vendor_id || person.vendorId || ''),
       Email: person.Email || '',
       Prefix: person.Prefix || '',
       Organization: person.Organization || '',
@@ -194,9 +195,9 @@ export default function AdminManagementView({
         body: JSON.stringify({
           action: 'update_user',
           ...editModalData,
-          VendorID: editModalData.VendorID || '',
-          vendor_id: editModalData.VendorID || '',
-          vendorId: editModalData.VendorID || ''
+          VendorID: stripVendorZeros(editModalData.VendorID),
+          vendor_id: stripVendorZeros(editModalData.VendorID),
+          vendorId: stripVendorZeros(editModalData.VendorID)
         })
       });
       const data = await res.json();
@@ -259,13 +260,14 @@ export default function AdminManagementView({
       const term = searchTerm.toLowerCase().trim();
 
       const u = (p.UserName || '').toLowerCase();
-      const vid = (p.VendorID || p['Vendor ID'] || p.vendor_id || p.vendorId || '').toLowerCase();
+      const rawVid = (p.VendorID || p['Vendor ID'] || p.vendor_id || p.vendorId || '').toLowerCase();
+      const strippedVid = stripVendorZeros(rawVid).toLowerCase();
       const org = (p.Organization || '').toLowerCase();
       const po = (p.ResponsiblePostoffice || '').toLowerCase();
       const zip = (p.ResponsibleZipcode || '').toLowerCase();
       const c1 = (p.ContactPerson1 || '').toLowerCase();
 
-      return u.includes(term) || vid.includes(term) || org.includes(term) || po.includes(term) || zip.includes(term) || c1.includes(term);
+      return u.includes(term) || rawVid.includes(term) || strippedVid.includes(term) || org.includes(term) || po.includes(term) || zip.includes(term) || c1.includes(term);
     });
   }, [people, statusFilter, searchTerm]);
 
@@ -530,7 +532,7 @@ export default function AdminManagementView({
                         </td>
 
                         <td className="col-password">{person.Password}</td>
-                        <td className="col-vendor">{person.VendorID || person['Vendor ID'] || person.vendor_id || person.vendorId || '-'}</td>
+                        <td className="col-vendor">{stripVendorZeros(person.VendorID || person['Vendor ID'] || person.vendor_id || person.vendorId) || '-'}</td>
                         <td className="col-prefix">{person.Prefix || '-'}</td>
                         <td className="col-org" title={person.Organization}>{person.Organization || '-'}</td>
                         <td className="col-po" title={person.ResponsiblePostoffice}>{person.ResponsiblePostoffice || '-'}</td>
@@ -658,7 +660,12 @@ export default function AdminManagementView({
                   <label>Vendor ID (เลข Vendor)</label>
                   <input className="aem-input" value={editModalData.VendorID || ''}
                     placeholder="เช่น 10000001"
-                    onChange={e => handleModalInputChange('VendorID', e.target.value)} />
+                    onChange={e => handleModalInputChange('VendorID', e.target.value)}
+                    onBlur={() => {
+                      if (editModalData.VendorID) {
+                        handleModalInputChange('VendorID', stripVendorZeros(editModalData.VendorID));
+                      }
+                    }} />
                 </div>
                 <div className="aem-field">
                   <label>Prefix (นำหน้ารหัส) <span className="req-star">*</span></label>

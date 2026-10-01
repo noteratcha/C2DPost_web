@@ -214,7 +214,7 @@ export default function Navbar({
     ''
   ).trim();
   const strippedVendor = rawVendor ? (rawVendor.replace(/^0+/, '') || '0') : '';
-  const displayRoleOrVendor = strippedVendor || currentPerson?.Status || 'DOL';
+  const displayRoleOrVendor = strippedVendor ? `Vendor : ${strippedVendor}` : (currentPerson?.Status || 'DOL');
 
   return (
     <>
@@ -424,7 +424,7 @@ export default function Navbar({
                   type="button"
                   className={`user-profile-badge ${isUserMenuOpen ? 'active' : ''}`}
                   onClick={() => setIsUserMenuOpen(prev => !prev)}
-                  title={`ผู้ใช้งาน: ${user}${strippedVendor ? ` | Vendor: ${strippedVendor}` : ''} (คลิกเพื่อเปิดเมนู)`}
+                  title={`ผู้ใช้งาน: ${user}${strippedVendor ? ` | Vendor : ${strippedVendor}` : ''} (คลิกเพื่อเปิดเมนู)`}
                   aria-expanded={isUserMenuOpen}
                 >
                   <div className="user-avatar-badge">
@@ -466,7 +466,7 @@ export default function Navbar({
                         <div className="user-dropdown-badges">
                           {strippedVendor ? (
                             <span className="user-dropdown-role-chip" title={`Vendor ID: ${rawVendor}`}>
-                              Vendor: {strippedVendor}
+                              Vendor : {strippedVendor}
                             </span>
                           ) : (
                             <span className="user-dropdown-role-chip">{currentPerson?.Status || 'DOL'}</span>

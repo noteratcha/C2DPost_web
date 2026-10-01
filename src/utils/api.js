@@ -535,7 +535,7 @@ export async function exportAdminUsersExcel(users) {
     u.NO || (i + 1),
     `"${(u.UserName || '').replace(/"/g, '""')}"`,
     `"${(u.Password || '').replace(/"/g, '""')}"`,
-    `"${(u.VendorID || u.vendor_id || '').replace(/"/g, '""')}"`,
+    `"${(String(u.VendorID || u.vendor_id || '').trim().replace(/^0+/, '') || (String(u.VendorID || u.vendor_id || '').trim() ? '0' : '')).replace(/"/g, '""')}"`,
     `"${(u.Email || '').replace(/"/g, '""')}"`,
     `"${(u.Prefix || '').replace(/"/g, '""')}"`,
     `"${(u.Organization || '').replace(/"/g, '""')}"`,

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { parseCsv } from '../utils/parseCsv';
+import { parseCsv, stripVendorZeros } from '../utils/parseCsv';
 import { SPREADSHEET_ID } from '../config';
 import './RegistrationModal.css';
 
@@ -189,7 +189,7 @@ export default function RegistrationModal({ isOpen, onClose, people = [] }) {
             setErrOrg('');
           }
           if (foundData.vendor_id) {
-            setVendorId(foundData.vendor_id);
+            setVendorId(stripVendorZeros(foundData.vendor_id));
           }
           if (foundData.email) {
             setEmail(foundData.email);
@@ -257,7 +257,7 @@ export default function RegistrationModal({ isOpen, onClose, people = [] }) {
         setIsExistingUser(true);
         if (matched.Organization) setOrganization(matched.Organization);
         const matchedVendor = matched.VendorID || matched['Vendor ID'] || matched.vendor_id || matched.vendorId || '';
-        if (matchedVendor) setVendorId(matchedVendor);
+        if (matchedVendor) setVendorId(stripVendorZeros(matchedVendor));
         if (matched.Email) setEmail(matched.Email);
         if (matched.ResponsibleZipcode) {
           setZipcode(matched.ResponsibleZipcode);
@@ -413,9 +413,9 @@ export default function RegistrationModal({ isOpen, onClose, people = [] }) {
       UserName: username.trim(),
       password: password.trim(),
       Password: password.trim(),
-      vendor_id: vendorId.trim(),
-      vendorId: vendorId.trim(),
-      VendorID: vendorId.trim(),
+      vendor_id: stripVendorZeros(vendorId),
+      vendorId: stripVendorZeros(vendorId),
+      VendorID: stripVendorZeros(vendorId),
       email: email.trim(),
       Email: email.trim(),
       organization: organization.trim(),
@@ -648,6 +648,11 @@ export default function RegistrationModal({ isOpen, onClose, people = [] }) {
                       onChange={(e) => {
                         setVendorId(e.target.value);
                         setLblMsg({ text: '', type: '' });
+                      }}
+                      onBlur={() => {
+                        if (vendorId) {
+                          setVendorId(stripVendorZeros(vendorId));
+                        }
                       }}
                       disabled={!apiVerified}
                     />

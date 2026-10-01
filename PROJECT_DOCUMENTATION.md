@@ -1512,3 +1512,15 @@ if any(k in desc for k in ["ถึงที่ทำการปลายทา�
 - **การแสดงผลในเมนูดรอปดาวน์ผู้ใช้งาน (`user-dropdown-badges`)**:
   - เพิ่มป้าย `Vendor: [เลขที่ตัดศูนย์แล้ว]` ในส่วนหัวข้อมูลผู้ใช้ พร้อม Tooltip ระบุรหัสเต็ม ป้องกันความสับสน
 
+## 70. กำหนดข้อความ "Vendor : " ด้านหน้าเลข Vendor และตัดเลข 0 ด้านหน้าของ Vendor ID ทุกแห่งทั้งระบบ (v2026.1001.1935)
+- **การแสดงผลบนป้ายผู้ใช้งาน (`Navbar.jsx`)**:
+  - กำหนดให้มีข้อความ `"Vendor : "` นำหน้าตัวเลข Vendor เสมอ เช่น `Vendor : 212876` บนบรรทัดที่ 2 แทน `DOL`
+  - ปรับ Tooltip และป้ายชิปในเมนูดรอปดาวน์เป็นรูปแบบ `Vendor : {strippedVendor}`
+- **การตัดเลข 0 ด้านหน้า Vendor ID ทุกแห่งทั้งระบบ (Global Leading Zero Stripping)**:
+  - **`parseCsv.js`**: ใช้ฟังก์ชัน `stripVendorZeros` ตัดเลข 0 ด้านหน้าตั้งแต่ระดับ Ingestion ของ CSV จาก Google Sheet
+  - **`AdminManagementView.jsx`**: ตารางผู้ใช้งานในคอลัมน์ "Vendor ID", ป๊อปอัปแก้ไขผู้ใช้งาน (Edit Modal), ช่องค้นหา และการบันทึกข้อมูล ตัดเลข 0 ด้านหน้าทั้งหมด
+  - **`RegistrationModal.jsx`**: การดึงข้อมูลผู้ใช้เดิมมาเติมในฟอร์ม (Auto-populate), ช่องพิมพ์ และคำขอส่งข้อมูลลงทะเบียนตัดเลข 0 ด้านหน้า
+  - **Backend API (`api/index.py` & `api.js`)**: Endpoint `/api/admin/users` และการส่งออกรายงาน Excel/CSV ฟอร์แมตหมายเลข Vendor ให้ไม่มีเลข 0 นำหน้า
+  - **Apps Script (`google_apps_script_vendor_setup.js`)**: ตัดเลข 0 ด้านหน้าก่อนบันทึกลงในคอลัมน์ R (18) ของ Google Sheet
+
+

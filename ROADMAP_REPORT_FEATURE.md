@@ -503,3 +503,8 @@
   - มีระบบ Fallback แสดงสถานะสิทธิ์เดิมหากยังไม่มีการกำหนดเลข Vendor
   - ปรับปรุงการแสดงผลชิปในเมนูดรอปดาวน์ผู้ใช้งาน (`user-dropdown-badges`)
 
+- [x] **4.90 กำหนดข้อความ "Vendor : " ด้านหน้าเลข Vendor และตัดเลข 0 ด้านหน้าของ Vendor ID ทุกแห่งทั้งระบบ (v2026.1001.1935)**
+  - เพิ่มข้อความ `"Vendor : "` นำหน้าหมายเลข Vendor บนบรรทัดที่ 2 ของป้ายผู้ใช้งานใน Navbar (เช่น `Vendor : 212876`)
+  - สร้างและใช้งานฟังก์ชัน `stripVendorZeros` เพื่อตัดเลข 0 ด้านหน้าของ Vendor ID ในทุกจุดของระบบ (Navbar, Admin Table, Edit Modal, Registration Modal, Export Excel/CSV, และ Google Sheet Sync)
+
+

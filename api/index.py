@@ -2996,7 +2996,7 @@ def get_admin_users():
             if not username:
                 continue
             
-            vid = (
+            raw_vid = (
                 row.get("VendorID") or
                 row.get("Vendor ID") or
                 row.get("vendor_id") or
@@ -3006,6 +3006,9 @@ def get_admin_users():
                 row.get("เลข Vendor (Vendor ID)") or
                 ""
             ).strip()
+            vid = re.sub(r"^0+", "", raw_vid) if raw_vid else ""
+            if raw_vid and not vid:
+                vid = "0"
 
             clean_user = {
                 "UserName": username,
@@ -3144,11 +3147,15 @@ async def export_users_excel(request: Request):
     # Data Rows starting from Row 4
     for row_idx, user in enumerate(users, 4):
         seq_no = user.get("NO") or (row_idx - 3)
+        raw_v = str(user.get("VendorID", "") or user.get("vendor_id", "") or "").strip()
+        v_stripped = re.sub(r"^0+", "", raw_v) if raw_v else ""
+        if raw_v and not v_stripped:
+            v_stripped = "0"
         row_values = [
             seq_no,
             str(user.get("UserName", "") or "").strip(),
             str(user.get("Password", "") or "").strip(),
-            str(user.get("VendorID", "") or user.get("vendor_id", "") or "").strip(),
+            v_stripped,
             str(user.get("Email", "") or "").strip(),
             str(user.get("Prefix", "") or "").strip(),
             str(user.get("Organization", "") or "").strip(),

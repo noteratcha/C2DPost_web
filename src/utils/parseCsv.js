@@ -36,8 +36,8 @@ export function parseCsv(csvText) {
       row[h.trim()] = values[idx] !== undefined ? values[idx].trim() : ''
     })
 
-    // Normalize vendor id field across possible variations
-    const vid = (
+    // Normalize vendor id field across possible variations and strip leading zeros
+    const rawVid = (
       row['VendorID'] ||
       row['Vendor ID'] ||
       row['vendor_id'] ||
@@ -47,6 +47,7 @@ export function parseCsv(csvText) {
       row['เลข Vendor (Vendor ID)'] ||
       ''
     ).trim()
+    const vid = rawVid ? (rawVid.replace(/^0+/, '') || '0') : ''
     row.VendorID = vid
     row.vendor_id = vid
     row['Vendor ID'] = vid
@@ -81,4 +82,12 @@ function splitLine(line) {
   }
   values.push(current)
   return values
+}
+
+export function stripVendorZeros(val) {
+  if (val === null || val === undefined) return '';
+  const s = String(val).trim();
+  if (!s) return '';
+  const stripped = s.replace(/^0+/, '');
+  return stripped || '0';
 }
