@@ -512,5 +512,11 @@
   - ปรับขนาด `max-width` ของ `.user-dropdown-po-chip` เป็น `190px` ใน `Navbar.css` ป้องกันการถูกตัดทอนข้อความ
   - ปรับปรุงข้อมูล Mock Fixtures ใน `App.jsx` ให้ครอบคลุมทั้งชื่อที่ทำการและรหัสไปรษณีย์
 
+- [x] **4.92 ปรับขยาย Timeout เป็น 120 วินาที พร้อมเพิ่ม Vercel maxDuration (v2026.1002.0635)**
+  - ขยายเวลา Timeout ของคำขอดึงรายงานรับฝาก e-Parcel (`getAllOrderReceived`) ใน `api/index.py` จาก 20s เป็น 120s
+  - กำหนด `"functions": { "api/index.py": { "maxDuration": 120 } }` ใน `vercel.json`
+  - ปรับปรุง Exception Handler แจ้งเตือนภาษาไทยเมื่อเกิดกรณี Timeout
+
+
 
 

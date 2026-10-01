@@ -646,7 +646,7 @@ def _fetch_received_report_payload(req_date, req_end_date, req_username, req_pas
                     url,
                     headers={"Content-Type": "application/json"},
                     auth=HTTPBasicAuth(username, password),
-                    timeout=20,
+                    timeout=120,
                     verify=False
                 )
                 if response.status_code == 401:
@@ -673,7 +673,10 @@ def _fetch_received_report_payload(req_date, req_end_date, req_username, req_pas
                         return {"items": []}
                 return {"items": [], "error": f"API ตอบกลับสถานะ {response.status_code}"}
             except Exception as e:
-                return {"items": [], "error": f"การเชื่อมต่อ e-Parcel ล้มเหลว ({d_str}): {str(e)}"}
+                err_str = str(e)
+                if "Read timed out" in err_str:
+                    return {"items": [], "error": f"การเชื่อมต่อ e-Parcel ล้มเหลว ({d_str}): ระบบไปรษณีย์ไทยใช้เวลาประมวลผลนานเกินกำหนด (เกิน 120 วินาที) เนื่องจากมีข้อมูลปริมาณมาก กรุณารอสักครู่แล้วกด 'อัปเดตข้อมูล' ใหม่อีกครั้ง ({err_str})"}
+                return {"items": [], "error": f"การเชื่อมต่อ e-Parcel ล้มเหลว ({d_str}): {err_str}"}
 
         workers = min(len(target_dates), 5)
         with ThreadPoolExecutor(max_workers=workers) as executor:

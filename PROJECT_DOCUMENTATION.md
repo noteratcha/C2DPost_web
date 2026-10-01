@@ -1534,5 +1534,14 @@ if any(k in desc for k in ["ถึงที่ทำการปลายทา�
 - **ข้อมูลผู้ใช้งานจำลอง (`App.jsx`)**:
   - เพิ่ม `ResponsiblePostoffice: 'ปณ.เรณูนคร'` และ `ResponsibleZipcode: '48170'` ใน Demo User Fixture และ `ศป.ขอนแก่น 40000` ใน Admin User Fixture
 
+## 72. ขยายค่า Timeout เป็น 120 วินาที พร้อมเพิ่ม Vercel maxDuration รองรับหน่วยงานขนาดใหญ่ (v2026.1002.0635)
+- **การขยาย Timeout รายงานรับฝาก e-Parcel (`api/index.py`)**:
+  - ปรับขยายค่า `timeout` ของคำขอ `requests.get` ไปยัง `https://r_dservice.thailandpost.com/webservice/getAllOrderReceived` จากเดิม `20` วินาที เป็น `120` วินาที (2 นาทีเต็ม)
+  - รองรับบัญชีหน่วยงานขนาดใหญ่ที่มีปริมาณข้อมูลพัสดุและใบสั่งจราจรหลักหมื่นฉบับต่อวัน (เช่น `Royalthai.pol` สำนักงานตำรวจแห่งชาติ) ซึ่งฐานข้อมูลของไปรษณีย์ไทยต้องใช้เวลาประมวลผลและสร้าง JSON นานกว่าปกติ
+  - ปรับปรุงการจัดการ Exception เมื่อเกิด `Read timed out` ให้แสดงข้อความแจ้งเตือนภาษาไทยที่เข้าใจง่ายและแนะนำให้ผู้ใช้กด "อัปเดตข้อมูล" ซ้ำ
+- **การกำหนด Vercel Serverless Function Timeout (`vercel.json`)**:
+  - เพิ่มการตั้งค่า `"functions": { "api/index.py": { "maxDuration": 120 } }` เพื่อเปิดเพดานการทำงานของฟังก์ชัน Serverless บน Vercel ให้รอได้เต็ม 120 วินาทีโดยไม่ถูกตัดสายด้วย Gateway Timeout
+
+
 
 
