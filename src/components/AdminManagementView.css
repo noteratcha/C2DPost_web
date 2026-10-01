@@ -830,6 +830,16 @@
   letter-spacing: 0.5px;
 }
 
+.col-vendor {
+  font-family: monospace;
+  font-weight: 600;
+  color: #059669;
+}
+
+:root[data-theme="dark"] .col-vendor {
+  color: #34d399;
+}
+
 .status-tag {
   display: inline-flex;
   align-items: center;

@@ -1425,3 +1425,59 @@ if any(k in desc for k in ["ถึงที่ทำการปลายทา�
    - **`DepositReportModal.css` & `TrackingTimelineModal.css`**: ปรับ `.stat-card-unit` (`#94a3b8`), `.deposit-loading-cell p` (`#94a3b8`), `.empty-desc` (`#94a3b8`), จุดสเต็ปนำจ่ายสำเร็จ/รับฝากแล้ว/มีเหตุขัดข้องเป็นสีขาวสดใส
    - **`PreviewGrid.css`**: ปรับ `.stat-label-item` (`#cbd5e1`), `.python-parity-table td` (`#cbd5e1`), `.empty-table-state h4` (`#f8fafc`), `.chk-box-badge` (`#94a3b8`)
    - **`SupportedDocsModal.css`, `Navbar.css`, `ThailandMap.css`, `AdminManagementView.css`, `RegistrationModal.css`, `LoginModal.css`, `App.css`**: ปรับข้อความตัวอักษร ป้ายเมนู คำอธิบาย และข้อความตัวอย่างทั้งหมดให้มี Contrast สูง อ่านง่าย สบายตา
+
+---
+
+## 65. การเพิ่มช่องกรอก "เลข Vendor (Vendor ID)" ในฟอร์มลงทะเบียนขอสิทธิ์ (v2026.1001.1722)
+
+### 65.1 ความต้องการและปัญหาที่พบ
+- ในระบบไปรษณีย์ไทย (e-Parcel Webservice API) ไม่มี Endpoint สำหรับ query คืนค่า "เลข Vendor ID" ให้แก่ Client โดยตรง (คำว่า Vendor ID ปรากฏเฉพาะใน Error Template เช่น "Vendor ID not found" หรือ "Merchant id does not match Vendor id")
+- ผู้ใช้งานจึงเลือกแนวทาง: **เพิ่มช่องให้กรอก "เลข Vendor (Vendor ID)" ในฟอร์มลงทะเบียน (`RegistrationModal.jsx`)** เพื่อให้หน่วยงานระบุรหัสผู้ฝากส่ง/คู่ค้าที่ได้รับจากไปรษณีย์ไทย (เช่น `10000001`) และส่งไปบันทึกลงในระบบ
+
+### 65.2 การออกแบบและการนำไปปฏิบัติ (Implementation Architecture)
+1. **Frontend (`RegistrationModal.jsx`)**:
+   - เพิ่ม State `vendorId` สำหรับรองรับการพิมพ์เลข Vendor
+   - จัดวางใน Section 2 (ข้อมูลหน่วยงาน) ควบคู่กับช่อง Email ในรูปแบบ `.reg-row` (2 คอลัมน์ Responsive)
+   - ส่งค่า `vendor_id` และ `vendorId` ไปยัง Backend API `/api/register_user`
+   - ล้างค่า `vendorId` อัตโนมัติเมื่อส่งข้อมูลสำเร็จหรือเปิด-ปิด Modal
+2. **Backend API (`api/index.py`)**:
+   - ปรับปรุงคลาส `RegisterUserRequest` ให้รองรับ `vendor_id: Optional[str] = ""`
+   - ฟอร์เวิร์ดค่า `vendor_id` ใน `form_data` ไปยัง Google Apps Script Web App ของระบบลงทะเบียน
+3. **Admin Management (`AdminManagementView.jsx`)**:
+   - รองรับฟิลด์ `VendorID` ใน State, ช่องค้นหาผู้ใช้ และ Modal แก้ไข/เพิ่มผู้ใช้ใหม่ เพื่อให้ผู้ดูแลระบบตรวจสอบและอัปเดตเลข Vendor ได้อย่างสะดวก
+
+---
+
+## 66. การจัดเก็บ Vendor ID ในฐานข้อมูล Google Sheets และคอลัมน์แสดงผลระบบจัดการแอดมิน (v2026.1001.1737)
+
+### 66.1 สถาปัตยกรรมการจัดเก็บในฐานข้อมูล Google Sheets (`LoginC2DPost`)
+- **ไฟล์ฐานข้อมูล**: `LoginC2DPost.gsheet` (Spreadsheet ID: `1hiWww6BI7NCTAw3Ai3CjbzS8TWdIX2AAOj7P_2BxMcQ`)
+- **โครงสร้างคอลัมน์ที่เพิ่มใหม่**: กำหนดให้บันทึก `VendorID` ใน **คอลัมน์ R (Column 18)**
+  - *เหตุผลสำคัญ*: เพื่อรักษา Backward Compatibility 100% ต่อสคริปต์เดิมทุกตัว (ทั้งระบบเดสก์ท็อป Python `gui.py`, `convert_dpost.py` และ Google Apps Script เดิม) โดยไม่กระทบคอลัมน์ A ถึง Q (1-17) เดิม
+  - *ระบบโหลดอัตโนมัติ*: ระบบ `parseCsv.js` ของ C2DPost Web ทำการ Mapping Dynamic Header จากบรรทัดแรกของ Sheet ทำให้เมื่อเพิ่มหัวคอลัมน์ `VendorID` ในคอลัมน์ R แล้ว ข้อมูลจะกลายเป็น `person.VendorID` ทันทีโดยไม่ต้องแก้โค้ดโหลดข้อมูล
+
+### 66.2 การแสดงผลและการส่งออกข้อมูล (Display & Export Integration)
+1. **Admin Management View (`AdminManagementView.jsx`)**:
+   - เพิ่มคอลัมน์ `<th style={{ width: '100px' }}>Vendor ID</th>` บนหัวตาราง
+   - แสดงผล `<td className="col-vendor">{person.VendorID || person.vendor_id || '-'}</td>` ด้วยฟอนต์โมโนสเปซและโทนสีเขียวโมเดิร์น
+   - อัปเดต `colSpan="13"` สำหรับแถวสถานะว่างเปล่าและกำลังโหลด
+2. **การส่งออก Excel ทางการ (`api/index.py` & `src/utils/api.js`)**:
+   - ปรับปรุงฟังก์ชัน `export_users_excel` ใน Backend API เพิ่มคอลัมน์ `("เลข Vendor (Vendor ID)", 20, "center")` ขยายหัวตารางเป็น `A1:R1` พร้อมจัดรูปแบบเซลล์ข้อความ (`@`) ป้องกันการตัดเลขศูนย์นำหน้า
+   - ปรับปรุงฟังก์ชัน `exportAdminUsersExcel` Client Fallback ใน `src/utils/api.js` เพิ่มหัวคอลัมน์ `Vendor ID` และการส่งออกค่า CSV อย่างสมบูรณ์
+
+### 66.3 การเชื่อมต่อ Admin Web App Deployment URL ใหม่ (v2026.1001.1758)
+- อัปเดต `SCRIPT_URL` ใน `api/index.py` สำหรับรับคำสั่งแก้ไข/เพิ่มผู้ใช้พร้อมบันทึก `VendorID` ลงคอลัมน์ R
+
+### 66.4 การเชื่อมต่อ Google Apps Script Web App Deployment URL ล่าสุดและระบบลงทะเบียน (v2026.1001.1815)
+- **Deployment URL ใหม่**: `https://script.google.com/macros/s/AKfycbwi9khFasbC7RYgsFya_pwTgOI-3B7jp2VIyoY_OVFV58ukjo1jyN_zKcQGfmxm1_8/exec`
+- **Frontend Registration (`RegistrationModal.jsx`)**:
+  - อัปเดต `SCRIPT_REGISTER_URL` ชี้ไปยัง Web App URL ใหม่
+  - เสริมการส่งข้อมูลใน Payload ให้รองรับทั้งคีย์ตัวพิมพ์เล็ก-ใหญ่ (`VendorID`, `Organization`, `ResponsiblePostoffice`, `ResponsibleZipcode`, `ContactPerson1`, ฯลฯ) ครอบคลุมทั้งกรณีส่งผ่าน Backend Proxy และ Direct Fallback
+- **Backend API (`api/index.py`)**:
+  - อัปเดตฟังก์ชัน `register_user` เชื่อมต่อไปยัง Deployment URL ใหม่
+  - เพิ่มระบบตรวจสอบชื่อผู้ใช้ซ้ำ (Pre-check duplicate username) จาก Google Sheet CSV ก่อนส่งข้อมูล เพื่อป้องกันการบันทึกทับผู้ใช้เดิม
+  - อัปเดต `admin_update_user` ใช้งาน Deployment URL ใหม่ รองรับทั้ง JSON Response และการบันทึก Vendor ID ลงคอลัมน์ R (คอลัมน์ที่ 18)
+
+
+
+

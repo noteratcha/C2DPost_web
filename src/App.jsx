@@ -336,6 +336,7 @@ export default function App() {
         UserName: 'admin',
         Password: 'admin_password',
         Prefix: 'ADM',
+        VendorID: '10000000',
         Organization: 'ส่วน ทข.ปข.10 (ผู้ดูแลระบบกลาง)',
         Status: 'ADMIN'
       };
@@ -345,6 +346,7 @@ export default function App() {
         UserName: 'renu_officer',
         Password: 'demo_password',
         Prefix: 'RN',
+        VendorID: '10000001',
         Organization: 'สำนักงานที่ดินจังหวัดนครพนม สาขาเรณูนคร',
         Status: 'DOL'
       };

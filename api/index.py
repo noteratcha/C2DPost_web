@@ -49,6 +49,8 @@ class VerifyUserRequest(BaseModel):
 class RegisterUserRequest(BaseModel):
     username: str
     password: str
+    vendor_id: Optional[str] = ""
+    vendorId: Optional[str] = ""
     email: str
     organization: str
     zipcode: str
@@ -2802,49 +2804,87 @@ def verify_user(req: VerifyUserRequest):
 @app.post("/api/register_user")
 def register_user(req: RegisterUserRequest):
     import requests
-    url = "https://script.google.com/macros/s/AKfycbwulS3437Gqf8tM_5pjYQhPfcSqcUNwM-PoKxjzw4cWL5FRCszE7VFDUKFuHEGYQg/exec"
-    form_data = {
-        "username": req.username.strip(),
-        "password": req.password.strip(),
-        "email": req.email.strip(),
-        "organization": req.organization.strip(),
-        "zipcode": req.zipcode.strip(),
-        "postoffice": req.postoffice.strip(),
-        "contact1": req.contact1.strip(),
-        "tel1": req.tel1.strip(),
-        "contact2": (req.contact2 or "").strip(),
-        "tel2": (req.tel2 or "").strip(),
-        "contact3": (req.contact3 or "").strip(),
-        "tel3": (req.tel3 or "").strip(),
-        "pdpa": req.pdpa or "Yes"
+    target_user = req.username.strip()
+    vendor_val = (req.vendor_id or req.vendorId or "").strip()
+
+    # Pre-check duplicate username in Google Sheet to avoid overwriting existing profiles
+    sheet_csv_url = "https://docs.google.com/spreadsheets/d/1hiWww6BI7NCTAw3Ai3CjbzS8TWdIX2AAOj7P_2BxMcQ/export?format=csv"
+    try:
+        sc = requests.get(sheet_csv_url, timeout=5)
+        if sc.status_code == 200:
+            lines = sc.text.splitlines()
+            for line in lines[1:]:
+                parts = line.split(",")
+                if parts and parts[0].strip().lower() == target_user.lower():
+                    return {
+                        "success": False,
+                        "error": "duplicate_username",
+                        "message": "❌ Username นี้ มีการลงทะเบียนแล้ว"
+                    }
+    except Exception:
+        pass
+
+    url = "https://script.google.com/macros/s/AKfycbwi9khFasbC7RYgsFya_pwTgOI-3B7jp2VIyoY_OVFV58ukjo1jyN_zKcQGfmxm1_8/exec"
+    payload = {
+        "action": "update_user",
+        "username": target_user,
+        "UserName": target_user,
+        "Password": req.password.strip(),
+        "Email": req.email.strip(),
+        "Prefix": "",
+        "Organization": req.organization.strip(),
+        "ResponsiblePostoffice": req.postoffice.strip(),
+        "ResponsibleZipcode": req.zipcode.strip(),
+        "ActivationDate": datetime.now().strftime("%d/%m/%Y"),
+        "ContactPerson1": req.contact1.strip(),
+        "TelContactPerson1": req.tel1.strip(),
+        "ContactPerson2": (req.contact2 or "").strip(),
+        "TelContactPerson2": (req.tel2 or "").strip(),
+        "ContactPerson3": (req.contact3 or "").strip(),
+        "TelContactPerson3": (req.tel3 or "").strip(),
+        "Status": "DOL",
+        "TypeBarcode": "EMS",
+        "Agree": req.pdpa or "Yes",
+        "VendorID": vendor_val,
+        "vendor_id": vendor_val,
+        "vendorId": vendor_val
     }
     try:
-        r = requests.post(url, data=form_data, timeout=15, allow_redirects=False)
+        r = requests.post(url, json=payload, timeout=20, allow_redirects=False)
         if r.status_code in (301, 302, 303, 307):
             redirect_url = r.headers.get("Location", "")
             if redirect_url:
-                r = requests.get(redirect_url, timeout=15)
-        result = r.text.strip()
-        if result == "SUCCESS":
-            return {"success": True, "result": "SUCCESS"}
-        elif result.startswith("<!DOCTYPE html>") or "<html" in result.lower():
-            return {
-                "success": False,
-                "error": "server_rejected",
-                "message": "เซิร์ฟเวอร์ Google Apps Script ปฏิเสธการทำงาน (โปรดตรวจสอบการกำหนดสิทธิ์ Web App)"
-            }
-        elif "มีคนใช้แล้ว" in result or "Username นี้" in result:
-            return {
-                "success": False,
-                "error": "duplicate_username",
-                "message": "❌ Username นี้ มีการลงทะเบียนแล้ว"
-            }
-        else:
-            return {
-                "success": False,
-                "error": "unknown",
-                "message": f"ระบบตอบกลับ: {result}"
-            }
+                r = requests.get(redirect_url, timeout=20)
+        try:
+            res_json = r.json()
+            if res_json.get("status") == "success" or res_json.get("result") == "SUCCESS":
+                return {"success": True, "result": "SUCCESS", "message": res_json.get("message", "ลงทะเบียนสำเร็จ")}
+            elif "มีคนใช้แล้ว" in str(res_json) or "Username นี้" in str(res_json):
+                return {"success": False, "error": "duplicate_username", "message": "❌ Username นี้ มีการลงทะเบียนแล้ว"}
+            else:
+                return {"success": False, "error": "unknown", "message": res_json.get("message", "การลงทะเบียนไม่สำเร็จ")}
+        except:
+            result = r.text.strip()
+            if result == "SUCCESS":
+                return {"success": True, "result": "SUCCESS"}
+            elif result.startswith("<!DOCTYPE html>") or "<html" in result.lower():
+                return {
+                    "success": False,
+                    "error": "server_rejected",
+                    "message": "เซิร์ฟเวอร์ Google Apps Script ปฏิเสธการทำงาน (โปรดตรวจสอบการกำหนดสิทธิ์ Web App)"
+                }
+            elif "มีคนใช้แล้ว" in result or "Username นี้" in result:
+                return {
+                    "success": False,
+                    "error": "duplicate_username",
+                    "message": "❌ Username นี้ มีการลงทะเบียนแล้ว"
+                }
+            else:
+                return {
+                    "success": False,
+                    "error": "unknown",
+                    "message": f"ระบบตอบกลับ: {result}"
+                }
     except Exception as e:
         return {
             "success": False,
@@ -2859,7 +2899,7 @@ async def admin_update_user(request: Request):
     to avoid browser CORS restrictions.
     """
     import requests
-    SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwxNG-AHRfeR8FiY9AYQ-uqQeCjwerT2rRIcXFfAy5JIrEHzfYb8CERcLl9vukKf6ch/exec"
+    SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwi9khFasbC7RYgsFya_pwTgOI-3B7jp2VIyoY_OVFV58ukjo1jyN_zKcQGfmxm1_8/exec"
     try:
         data = await request.json()
         if "action" not in data:
@@ -2907,6 +2947,7 @@ async def export_users_excel(request: Request):
         ("ลำดับ", 8, "center"),
         ("ชื่อผู้ใช้ (UserName)", 22, "center"),
         ("รหัสผ่าน (Password)", 18, "center"),
+        ("เลข Vendor (Vendor ID)", 20, "center"),
         ("อีเมล (Email)", 28, "left"),
         ("คำนำหน้ารหัส (Prefix)", 16, "center"),
         ("หน่วยงาน (Organization)", 38, "left"),
@@ -2931,7 +2972,7 @@ async def export_users_excel(request: Request):
     alt_fill = PatternFill(start_color="F8FAFC", end_color="F8FAFC", fill_type="solid")
 
     # Title row in Row 1
-    ws.merge_cells("A1:Q1")
+    ws.merge_cells("A1:R1")
     title_cell = ws["A1"]
     title_cell.value = f"รายชื่อบัญชีผู้ใช้งานระบบ C2DPost Web Edition — ส่วน ทข.ปข.10 (ส่งออก ณ วันที่ {datetime.now().strftime('%d/%m/%Y %H:%M:%S')})"
     title_cell.font = Font(name="Sarabun", size=13, bold=True, color="064E3B")
@@ -2957,6 +2998,7 @@ async def export_users_excel(request: Request):
             seq_no,
             str(user.get("UserName", "") or "").strip(),
             str(user.get("Password", "") or "").strip(),
+            str(user.get("VendorID", "") or user.get("vendor_id", "") or "").strip(),
             str(user.get("Email", "") or "").strip(),
             str(user.get("Prefix", "") or "").strip(),
             str(user.get("Organization", "") or "").strip(),
@@ -2980,7 +3022,7 @@ async def export_users_excel(request: Request):
             align_mode = columns[col_idx - 1][2]
             cell.alignment = Alignment(horizontal=align_mode, vertical="center")
             # Preserve leading zero numbers as text format
-            if col_idx in (2, 3, 5, 8, 11, 13, 15):
+            if col_idx in (2, 3, 4, 6, 9, 12, 14, 16):
                 cell.number_format = '@'
             if is_even:
                 cell.fill = alt_fill

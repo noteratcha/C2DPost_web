@@ -465,3 +465,27 @@
     - `TrackingInquiryView.css` & `TrackingTimelineModal.css`: ป้ายกำกับไทม์ไลน์, ป้ายผู้ลงนาม, จุด Stepper Dots ไอคอนขาวบริสุทธิ์
     - `PreviewGrid.css`, `Navbar.css`, `ThailandMap.css`, `SupportedDocsModal.css`, `RegistrationModal.css`, `LoginModal.css`, `AdminManagementView.css`, `App.css`
   - **ปรับ Micro-Contrast ของปุ่ม Active และ Badge**: เปลี่ยนสีข้อความ/ไอคอนปุ่มแอคทีฟจาก `#042f2e` เป็น `#ffffff` ชัดเจนทุกสายตา
+
+- [x] **4.83 เพิ่มช่องกรอก "เลข Vendor (Vendor ID)" ในฟอร์มลงทะเบียนขอสิทธิ์ (v2026.1001.1722)**
+  - เพิ่มช่องกรอก `เลข Vendor (Vendor ID)` ใน `RegistrationModal.jsx` (Section 2 ข้อมูลหน่วยงาน) วางเคียงคู่กับช่อง Email แบบ Responsive Grid
+  - เชื่อมโยง State `vendorId` เข้ากับคำขอลงทะเบียน `/api/register_user` และส่งต่อผ่าน Google Apps Script
+  - รองรับฟิลด์ `VendorID` ในหน้าจัดการผู้ใช้ของผู้ดูแลระบบ (`AdminManagementView.jsx`) ทั้งในตาราง ค้นหา และแบบฟอร์มแก้ไข/เพิ่มผู้ใช้ใหม่
+
+- [x] **4.84 เพิ่มคอลัมน์ Vendor ID ในฐานข้อมูล Google Sheets และตารางแอดมินพร้อม Export Excel (v2026.1001.1737)**
+  - กำหนดให้บันทึกฟิลด์ `VendorID` เป็นคอลัมน์ใหม่ใน **Column R (ลำดับที่ 18)** ของ Google Sheet `LoginC2DPost` รักษาความเข้ากันได้ 100% กับสคริปต์เดิมทุกตัว
+  - เพิ่มคอลัมน์ `Vendor ID` ในตาราง Admin Management (`AdminManagementView.jsx`) พร้อมปรับปรุง `colSpan="13"` สำหรับ Empty/Loading states และจัดสไตล์ `.col-vendor` สีเขียวโมเดิร์น
+  - อัปเดตฟังก์ชันส่งออก Excel ใน `api/index.py` (`export_users_excel`) และ `src/utils/api.js` (`exportAdminUsersExcel`) ให้รองรับคอลัมน์ `Vendor ID` อย่างสมบูรณ์
+
+- [x] **4.85 ปรับปรุงการเชื่อมต่อ Deployment Web App URL ใหม่ของระบบ Admin (v2026.1001.1758)**
+  - สลับ `SCRIPT_URL` ใน `api/index.py` สำหรับเชื่อมต่อ Web App
+  - เพิ่มฟังก์ชัน `doPost(e)` เป็น Entrypoint มาตรฐานใน Apps Script ให้เรียกใช้งานได้ถูกต้อง
+
+- [x] **4.86 อัปเดต Deployment Web App URL ล่าสุด และบูรณาการระบบลงทะเบียนขอสิทธิ์ (v2026.1001.1815)**
+  - สลับ `SCRIPT_REGISTER_URL` ใน `RegistrationModal.jsx` และ `SCRIPT_URL` ใน `api/index.py` เป็น `https://script.google.com/macros/s/AKfycbwi9khFasbC7RYgsFya_pwTgOI-3B7jp2VIyoY_OVFV58ukjo1jyN_zKcQGfmxm1_8/exec`
+  - ปรับปรุง Payload การลงทะเบียนรองรับทั้ง TitleCase และ camelCase (`VendorID`, `Organization`, `ResponsiblePostoffice`, `ResponsibleZipcode`, ฯลฯ)
+  - เพิ่มระบบตรวจจับผู้ใช้ซ้ำ (Pre-check duplicate username) ใน Backend API ก่อนส่งข้อมูล ป้องกันการเขียนทับบัญชีเดิม
+  - ทดสอบการเชื่อมต่อ Live Roundtrip บันทึก VendorID ลงคอลัมน์ 18 (R) สำเร็จ 100%
+
+
+
+

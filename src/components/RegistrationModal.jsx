@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './RegistrationModal.css';
 
-const SCRIPT_REGISTER_URL = 'https://script.google.com/macros/s/AKfycbwulS3437Gqf8tM_5pjYQhPfcSqcUNwM-PoKxjzw4cWL5FRCszE7VFDUKFuHEGYQg/exec';
+const SCRIPT_REGISTER_URL = 'https://script.google.com/macros/s/AKfycbwi9khFasbC7RYgsFya_pwTgOI-3B7jp2VIyoY_OVFV58ukjo1jyN_zKcQGfmxm1_8/exec';
 const POSTOFFICE_CSV_URL = 'https://docs.google.com/spreadsheets/d/12tt2MBVqBRMzoqfCjskt_Aft-SUGVMs7uH1Endp2cQI/export?format=csv';
 
 let postOfficeCache = null;
@@ -20,6 +20,7 @@ export default function RegistrationModal({ isOpen, onClose }) {
   // Section 2: ข้อมูลหน่วยงาน
   const [organization, setOrganization] = useState('');
   const [errOrg, setErrOrg] = useState('');
+  const [vendorId, setVendorId] = useState('');
   const [email, setEmail] = useState('');
   const [errEmail, setErrEmail] = useState('');
   const [zipcode, setZipcode] = useState('');
@@ -58,6 +59,7 @@ export default function RegistrationModal({ isOpen, onClose }) {
       setVerifyingApi(false);
       setVerifyStatus({ text: '', type: '' });
       setShowPassword(false);
+      setVendorId('');
     } else {
       if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
       setCountdown(null);
@@ -251,19 +253,36 @@ export default function RegistrationModal({ isOpen, onClose }) {
     setBtnSubmitText('กำลังส่งข้อมูล...');
 
     const payload = {
+      action: 'register',
       username: username.trim(),
+      UserName: username.trim(),
       password: password.trim(),
+      Password: password.trim(),
+      vendor_id: vendorId.trim(),
+      vendorId: vendorId.trim(),
+      VendorID: vendorId.trim(),
       email: email.trim(),
+      Email: email.trim(),
       organization: organization.trim(),
+      Organization: organization.trim(),
       zipcode: zipcode.trim(),
+      ResponsibleZipcode: zipcode.trim(),
       postoffice: postoffice.trim(),
+      ResponsiblePostoffice: postoffice.trim(),
       contact1: contact1.trim(),
+      ContactPerson1: contact1.trim(),
       tel1: tel1.trim(),
+      TelContactPerson1: tel1.trim(),
       contact2: contact2.trim(),
+      ContactPerson2: contact2.trim(),
       tel2: tel2.trim(),
+      TelContactPerson2: tel2.trim(),
       contact3: contact3.trim(),
+      ContactPerson3: contact3.trim(),
       tel3: tel3.trim(),
-      pdpa: chkPdpa ? 'Yes' : 'No'
+      TelContactPerson3: tel3.trim(),
+      pdpa: chkPdpa ? 'Yes' : 'No',
+      Agree: chkPdpa ? 'Yes' : 'No'
     };
 
     try {
@@ -319,6 +338,7 @@ export default function RegistrationModal({ isOpen, onClose }) {
     // Clear fields
     setUsername('');
     setPassword('');
+    setVendorId('');
     setOrganization('');
     setEmail('');
     setZipcode('');
@@ -456,18 +476,35 @@ export default function RegistrationModal({ isOpen, onClose }) {
                   />
                 </div>
 
-                <div className="reg-field">
-                  <label htmlFor="reg-email">Email (อีเมล) *</label>
-                  <input
-                    id="reg-email"
-                    type="email"
-                    className={`reg-input ${errEmail ? 'border-red' : ''}`}
-                    placeholder="(เช่น example@domain.com)"
-                    value={email}
-                    onChange={(e) => handleEmailChange(e.target.value)}
-                    disabled={!apiVerified}
-                  />
-                  {errEmail && <span className="reg-err-text">{errEmail}</span>}
+                <div className="reg-row">
+                  <div className="reg-field">
+                    <label htmlFor="reg-vendor">เลข Vendor (Vendor ID)</label>
+                    <input
+                      id="reg-vendor"
+                      type="text"
+                      className="reg-input"
+                      placeholder="(รหัสคู่ค้า/ผู้ฝากส่ง เช่น 10000001)"
+                      value={vendorId}
+                      onChange={(e) => {
+                        setVendorId(e.target.value);
+                        setLblMsg({ text: '', type: '' });
+                      }}
+                      disabled={!apiVerified}
+                    />
+                  </div>
+                  <div className="reg-field">
+                    <label htmlFor="reg-email">Email (อีเมล) *</label>
+                    <input
+                      id="reg-email"
+                      type="email"
+                      className={`reg-input ${errEmail ? 'border-red' : ''}`}
+                      placeholder="(เช่น example@domain.com)"
+                      value={email}
+                      onChange={(e) => handleEmailChange(e.target.value)}
+                      disabled={!apiVerified}
+                    />
+                    {errEmail && <span className="reg-err-text">{errEmail}</span>}
+                  </div>
                 </div>
 
                 <div className="reg-row">

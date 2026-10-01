@@ -23,6 +23,7 @@ export default function AdminManagementView({
   const initialFormState = {
     UserName: '',
     Password: '',
+    VendorID: '',
     Email: '',
     Prefix: '',
     Organization: '',
@@ -91,6 +92,7 @@ export default function AdminManagementView({
     setEditModalData({
       UserName: person.UserName || '',
       Password: person.Password || '',
+      VendorID: person.VendorID || person.vendor_id || '',
       Email: person.Email || '',
       Prefix: person.Prefix || '',
       Organization: person.Organization || '',
@@ -117,6 +119,7 @@ export default function AdminManagementView({
     setEditModalData({
       UserName: '',
       Password: '',
+      VendorID: '',
       Email: '',
       Prefix: '',
       Organization: '',
@@ -243,12 +246,13 @@ export default function AdminManagementView({
       const term = searchTerm.toLowerCase().trim();
 
       const u = (p.UserName || '').toLowerCase();
+      const vid = (p.VendorID || p.vendor_id || '').toLowerCase();
       const org = (p.Organization || '').toLowerCase();
       const po = (p.ResponsiblePostoffice || '').toLowerCase();
       const zip = (p.ResponsibleZipcode || '').toLowerCase();
       const c1 = (p.ContactPerson1 || '').toLowerCase();
 
-      return u.includes(term) || org.includes(term) || po.includes(term) || zip.includes(term) || c1.includes(term);
+      return u.includes(term) || vid.includes(term) || org.includes(term) || po.includes(term) || zip.includes(term) || c1.includes(term);
     });
   }, [people, statusFilter, searchTerm]);
 
@@ -457,6 +461,7 @@ export default function AdminManagementView({
                   <th style={{ width: '50px' }}>NO</th>
                   <th>UserName</th>
                   <th>Password</th>
+                  <th style={{ width: '100px' }}>Vendor ID</th>
                   <th style={{ width: '60px' }}>Prefix</th>
                   <th>หน่วยงาน (Organization)</th>
                   <th>ไปรษณีย์รับผิดชอบ</th>
@@ -471,7 +476,7 @@ export default function AdminManagementView({
               <tbody>
                 {filteredUsers.length === 0 ? (
                   <tr>
-                    <td colSpan="12" className="table-empty-row">
+                    <td colSpan="13" className="table-empty-row">
                       {loadingPeople ? (
                         <div className="table-loading-state">
                           <span className="btn-spinner large"></span>
@@ -512,6 +517,7 @@ export default function AdminManagementView({
                         </td>
 
                         <td className="col-password">{person.Password}</td>
+                        <td className="col-vendor">{person.VendorID || person.vendor_id || '-'}</td>
                         <td className="col-prefix">{person.Prefix || '-'}</td>
                         <td className="col-org" title={person.Organization}>{person.Organization || '-'}</td>
                         <td className="col-po" title={person.ResponsiblePostoffice}>{person.ResponsiblePostoffice || '-'}</td>
@@ -627,13 +633,19 @@ export default function AdminManagementView({
                 </div>
               </div>
 
-              {/* Row 2: Email + Prefix */}
-              <div className="aem-grid-2">
+              {/* Row 2: Email + Vendor ID + Prefix */}
+              <div className="aem-grid-3">
                 <div className="aem-field">
                   <label>Email <span className="req-star">*</span></label>
                   <input className="aem-input" type="email" value={editModalData.Email}
                     placeholder="email@domain.com"
                     onChange={e => handleModalInputChange('Email', e.target.value)} />
+                </div>
+                <div className="aem-field">
+                  <label>Vendor ID (เลข Vendor)</label>
+                  <input className="aem-input" value={editModalData.VendorID || ''}
+                    placeholder="เช่น 10000001"
+                    onChange={e => handleModalInputChange('VendorID', e.target.value)} />
                 </div>
                 <div className="aem-field">
                   <label>Prefix (นำหน้ารหัส) <span className="req-star">*</span></label>
