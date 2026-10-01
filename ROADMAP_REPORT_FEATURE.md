@@ -517,6 +517,12 @@
   - กำหนด `"functions": { "api/index.py": { "maxDuration": 120 } }` ใน `vercel.json`
   - ปรับปรุง Exception Handler แจ้งเตือนภาษาไทยเมื่อเกิดกรณี Timeout
 
+- [x] **4.93 พัฒนาระบบ Auto-Retry อัตโนมัติใน Backend เมื่อเกิด Timeout (v2026.1002.0645)**
+  - พัฒนากลไก Auto-Retry ใน `fetch_date` (`api/index.py`) สูงสุด 2 รอบ (`max_attempts = 2`, `timeout_per_attempt = 55s`)
+  - หน่วงเวลา 1 วินาทีแล้วลองส่งคำขอรอบที่ 2 ทันทีเมื่อเกิด Timeout หรือ Read timed out
+  - ใช้ประโยชน์จากการที่คำขอรอบแรกกระตุ้นให้ฐานข้อมูลไปรษณีย์ไทยเริ่ม Query และสร้างแคชผลลัพธ์ ทำให้คำขอรอบสองดึงข้อมูลสำเร็จได้รวดเร็ว
+
+
 
 
 

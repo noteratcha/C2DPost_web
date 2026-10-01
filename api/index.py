@@ -589,6 +589,7 @@ def _fetch_received_report_payload(req_date, req_end_date, req_username, req_pas
     Returns the normalized payload dict (or JSONResponse for unauthorized).
     """
     import re
+    import time
     from datetime import datetime, timedelta
     from concurrent.futures import ThreadPoolExecutor
     import requests
@@ -640,43 +641,61 @@ def _fetch_received_report_payload(req_date, req_end_date, req_username, req_pas
     
     if username and password and not is_demo_user:
         def fetch_date(d_str):
-            try:
-                url = f"https://r_dservice.thailandpost.com/webservice/getAllOrderReceived?date={d_str}"
-                response = requests.get(
-                    url,
-                    headers={"Content-Type": "application/json"},
-                    auth=HTTPBasicAuth(username, password),
-                    timeout=120,
-                    verify=False
-                )
-                if response.status_code == 401:
-                    return {"unauthorized": True}
-                if response.status_code == 200:
-                    try:
-                        resp_json = response.json()
-                        if isinstance(resp_json, list):
-                            if len(resp_json) > 0 and isinstance(resp_json[0], dict) and resp_json[0].get("errorCode"):
-                                err_detail = str(resp_json[0].get("errorDetail") or "")
+            url = f"https://r_dservice.thailandpost.com/webservice/getAllOrderReceived?date={d_str}"
+            max_attempts = 2
+            timeout_per_attempt = 55
+            last_err = None
+
+            for attempt in range(1, max_attempts + 1):
+                try:
+                    response = requests.get(
+                        url,
+                        headers={"Content-Type": "application/json"},
+                        auth=HTTPBasicAuth(username, password),
+                        timeout=timeout_per_attempt,
+                        verify=False
+                    )
+                    if response.status_code == 401:
+                        return {"unauthorized": True}
+                    if response.status_code == 200:
+                        try:
+                            resp_json = response.json()
+                            if isinstance(resp_json, list):
+                                if len(resp_json) > 0 and isinstance(resp_json[0], dict) and resp_json[0].get("errorCode"):
+                                    err_detail = str(resp_json[0].get("errorDetail") or "")
+                                    if re.search(r"no\s*receive\s*product|no\s*data", err_detail, re.IGNORECASE):
+                                        return {"items": []}
+                                    return {"items": [], "notice": err_detail}
+                                return {"items": resp_json}
+                            elif isinstance(resp_json, dict) and "data" in resp_json and isinstance(resp_json["data"], list):
+                                return {"items": resp_json["data"]}
+                            elif isinstance(resp_json, dict) and resp_json.get("errorCode"):
+                                err_detail = str(resp_json.get("errorDetail") or "")
                                 if re.search(r"no\s*receive\s*product|no\s*data", err_detail, re.IGNORECASE):
                                     return {"items": []}
                                 return {"items": [], "notice": err_detail}
-                            return {"items": resp_json}
-                        elif isinstance(resp_json, dict) and "data" in resp_json and isinstance(resp_json["data"], list):
-                            return {"items": resp_json["data"]}
-                        elif isinstance(resp_json, dict) and resp_json.get("errorCode"):
-                            err_detail = str(resp_json.get("errorDetail") or "")
-                            if re.search(r"no\s*receive\s*product|no\s*data", err_detail, re.IGNORECASE):
-                                return {"items": []}
-                            return {"items": [], "notice": err_detail}
-                        return {"items": []}
-                    except Exception:
-                        return {"items": []}
-                return {"items": [], "error": f"API ตอบกลับสถานะ {response.status_code}"}
-            except Exception as e:
-                err_str = str(e)
-                if "Read timed out" in err_str:
-                    return {"items": [], "error": f"การเชื่อมต่อ e-Parcel ล้มเหลว ({d_str}): ระบบไปรษณีย์ไทยใช้เวลาประมวลผลนานเกินกำหนด (เกิน 120 วินาที) เนื่องจากมีข้อมูลปริมาณมาก กรุณารอสักครู่แล้วกด 'อัปเดตข้อมูล' ใหม่อีกครั้ง ({err_str})"}
-                return {"items": [], "error": f"การเชื่อมต่อ e-Parcel ล้มเหลว ({d_str}): {err_str}"}
+                            return {"items": []}
+                        except Exception:
+                            return {"items": []}
+                    return {"items": [], "error": f"API ตอบกลับสถานะ {response.status_code}"}
+                except Exception as e:
+                    last_err = e
+                    err_str = str(e)
+                    is_timeout = "timed out" in err_str.lower() or isinstance(e, requests.exceptions.Timeout)
+                    if is_timeout and attempt < max_attempts:
+                        # Attempt 1 timed out: Thailand Post database has begun caching the query.
+                        # Wait 1s and retry immediately on attempt 2 to catch the completed cache!
+                        time.sleep(1)
+                        continue
+                    break
+
+            err_str = str(last_err) if last_err else "ไม่ทราบสาเหตุ"
+            if "timed out" in err_str.lower():
+                return {
+                    "items": [],
+                    "error": f"การเชื่อมต่อ e-Parcel ล้มเหลว ({d_str}): ระบบไปรษณีย์ไทยใช้เวลาประมวลผลนานเกินกำหนด (ระบบลองใหม่อัตโนมัติ {max_attempts} ครั้งแล้ว) เนื่องจากมีข้อมูลปริมาณมาก กรุณารอสักครู่แล้วกด 'อัปเดตข้อมูล' ใหม่อีกครั้ง ({err_str})"
+                }
+            return {"items": [], "error": f"การเชื่อมต่อ e-Parcel ล้มเหลว ({d_str}): {err_str}"}
 
         workers = min(len(target_dates), 5)
         with ThreadPoolExecutor(max_workers=workers) as executor:
