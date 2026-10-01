@@ -317,7 +317,7 @@ export async function exportAllFiles(records, files = [], onProgress) {
 
 - **นโยบาย**: ทุกครั้งที่มีการแก้ไขโค้ดหรือปรับปรุงฟีเจอร์ใดๆ **ต้องอัปเดตเลขเวอร์ชันของเว็บทุกครั้ง** ก่อนทำการ Build และ Deploy ขึ้นระบบจริง
 - **รูปแบบเลขเวอร์ชัน**: `vYYYY.MMDD.HHMM` (อิงตามเวลาปัจจุบันในประเทศไทย เช่น `v2026.0914.1135`)
-- **เวอร์ชันล่าสุดคงค้างในงาน**: `v2026.0924.0935` (โฟลเดอร์ซิงก์ร่วม `PROJECT_DOCUMENTATION.md` และ `config.js`)
+- **เวอร์ชันล่าสุดคงค้างในงาน**: `v2026.0918.2157` (โฟลเดอร์ซิงก์ร่วม `PROJECT_DOCUMENTATION.md` และ `config.js`)
 - **ตำแหน่งที่ต้องอัปเดต**:
   1. `src/config.js`:
      ```javascript
@@ -570,9 +570,9 @@ vercel --prod --yes                    # 3. ขึ้น Production + Aliased �
      __version__ = "YYYY.MMDD.HHMM"
      ```
      *(สำคัญอย่างยิ่ง: จุดนี้ขับเคลื่อนค่า `/api/health` และหัวเรื่อง FastAPI Documentation หากไม่อัปเดต การตรวจสอบ API จะยังคงรายงานเวอร์ชันเก่า)*
-  4. `C2DPost_web/PROJECT_DOCUMENTATION.md`: หัวข้อเลขเวอร์ชันและประวัติ (`v2026.0924.0935`)
-  5. `C2DPost_web/ROADMAP_REPORT_FEATURE.md`: เช็กลิสต์เวอร์ชันล่าสุด (`v2026.0924.0935`)
-  6. `.agents/skills/c2dpost-web-workflow/SKILL.md`: ส่วนสรุปเวอร์ชันล่าสุด (`v2026.0924.0935`)
+  4. `C2DPost_web/PROJECT_DOCUMENTATION.md`: หัวข้อเลขเวอร์ชันและประวัติ (`v2026.1001.1722`)
+  5. `C2DPost_web/ROADMAP_REPORT_FEATURE.md`: เช็กลิสต์เวอร์ชันล่าสุด (`v2026.1001.1722`)
+  6. `.agents/skills/c2dpost-web-workflow/SKILL.md`: ส่วนสรุปเวอร์ชันล่าสุด (`v2026.1001.1722`)
 - **คำสั่งทดสอบตรวจสอบความถูกต้องหลัง Deploy ขึ้น Production**:
   ```powershell
   python -c "import urllib.request; print(urllib.request.urlopen('https://c2dpost-web.vercel.app/api/health').read().decode())"
@@ -2548,7 +2548,7 @@ useEffect(() => {
 
 ---
 
-## 92. PDF Status Step Classification Fix: เตรียมนำจ่าย vs ถึง ปณ.ปลายทาง (v2026.0918.2118)
+## 92. PDF Status Step Classification Fix: เตรียมนำจ่าย vs ถึง ปณ.ปลายทาง (v2026.0918.2157)
 
 - **Problem (`classify_step_for_pdf` in `api/index.py`)**: Descriptions like `ถึงที่ทำการไปรษณีย์ปลายทาง (เตรียมการนำจ่าย)` contain both `ปลายทาง` AND `ถึง`, so the old guard `if "เตรียมนำจ่าย" in desc and "ถึง" not in desc:` never fired (because `ถึง` appears in `ถึงที่ทำการ...`). Result: the latest action was mislabeled `ถึง ปณ.ปลายทาง` instead of `เตรียมนำจ่าย`. The real phrase may also be `เตรียมการนำจ่าย` (with `การ`) which `"เตรียมนำจ่าย" in desc` did not even match.
 - **Solution**: Check `เตรียมนำจ่าย` / `เตรียมการนำจ่าย` in a dedicated step placed BEFORE the destination-office group, and delete the contradictory `"ถึง" not in desc` guard entirely. Plain `ถึงที่ทำการไปรษณีย์ปลายทาง` (no prepare-phrase) still classifies as `ถึง ปณ.ปลายทาง`.
@@ -2582,91 +2582,449 @@ Each bug recorded must adhere to the standardized structure:
 
 ---
 
-## 94. Dashboard and Deposit Report KPI Stat Cards Synchronization (v2026.0924.1945)
+## 94. Statistics Dashboard Optimization & Design Harmonization (`v2026.0924.1825`)
 
-### 1. Architectural & UX Alignment
-- **Problem**: The Dashboard ("สถิติ") page previously used a legacy stat cards order starting with Total Items, worded "รับฝาก (ทั้งหมด)" and "ส่งคืน / ไม่สำเร็จ", with complex text formatting like `60 (96.80% ของที่สรุปผล)`. Meanwhile, "รายงานสถานะ" (`DepositReportView.jsx`) displays process stages chronologically ending with total items, using clean `({rate}%)` format and designated accent colors (`text-blue`, `text-amber`, `text-emerald`, `text-rose`).
-- **Solution**:
-  1. Standardize stat card order across both views:
-     - Card 1: `รับฝากแล้ว` (`icon-received-deposit`, `text-blue`)
-     - Card 2: `อยู่ระหว่างการนำจ่าย` (`icon-transit`, `text-amber`)
-     - Card 3: `นำจ่ายสำเร็จ` (`icon-delivered`, `text-emerald`)
-     - Card 4: `ส่งคืน` (`icon-returned`, `text-rose`)
-     - Card 5: `รายการทั้งหมด` (`icon-total`, neutral)
-  2. Rates are calculated uniformly against `totalItems` with 2 decimal precision (`((count / totalItems) * 100).toFixed(2)`).
-  3. Icons use the identical SVG vectors and background accent classes.
-
----
-
-## 95. Thailand Post True Return Reason Extraction Protocol (v2026.0924.2005)
-
-### 1. Operational Logic of Postal Return Chronology
-- In Thailand Post's tracking lifecycle, when a delivery fails, the destination post office logs the specific reason (e.g. `ย้าย / ไม่ทราบที่อยู่ใหม่`, `บ้านปิด`, `ออกใบแจ้ง`) BEFORE initiating the return dispatch (`ปณ.ปลายทางส่งคืน`).
-- Querying only the latest status snapshot (`getOrderByBarcodes` or `events[-1]`) returns transportation milestones such as `ปณ.ต้นทางส่งคืนบริษัท`, masking the underlying failure cause.
-- Protocol: Always traverse the tracking event list to locate `ปณ.ปลายทางส่งคืน`, extract the event immediately prior (`events[dest_return_idx - 1]`), and normalize it through `_normalize_failure_reason`.
+### 1. Architectural & Layout Refinements
+1. **Simplified Information Architecture**:
+   - Tab and Header renamed to simply **"สถิติ"** (replacing "สถิติ & แผนที่").
+   - Removed the parcels detail table card completely to eliminate redundant tables already present in the Deposit Report page (`DepositReportView.jsx`).
+2. **Reordered Visual Hierarchy**:
+   - **Top**: 5 Canonical KPI Stat Cards (Total, Received, In-Transit, Delivered, Returned).
+   - **Middle**: Thailand Interactive SVG Map + Province Ranking Table.
+   - **Bottom**: Failure & Return Reasons breakdown card with percentage progress bars.
+3. **Failure Reason Classification ("บ้านปิด")**:
+   - Classified `"บ้านปิด"` as a dedicated top-priority reason bucket in `_classify_failure_reason()`.
+   - Included parcels with delivery exception statuses (such as code 301 / บ้านปิด / ออกใบแจ้ง) into reason aggregation so reasons are properly computed and displayed.
+4. **Design System Alignment**:
+   - All cards, headers, borders, shadows, chips, and progress bars adopt the exact dual-theme glassmorphism design tokens established in `DepositReportView.css`.
 
 ---
 
-## 96. Thailand Post Empty-Date Notice Suppression ("No Receive Product.") (v2026.0924.2018)
+## 95. Statistics Dashboard Default "This Month" & Reactive Auto-Fetch Pipeline (`v2026.0924.1925`)
 
-### 1. Operational Logic of Multi-Day Range Queries
-- When querying Thailand Post e-Parcel web service `getAllOrderReceived` over multi-day ranges (e.g. "เดือนนี้" / 1st to 24th), days without deposits (weekends, holidays) respond with:
-  ```json
-  [{"errorCode": "...", "errorDetail": "No Receive Product."}]
-  ```
-- This is a normal empty-state response rather than an operational failure or system notice.
-- Aggregation loops must strictly drop `No Receive Product.` / `no data` notices so that non-empty days in the batch are not polluted with technical warning banners on the dashboard or deposit reports.
-- Frontends must also apply defense-in-depth sanitization:
-  ```javascript
-  {data?.api_notice && !/no receive product|no data/i.test(data.api_notice) && (
-    <div className="deposit-alert info">...</div>
-  )}
-  ```
+### 1. Architectural & UX Decisions
+1. **Default Date Range Alignment ("เดือนนี้")**:
+   - Initialized `startDate` in `DashboardView.jsx` to `monthStartIso` (first day of the current month) up to `todayIso` (today).
+   - Ensured the quick-filter button `"เดือนนี้"` receives the `.active` CSS state automatically on mount.
+   - Handled cache migration: automatically migrates legacy `todayIso` cached filters in `sessionStorage` to `monthStartIso`.
+2. **Reactive Auto-Fetch Pipeline**:
+   - **On Mount**: Mounted with `hasAutoFetchedRef` guard to immediately trigger `handleFetchReport(startDate, endDate)` without requiring manual click on "อัปเดตข้อมูล".
+   - **On Quick-Filter Selection**: Instant reactivity when clicking any date pill ("วันนี้", "เมื่อวาน", "7 วันล่าสุด", "เดือนนี้", "เดือนที่แล้ว") or "คืนค่าเริ่มต้น" — immediately dispatches the report query with the new date range.
+3. **Seamless Loading Feedback**:
+   - Added `.dash-loading-state` with `.spinner-medium` to inform the user during asynchronous data ingestion.
 
 ---
 
-## 97. Balanced Dual-Card Layout for Thailand Map and Province Ranking (v2026.0924.2025)
+## 96. System-Wide 2-Decimal Percentage Precision Standard (`v2026.0924.1935`)
 
-### 1. Symmetric Grid Configuration
-- The dashboard layout for geographic performance previously used an asymmetrical column ratio `1.35fr : 1fr`, causing the map card to appear noticeably wider than the province ranking table.
-- Standardized to symmetric 50/50 split:
-  ```css
-  .dash-map-layout {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 1.25rem;
-    align-items: start;
-  }
-  .dash-map-card,
-  .dash-ranking-card {
-    min-width: 0;
-    width: 100%;
-  }
-  ```
-- Retains `@media (max-width: 1100px)` single column fallback (`grid-template-columns: 1fr`).
+### 1. Architectural & Formatting Rules
+1. **Frontend Formatting (`formatPct`)**:
+   - All percentages rendered across all views must be formatted with 2 decimal places using `val.toFixed(2)` (e.g. `96.80%`, `16.22%`, `0.00%`).
+   - Defined `formatPct(val)` in `DashboardView.jsx` to handle null, undefined, and non-numeric values safely, returning `'0.00'`.
+   - Used across:
+     - 4 Status summary cards in `DashboardView.jsx`
+     - Interactive SVG map hover tooltip & selected province panel
+     - Province ranking table `%สำเร็จ` column
+     - Delivery failure & return reasons breakdown card chips
+     - Deposit report KPI summary cards (`DepositReportView.jsx` and `DepositReportModal.jsx`)
+     - File conversion progress tracker in `App.jsx` and `api.js`
+2. **Backend API Precision (`api/index.py`)**:
+   - All percentage metrics computed by `dashboard_report` endpoint use `round(value, 2)` instead of `round(value, 1)`.
 
-## 98. Classification of "บ้านปิด" (Code 301) Under "อยู่ระหว่างการนำจ่าย" (In Transit) (v2026.0924.2045)
+---
 
-- **Domain Rule**:
-  - In Thailand Post operations, status code 301 (`นำจ่ายไม่สำเร็จ (บ้านปิด)`) represents a temporary delivery attempt milestone where the recipient's house was closed.
-  - The parcel is held at the destination post office awaiting customer pickup or re-delivery. It is **NOT** a returned item (`ส่งคืน`).
-  - An item is only marked as returned when the destination office registers a formal return dispatch (e.g. `ปณ.ปลายทางส่งคืน`, code 502/503).
-- **Backend Rules (`api/index.py`)**:
-  - `classify_delivery_status(status_code, status_desc)`: If status text contains "บ้านปิด" or code is "301" without explicit return keywords/codes, always return `("in_transit", "อยู่ระหว่างการนำจ่าย")`.
-  - `get_dashboard_report`: Explicitly classify "บ้านปิด" records under `key: "in_transit"`, incrementing `in_transit_count` and province `st["in_transit"]`. Do NOT increment `failed` or `st["failed"]`.
-- **Frontend Rules (`DepositReportView.jsx`, `TrackingInquiryView.jsx`)**:
-  - `getDeliveryStatusInfo`: Intercept `/บ้านปิด/i` and code 301, returning `{ key: 'in_transit', label: 'อยู่ระหว่างการนำจ่าย', smartLabel: 'นำจ่ายไม่สำเร็จ (บ้านปิด)', className: 'exception' }`.
+## 97. Statistics Dashboard Total Service Fee KPI Card & Proportional Reason Percentages (`v2026.0924.2340`)
 
-## 99. True Return Cause Extraction Prior to Return Steps (v2026.0924.2055)
+### 1. Architectural & UX Decisions
+1. **Total Fee KPI Stat Card Alignment**:
+   - Integrated the 6th canonical KPI stat card ("ยอดรวมค่าบริการ") into `DashboardView.jsx` (`statCards`).
+   - Uses `icon-fee` SVG currency/dollar line badge with `.text-gold` typography, perfectly matching the design system of `DepositReportView.jsx`.
+   - Formatted via `Number(totalFee || 0).toLocaleString('th-TH', { minimumFractionDigits: ..., maximumFractionDigits: 2 })`.
+   - Updated `api/index.py` (`get_dashboard_report`) to include `"total_fee"` in `summary`.
+2. **Proportional Reason Percentages**:
+   - Fixed denominator calculation for reasons breakdown in `api/index.py` and `DashboardView.jsx`.
+   - Formula changed from `c * 100 / failed` to `c * 100 / total_reasons` (`totalReasonsCount`).
+   - Guarantees reason percentages represent true proportions out of total delivery exception reasons found, strictly capping at 100% total sum without anomalies.
 
-- **Domain Rule**:
-  - In Thailand Post tracking, parcels marked with return steps (e.g. `ปณ.ปลายทางส่งคืน`, `ส่งคืนต้นทาง`, `ปณ.ต้นทางส่งคืนบริษัท`) have their actual failure reason recorded in the delivery attempt milestone IMMEDIATELY PRECEDING the return step (e.g. `ย้าย / ไม่ทราบที่อยู่ใหม่`, `บ้านปิด`, `ผู้รับไม่อยู่`, `ออกใบแจ้ง`, `ปฏิเสธการรับ`).
-  - The return step itself is NEVER the cause of failure; it is merely the transport action.
-- **Backend Rules (`api/index.py`)**:
-  - Must ensure `re` is imported at top level so regex normalization never raises `NameError`.
-  - `_extract_failure_reason_from_events(events)`: Locate the first return milestone, scan backward skipping transit milestones, and return the normalized preceding delivery exception.
-  - Dashboard reason aggregation: Ensure reasons containing return transport phrases are sanitized so they never appear in the "สาเหตุการส่งคืน / นำจ่ายไม่สำเร็จ" card.
-- **Frontend Rules (`TrackingTimelineModal.jsx`, `DepositReportView.jsx`)**:
-  - `TrackingTimelineModal.jsx`: Exclude return words from `isException` so return steps only receive the danger `ส่งคืนต้นทาง` badge, not `ข้อยกเว้น: ปณ.ปลายทางส่งคืน`.
-  - `DepositReportView.jsx`: Badge shows `ส่งคืน ({failureReason})` when available.
+---
+
+## 98. Resilient Receiver Address Parser with Auto Postal Code Database Lookup (`v2026.0925.0145`)
+
+### 1. The Core Postal Extraction Problem
+- Thai government land notices often omit the 5-digit postal code at the bottom of the receiver address block (e.g. `9.pdf` from Renunakhon Land Office, ending at `จังหวัด นครพนม`).
+- Previously, `parse_receiver_label` relied strictly on a 5-digit regex (`^[๐-๙0-9]{5}$`) to locate the terminal line (`end_idx`). Without a postal code, `end_idx` remained `-1`, and the parser discarded the entire recipient block (`return None`), yielding 0 records.
+
+### 2. Multi-Tier Boundary Fallback Detection
+- **Fallback 1**: If no 5-digit zipcode line is matched, scan sequentially for `^(?:จังหวัด|จ\.)\s*[฀-๿]+`.
+- **Fallback 2**: If no province prefix is found, scan up to 6 lines following the recipient name for amphur/district tokens (`อำเภอ/เขต`, `อำเภอ`, `อ.`).
+- **Terminal Line Handling**: When terminating on a province or amphur line (instead of a standalone zipcode line), append the line text to `raw_address_lines` to preserve full administrative jurisdiction.
+
+### 3. Integrated Standard Thai Postal Code Database (`thai_postcodes.json`)
+- Installed official mapping table of 7,498 sub-districts and 928 districts: `api/core/thai_postcodes.json`.
+- Implemented `lookup_thai_zipcode(province, amphur, tambon)`:
+  1. Priority 1: Exact `province|amphoe|district` match.
+  2. Priority 2: `province|amphoe` match.
+  3. Priority 3: `amphoe` match.
+- Fallback in `process_pdf`: If receiver province & amphur match sender province & amphur, adopt `SHIPPER ZIPCODE`.
+
+---
+
+## 99. Map Interactive Province Locking & Floating Rich Tooltip Architecture (`v2026.0925.0200`)
+
+### 1. State Separation: Hover vs. Persistent Lock
+- **The Friction**: In typical SVG maps, `selectedProvince` is tied to `onMouseEnter` / `onMouseLeave`, causing selection to disappear the instant the cursor leaves the SVG canvas.
+- **The Decoupled Architecture**:
+  - `hoveredProvince`: string | null (transient hover state).
+  - `lockedProvince`: string | null (persistent pinned state upon clicking a province or ranking table row).
+  - Priority Resolution: `activeProvince = lockedProvince || hoveredProvince`.
+  - When locked, mouse leaving the SVG retains the locked province data in the detail card until the user explicitly clicks again to toggle unlock or hits the `[ปลดล็อค ✕]` button.
+
+### 2. Floating Rich Tooltip Engine
+- **Eliminate Native `<title>`**: Remove browser `<title>` tags to prevent unsightly OS native yellow/gray tooltips with annoying 2-second delays.
+- **Dynamic Mouse Tracking**:
+  - `onMouseMove` monitors mouse offset within `ref={mapWrapRef}`.
+  - Smart Boundary Flipping: `flipX = x + 265 > rect.width`, `flipY = y + 215 > rect.height` prevents edge overflow.
+  - Content: Header with location pin & success rate pill, progress bar, 4-metric count grid (รับฝาก, นำจ่าย, สำเร็จ, ส่งคืน), total volume, and contextual click hints.
+
+### 3. Visual Prominence for Locked Provinces
+- **SVG Overlay Layer**: Render a dedicated accent outline (`stroke="#f59e0b"`, `strokeWidth="3.2"`) after normal province paths to guarantee the glowing border renders on top of adjacent borders.
+- **Pulsing Glow Animation**: `@keyframes lockedProvinceGlow` alternates between 2.8px and 3.4px with soft golden drop shadow.
+
+---
+
+## 100. Separated Failure Reasons & Return Reasons Architecture (`v2026.0925.0215`)
+
+### 1. The Operational Distinction
+- In postal and logistics operations, unsuccessful parcel handling falls into two fundamentally distinct categories:
+  1. **Actual Returns (`return_reasons`)**: The parcel has completed its return cycle back to sender (e.g. `ย้าย / ไม่ทราบที่อยู่ใหม่`, `ปฏิเสธการรับ`, `ไม่มีผู้รับตามจ่าหน้า`, `502`, `503`).
+  2. **Delivery Attempt Exceptions (`delivery_failed_reasons`)**: The parcel is currently at the delivery post office or out for delivery, but experienced a delivery obstacle during the first attempt (e.g. `บ้านปิด`, `ออกใบแจ้ง`, `ผู้รับไม่อยู่`, `ติดต่อไม่ได้`, `301`, `302`).
+- Lumping both into a single combined card causes confusion regarding how many parcels were permanently lost/returned vs. still awaiting re-delivery.
+
+### 2. Backend Categorization (`api/index.py`)
+- In `get_dashboard_report`:
+  - Tag every record with `reason_type`: `"return"` or `"delivery_failed"`.
+  - Maintain two dedicated counters: `return_reason_counts` and `delivery_failed_reason_counts`.
+  - Generate separate response structures:
+    - `return_reasons`: `[{ reason, count, pct }]` where `pct = count * 100 / total_return_reasons`.
+    - `delivery_failed_reasons`: `[{ reason, count, pct }]` where `pct = count * 100 / total_delivery_failed_reasons`.
+    - `reasons`: Retained for backward compatibility.
+    - `summary`: Enriched with `total_return_reasons` and `total_delivery_failed_reasons`.
+
+### 3. Frontend Twin Analytical Card Presentation (`DashboardView.jsx` & `DashboardView.css`)
+- **Twin Responsive Grid**: `.dash-reasons-container` presents two side-by-side analytical cards on desktop (`minmax(460px, 1fr)`), automatically stacking to single column on tablet/mobile (< 960px).
+- **Rose/Crimson Theme for Returns**: `.dash-return-card`, `.bar-return`, `.chip-return`, `.dot-return` with return arrow icon.
+- **Amber/Orange Theme for Attempt Failures**: `.dash-failed-card`, `.bar-failed`, `.chip-failed`, `.dot-failed` with transit warning icon.
+- **Resilient Fallback**: If cached older API payloads lack split arrays, frontend dynamically splits `data.reasons` by keyword matching to ensure unbroken presentation.
+
+---
+
+## 101. Streamlined Province Detail Card UI Without Top Banners (`v2026.0925.0635`)
+
+### 1. Rationale for Banner Removal
+- The `.dash-pd-lock-banner` and `.dash-pd-hover-hint` occupied valuable vertical real estate in the province detail card.
+- User feedback indicated that the full-width yellow status banner was visual noise rather than helpful context.
+
+### 2. Implementation Details
+- Removed `.dash-pd-lock-banner` and `.dash-pd-hover-hint` from `DashboardView.jsx`.
+- Placed a compact, unobtrusive dismiss button `.dash-pd-close-btn` (`✕`) directly adjacent to the success rate pill in `.dash-pd-name-row`, rendered exclusively when `lockedProvince` is active.
+- Preserved existing intuitive multi-channel unlock mechanisms:
+  1. Re-clicking the locked province on the SVG map (Toggle Lock).
+  2. Clicking the locked row in the province ranking table.
+  3. Clicking the minimalist `✕` button on the card.
+
+
+
+
+
+---
+
+## 102. System-Wide Dark Mode Typography & Contrast Variable Architecture (v2026.0925.0705)
+
+### 1. The Core Variable Deficit
+- **The Issue**: Components frequently applied CSS fallback colors such as `color: var(--text-main, #0f172a)` or `color: var(--text-muted, #64748b)`.
+- When `:root[data-theme="dark"]` in `src/index.css` lacked definitions for `--text-main` and `--text-muted`, the browser triggered fallback evaluation, rendering ink-black `#0f172a` text on deep-slate `#1e293b` backgrounds.
+
+### 2. Standardized Global Variable Contract (`src/index.css`)
+```css
+:root, :root[data-theme="light"] {
+  --text-main: #0f172a;
+  --text-primary: #0f172a;
+  --text-muted: #64748b;
+  --text-secondary: #475569;
+  --bg-card: #ffffff;
+  --bg-card-sub: #f8fafc;
+  --bg-hover: #f1f5f9;
+  --bg-input: #ffffff;
+  --bg-row-even: #f8fafc;
+  --border-color: rgba(0, 0, 0, 0.08);
+}
+
+:root[data-theme="dark"] {
+  --text-main: #f8fafc;
+  --text-primary: #f8fafc;
+  --text-muted: #94a3b8;
+  --text-secondary: #cbd5e1;
+  --bg-card: #1e293b;
+  --bg-card-sub: #0f172a;
+  --bg-hover: rgba(255, 255, 255, 0.06);
+  --bg-input: #0f172a;
+  --bg-row-even: rgba(15, 23, 42, 0.35);
+  --border-color: rgba(255, 255, 255, 0.08);
+}
+```
+
+### 3. Component Verification Checklist
+1. All card titles and numeric values must use `--text-main` or `#f8fafc` in dark mode.
+2. All labels, subtitles, units, and timestamps must use `--text-muted` or `#94a3b8` in dark mode.
+3. Secondary body text (receiver names, addresses, descriptions) must use `--text-secondary` or `#cbd5e1`.
+4. Interactive active pills and status badges must avoid dark text colors (use `#ffffff` on active badges).
+
+---
+
+## 103. Vendor ID Field Integration & e-Parcel Webservice Architecture (v2026.1001.1722)
+
+### 1. Architectural Findings in Thailand Post e-Parcel Spec
+- A thorough audit of the 140-page *API Standard preload Data on e-Parcel* manual confirmed that Thailand Post's public Web Service API (`https://r_dservice.thailandpost.com/webservice/*`) **does not provide a dedicated profile endpoint or mechanism to query the customer's Vendor ID directly**.
+- The term "Vendor" appears exclusively in internal error response templates (e.g. `"Vendor ID not found"`, `"Merchant id does not match Vendor id"`).
+- Consequently, client applications must either capture the Vendor ID during agency onboarding or maintain an administrative map in Google Sheets.
+
+### 2. Implementation Specifications
+1. **Frontend Registration Form (`RegistrationModal.jsx`)**:
+   - Added `vendorId` state and rendered `<label htmlFor="reg-vendor">เลข Vendor (Vendor ID)</label>` in Section 2 (ข้อมูลหน่วยงาน).
+   - Formatted side-by-side with Email in a responsive `.reg-row` container (`@media (max-width: 540px)` auto-stacks to single column).
+   - Clean reset handling upon modal open/close and successful registration.
+   - Dispatched in registration payload as both `vendor_id` and `vendorId`.
+2. **Backend API (`api/index.py`)**:
+   - Extended `RegisterUserRequest` model with `vendor_id: Optional[str] = ""` and `vendorId: Optional[str] = ""`.
+   - Forwarded `vendor_id` in form payload to Google Apps Script Web App registration dispatcher.
+3. **Admin Management Parity (`AdminManagementView.jsx`)**:
+   - Added `VendorID` to administrative user state, search filter, and the user edit modal.
+
+---
+
+## 104. Vendor ID Google Sheet Column Architecture & Admin Management Parity (v2026.1001.1737)
+
+### 1. Google Sheets (`LoginC2DPost`) Column R Placement
+- Spreadsheet ID: `1hiWww6BI7NCTAw3Ai3CjbzS8TWdIX2AAOj7P_2BxMcQ`
+- Current 17 Columns (A-Q): `UserName`, `Password`, `Email`, `Prefix`, `Organization`, `ResponsiblePostoffice`, `ResponsibleZipcode`, `ActivationDate`, `ContactPerson1`, `TelContactPerson1`, `ContactPerson2`, `TelContactPerson2`, `ContactPerson3`, `TelContactPerson3`, `Status`, `TypeBarcode`, `Agree`.
+- **New 18th Column (Column R)**: `VendorID`
+- **Backward Compatibility Rationale**: Placing `VendorID` at Column R leaves columns 1-17 intact, ensuring existing scripts in both Desktop Python (`gui.py`) and legacy Apps Script run with zero disruptions.
+
+### 2. Admin UI & Export Synchronizations
+- **Data Table (`AdminManagementView.jsx`)**: Added `<th style={{ width: '100px' }}>Vendor ID</th>` and `<td className="col-vendor">{person.VendorID || person.vendor_id || '-'}</td>` styled with monospaced emerald fonts. Empty state `colSpan` bumped to 13.
+- **Backend OpenPyXL (`api/index.py`)**: Added `("เลข Vendor (Vendor ID)", 20, "center")` column, merged `A1:R1` header, and set text format (`@`) to preserve leading zeros.
+- **Client CSV Fallback (`src/utils/api.js`)**: Synchronized headers and row mapper with `u.VendorID || u.vendor_id || ''`.
+
+### 3. Admin Web App Deployment URL Transition (v2026.1001.1758)
+- Updated `SCRIPT_URL` in `api/index.py` for standard Google Apps Script Web App execution.
+
+---
+
+## 105. Latest Web App Deployment URL & Unified Registration Parity (v2026.1001.1815)
+
+### 1. Unified Web App Deployment URL
+- Active URL: `https://script.google.com/macros/s/AKfycbwi9khFasbC7RYgsFya_pwTgOI-3B7jp2VIyoY_OVFV58ukjo1jyN_zKcQGfmxm1_8/exec`
+- Used across:
+  - `RegistrationModal.jsx` (`SCRIPT_REGISTER_URL`)
+  - `api/index.py` (`register_user` and `admin_update_user`)
+
+### 2. Dual Payload Key Compatibility & Duplicate Pre-check
+- **Frontend & Backend Payload Keys**: Both TitleCase (`VendorID`, `Organization`, `ResponsiblePostoffice`, `ResponsibleZipcode`, `ContactPerson1`, `TelContactPerson1`) and lowercase (`vendor_id`, `postoffice`, `zipcode`, `contact1`, `tel1`) are passed to ensure 100% interoperability across both `doPostRegister` and `doPostAdminUpdate` routines.
+- **Backend Pre-check**: `register_user` queries Google Sheet CSV to verify username uniqueness before dispatching write commands to prevent accidental overwrites of existing user rows.
+- **Live Verification**: Successfully verified live roundtrip POST writes to Column 18 (`VendorID`) in Google Sheet `LoginC2DPost` and clean deletion handling.
+
+---
+
+## 106. Existing User Auto-Population & Profile Update Workflow (v2026.1001.1835)
+
+### 1. Verification with Automatic Data Population
+- When verifying user credentials in `RegistrationModal.jsx`, the system queries Google Sheet `LoginC2DPost` (`https://docs.google.com/spreadsheets/d/1hiWww6BI7NCTAw3Ai3CjbzS8TWdIX2AAOj7P_2BxMcQ/export?format=csv&gid=0`).
+- If an existing account (e.g. `DOL.Renunakhon`) is found:
+  - Automatically populates all profile fields: `Organization`, `VendorID`, `Email`, `ResponsibleZipcode`, `ResponsiblePostoffice`, and all contact persons (`ContactPerson1-3`, `TelContactPerson1-3`).
+  - Sets `isExistingUser = true` and toggles the action button to **"บันทึก / อัปเดตข้อมูล"**.
+  - Displays affirmative feedback: `✅ ตรวจสอบถูกต้อง (พบข้อมูลเดิมในระบบ - ดึงข้อมูลอัตโนมัติเรียบร้อยแล้ว)`.
+
+### 2. Update Submission Handling
+- When the user submits updates:
+  - Dispatches `action: "update_user"` with `is_update: true` to the backend `/api/register_user`.
+  - Backend bypasses the duplicate username pre-check and executes `update_user` on Google Apps Script, updating Column 18 (`VendorID`) and any modified contact information without conflict.
+
+---
+
+## 107. Vendor ID Live Display in Admin Management & Backend Zero-Cache Proxy (v2026.1001.1850)
+
+### 1. Vendor ID Display in Admin View & Edit Modal
+- **Table Cell & Header (`AdminManagementView.jsx`)**:
+  - Displays the Vendor ID from Google Sheet Column 18 (R) in the dedicated "Vendor ID" column.
+  - Normalizes access across aliases (`VendorID`, `Vendor ID`, `vendor_id`, `vendorId`, `เลข Vendor`).
+- **User Edit Modal**:
+  - Automatically initializes the "Vendor ID (เลข Vendor)" input with the user's existing Vendor ID on row click.
+  - Included in the payload when saving user profile changes through `/api/admin/update_user`.
+- **Search Filtering**:
+  - Allows administrators to search users by Vendor ID directly in the Admin search bar.
+
+### 2. Auto-Refresh & Backend Zero-Cache Proxy Architecture
+- **Auto-Refresh on Mount**:
+  - `AdminManagementView.jsx` triggers `onRefreshPeople()` immediately when the admin switches to the view, preventing stale data display.
+- **Backend Proxy (`GET /api/admin/users`)**:
+  - Fetches the latest Google Sheet CSV directly via serverless Python with `Cache-Control: no-cache, no-store, must-revalidate`.
+  - Parses and returns clean JSON with fully normalized fields.
+- **Frontend Fallback**:
+  - `App.jsx` (`loadPeople`) calls `/api/admin/users` first.
+  - If unreachable, falls back to direct Google Sheets CSV fetch with `{ cache: 'no-store' }`.
+
+---
+
+## 108. Vendor ID Display on Navbar User Badge with Leading Zero Stripping (v2026.1001.1920)
+
+### 1. User Badge Secondary Line Enhancement (`Navbar.jsx`)
+- **Visual Display**: Line 2 of the user badge (`.user-display-role`), which previously displayed the static status `DOL`, now dynamically presents the user's Vendor ID.
+- **Leading Zero Stripping Logic**:
+  - Automatically strips leading zeros (e.g. `0000212876` ➔ `212876`) via regex `rawVendor.replace(/^0+/, '') || '0'`.
+  - Normalizes vendor ID lookup across multiple naming conventions (`VendorID`, `Vendor ID`, `vendor_id`, `vendorId`, `เลข Vendor`).
+  - Fallback: If no Vendor ID exists for the user (or during initial setup), seamlessly falls back to the user's status (`currentPerson?.Status || 'DOL'`).
+- **User Dropdown Header Details**:
+  - Highlights `Vendor: {strippedVendor}` in `.user-dropdown-badges` with full ID hover tooltip.
+
+### 2. Client-Side User Profile Session Caching (`App.jsx`)
+- Introduces `STORAGE_PERSON_KEY` (`c2dpost_web_person`) in `localStorage` to cache resolved person details across page reloads.
+- Eliminates visual flicker or delay while Google Sheets data is being fetched asynchronously in the background.
+
+---
+
+## 109. Prepend "Vendor : " Label and Enforce Zero-Stripped Vendor ID Globally (v2026.1001.1935)
+
+### 1. "Vendor : " Label on Navbar User Badge (`Navbar.jsx`)
+- **Visual Presentation**: Formats line 2 of the user badge with the explicit label `"Vendor : "`, displaying e.g. `Vendor : 212876` instead of raw digits alone.
+- **Consistent User Card Badges**: Synchronizes the user dropdown header chip with the same `Vendor : {strippedVendor}` standard.
+
+### 2. Global Zero-Stripping Enforcement Across Architecture
+- **Ingestion (`parseCsv.js`)**: Exports `stripVendorZeros` and applies it immediately upon CSV rows ingestion for `row.VendorID`, `row.vendor_id`, `row['Vendor ID']`, and `row.vendorId`.
+- **Admin View (`AdminManagementView.jsx`)**: Table column "Vendor ID", user edit modal initialization, onBlur input sanitation, and search filtering all enforce `stripVendorZeros`.
+- **Registration Form (`RegistrationModal.jsx`)**: Autofill from existing accounts, manual entry, onBlur, and registration submission payloads all guarantee stripped vendor IDs.
+- **Backend API & Exports (`api/index.py` & `src/utils/api.js`)**: Serverless endpoints `/api/admin/users`, Excel export, and CSV download sanitize vendor IDs to remove leading zeros.
+- **Google Apps Script (`google_apps_script_vendor_setup.js`)**: Strips leading zeros prior to persisting in Column 18 (R).
+
+---
+
+## 110. Post Office Chip Postal Code Display & Visual Optimization (v2026.1001.1950)
+
+### 1. Postal Code Appendage Logic (`Navbar.jsx`)
+- **Field Synthesis**:
+  - Extracts post office name: `currentPerson?.ResponsiblePostoffice?.trim() || ''`.
+  - Extracts postal code: `String(currentPerson?.ResponsibleZipcode || currentPerson?.zipcode || currentPerson?.Zipcode || '').trim()`.
+  - Display string: `poName ? (poZip && !poName.includes(poZip) ? `${poName} ${poZip}` : poName) : (poZip || '')`.
+  - Prevents duplicated postal code if the name already contains the zipcode string.
+- **Tooltip**: Full contextual description `title={`ที่ทำการไปรษณีย์รับผิดชอบ: ${displayPostOffice}`}`.
+
+### 2. Container Sizing (`Navbar.css`)
+- Increased `.user-dropdown-po-chip` `max-width` from `135px` to `190px` to guarantee full display of post office name and 5-digit postal code without ellipsis cutoff.
+
+---
+
+## 111. e-Parcel Deposit Report Timeout Extension to 120s & Vercel maxDuration Configuration (v2026.1002.0635)
+
+### 1. Architectural Need for Timeout Extension
+- **High-Volume Account Workload**: Mega accounts like `Royalthai.pol` (Royal Thai Police - Traffic Citations) submit thousands of items daily.
+- Querying `getAllOrderReceived?date=DD/MM/YYYY` requires Thailand Post's legacy e-Parcel database to scan massive tables and serialize large JSON payloads, frequently taking 30–60+ seconds.
+- The original 20s timeout caused frequent `requests.exceptions.ReadTimeout` errors.
+
+### 2. Implementation Specifics
+- **`api/index.py`**:
+  - `fetch_date`: `requests.get(url, ..., timeout=120, verify=False)`
+  - Exception handling specifically catches `Read timed out` and formats an actionable Thai advisory notice.
+- **`vercel.json`**:
+  - Adds `"functions": { "api/index.py": { "maxDuration": 120 } }` to authorize the Serverless function to execute up to 120 seconds.
+
+---
+
+## 112. Backend Auto-Retry Strategy for Heavy e-Parcel Reports (v2026.1002.0645)
+
+### 1. Dual-Attempt Auto-Retry Architecture (`api/index.py`)
+- **Execution Pattern**:
+  - `max_attempts = 2`, `timeout_per_attempt = 55` seconds.
+  - Attempt 1 triggers database execution and forces the server to begin accumulating the result set into the query cache.
+  - Upon catching a timeout exception (`Read timed out` or `ConnectTimeout`), the handler sleeps for 1 second (`time.sleep(1)`) and immediately executes attempt 2.
+  - Attempt 2 captures the freshly prepared buffer cache, returning the full dataset without requiring user manual intervention.
+- **Vercel Execution Budget Alignment**:
+  - Total worst-case execution: `55s + 1s + 55s = 111s`, fitting strictly within the 120s Vercel Serverless Function ceiling.
+
+---
+
+## 113. สรุปภาพรวมทักษะ เทคนิค สไตล์ และแนวทางพัฒนามาตรฐาน (Skills, Techniques & Design Style Manifesto)
+
+หมวดนี้รวบรวมและสรุปองค์ความรู้ ทักษะทางวิศวกรรม เทคนิคเฉพาะตัว และสไตล์การออกแบบที่ใช้ในการพัฒนาระบบ C2DPost เพื่อเป็นบรรทัดฐานและคู่มืออ้างอิงสำหรับการต่อยอดระบบในอนาคต
+
+### 1. ทักษะหลักในการพัฒนา (Core Engineering Competencies)
+
+1. **สถาปัตยกรรม Hybrid 3 ประสาน (Web + Serverless + Extension Bridge)**:
+   - **Frontend**: React 18 + Vite ออกแบบให้ทำงานได้ทั้งแบบออนไลน์และออฟไลน์
+   - **Backend Serverless**: Python 3.12 บน Vercel รองรับงานคำนวณหนัก ดึงข้อมูล และแปลงเอกสารแบบ On-demand ไร้ภาระค่าดูแลเซิร์ฟเวอร์
+   - **Browser Extension Proxy (Manifest V3)**: ทำหน้าที่เป็นตัวกลางแก้ปัญหา CORS และ IP Geoblocking โดยส่งคำขอจาก IP ในประเทศไทยของผู้ใช้โดยตรง
+
+2. **การจัดการฐานข้อมูลแบบ Zero-Maintenance (Google Sheets + Apps Script)**:
+   - ใช้ Google Sheets เป็นฐานข้อมูลกลางที่ผู้ดูแลระบบสามารถตรวจสอบและแก้ไขผ่านชีตได้โดยตรง
+   - สื่อสารผ่าน Google Apps Script Web App ด้วย Endpoint `doPost(e)` รองรับการสร้างบัญชี, ตรวจสอบสิทธิ์, อัปเดตข้อมูลผู้ใช้ และนับสถิติการใช้งาน
+
+3. **การประมวลผลเอกสาร PDF และ Excel ความเที่ยงตรงสูง (Document Engineering)**:
+   - **PDF Parsing (`pdfplumber`)**: สกัดตารางข้อมูลจาก PDF ใบจ่าหน้าของกรมที่ดิน โดยใช้ระเบียบวิธีวิเคราะห์เชิงตำแหน่ง (Coordinate-based regex extraction)
+   - **Vector PDF Layout (`PyMuPDF / fitz`)**: รวมใบตอบรับอิเล็กทรอนิกส์ (e-AR) แบบ 3-Up ต่อหน้า A4 โดยใช้เทคนิค Vector Viewport Clipping ประหยัดกระดาษ 66% โดยไม่สูญเสียความคมชัด
+   - **Excel Engine (`openpyxl`)**: สร้างไฟล์ส่งออก DPost และรายงานผู้ใช้งาน โดยกำหนดฟอร์แมตเซลล์เป็น Text (`@`) เพื่อรักษาเลข 0 ด้านหน้าของเบอร์โทรศัพท์และรหัสไปรษณีย์
+
+---
+
+### 2. เทคนิคทางเทคนิคขั้นสูง (Advanced Technical Techniques)
+
+1. **เทคนิค Cache-Warming Auto-Retry สำหรับ API ภาระงานหนัก (Timeout Resilience)**:
+   - เมื่อต้องดึงข้อมูลจากระบบดั้งเดิมของไปรษณีย์ไทย (`r_dservice.thailandpost.com`) ที่มีข้อมูลขนาดใหญ่ (เช่น บัญชี `Royalthai.pol` ที่มีใบสั่งจราจรหลักหมื่นฉบับ)
+   - ระบบจะแบ่งการรอคอยออกเป็น 2 รอบอัตโนมัติ (`max_attempts = 2`, `timeout = 55s` ต่อรอบ):
+     - **รอบที่ 1**: ส่งคำขอกระตุ้นให้ฐานข้อมูลของไปรษณีย์ไทยเริ่ม Query และสร้างแคชผลลัพธ์
+     - **รอบที่ 2 (Auto-Retry)**: หน่วงเวลา 1 วินาทีแล้วส่งคำขอซ้ำทันทีเพื่อดึงข้อมูลจาก Buffer Cache ที่เตรียมเสร็จแล้วกลับมาได้ในเวลาเพียง 1–3 วินาที
+   - ควบคุมเวลารวมไม่ให้เกินเพดาน 120 วินาที (`maxDuration: 120` ใน `vercel.json`)
+
+2. **เทคนิค Global Zero-Stripping (การตัดเลข 0 นำหน้าทุกจุดทั้งระบบ)**:
+   - ใช้ฟังก์ชันมาตรฐาน `stripVendorZeros` ตัดเลข 0 ด้านหน้าตั้งแต่ระดับ Ingestion ของ CSV จาก Google Sheet, หน้าตารางจัดการผู้ใช้, โมดอลแก้ไข, ฟอร์มลงทะเบียน, การบันทึกลงชีต, และการส่งออกรายงาน Excel/CSV
+
+3. **เทคนิค Postal Code Synthesis & Defensive Deduplication**:
+   - การผนวกชื่อที่ทำการไปรษณีย์รับผิดชอบกับรหัสไปรษณีย์ 5 หลัก (`ปณ.เรณูนคร 48170`) โดยมีระบบป้องกันการแสดงรหัสไปรษณีย์ซ้ำซ้อน หากในชื่อที่ทำการเดิมมีรหัสระบุอยู่แล้ว
+
+4. **เทคนิค Zero-Cache Backend Proxy with Client Fallback**:
+   - ดึงข้อมูลผ่าน Serverless Proxy ด้วย Headers `Cache-Control: no-cache, no-store, must-revalidate` เพื่อป้องกันเบราว์เซอร์แคชข้อมูลเก่า
+   - หาก Proxy ขัดข้อง ระบบ Frontend มี Fallback ไปดึง Google Sheets CSV โดยตรงแบบ `cache: 'no-store'` ทันที
+
+---
+
+### 3. สไตล์การออกแบบและหลักการ UX/UI (Aesthetic & UX Design Style)
+
+1. **Aesthetic Design (Glassmorphism & Thailand Post Emerald Palette)**:
+   - คุมโทนสีเขียวมรกตโมเดิร์น (`#059669`, `#10b981`) สื่อถึงความเป็นทางการและเป็นมิตรของบริการไปรษณีย์
+   - รองรับ Dark Mode และ Light Mode อย่างสมบูรณ์แบบด้วย CSS Variables
+   - ใช้ฟอนต์ `'Prompt'` สำหรับส่วนหัวภาษาไทย และ `'Inter'` สำหรับตัวเลขและรหัสแทร็กกิ้ง
+
+2. **User-Friendly Error Transformation (แปลง Error เชิงเทคนิคเป็นมิตรต่อผู้ใช้)**:
+   - แปลง Exception ภาษาอังกฤษที่น่ากลัว (เช่น `HTTPSConnectionPool... Read timed out`) ให้เป็นคำอธิบายภาษาไทยที่เข้าใจง่าย พร้อมระบุสาเหตุและคำแนะนำในการแก้ปัญหาอย่างชัดเจน
+
+3. **Active Dynamic Sizing & Minimal Interaction**:
+   - หน้าต่างป๊อปอัปและโมดอลปรับขนาดตามข้อมูลที่มีจริง (`min(94vw, 700px)`)
+   - ตัดปุ่มที่ซ้ำซ้อนออก (เช่น ปุ่ม "ปิดหน้าต่าง" ใน Footer หากมีปุ่ม ✕ ด้านบนอยู่แล้ว) เพื่อลด Cognitive Load ของผู้ใช้
+   - ขยายขนาดชิปแสดงผล (`.user-dropdown-po-chip` ➔ `190px`) เพื่อแสดงข้อความได้ครบถ้วนโดยไม่ต้องตัดทอนด้วยจุดไข่ปลา (...)
+
+---
+
+### 4. ระเบียบปฏิบัติในการพัฒนาและการบันทึก (Workflow & Standards)
+
+* **กฎการปรับปรุงเวอร์ชัน 6 จุดพร้อมกัน (Strict 6-Location Version Synchronization)**:
+  1. `src/config.js` (`APP_VERSION`)
+  2. `package.json` (`version`)
+  3. `api/core/convert_dpost.py` (`__version__`)
+  4. `PROJECT_DOCUMENTATION.md` (เพิ่ม Section บันทึกการเปลี่ยนแปลง)
+  5. `ROADMAP_REPORT_FEATURE.md` (เพิ่ม Task และขีดเครื่องหมายเสร็จสิ้น)
+  6. `.agents/skills/c2dpost-web-workflow/SKILL.md` (เพิ่ม Section องค์ความรู้เชิงสถาปัตยกรรม)
+* **กระบวนการ Deploy**:
+  `npm run build` ➔ `git add` ➔ `git commit` ➔ `git push origin main` ➔ `npx vercel --prod --yes` ➔ ทดสอบหน้าเว็บจริงด้วย `read_url_content`
+
+
+
+
+
 
