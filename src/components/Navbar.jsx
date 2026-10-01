@@ -216,6 +216,13 @@ export default function Navbar({
   const strippedVendor = rawVendor ? (rawVendor.replace(/^0+/, '') || '0') : '';
   const displayRoleOrVendor = strippedVendor ? `Vendor : ${strippedVendor}` : (currentPerson?.Status || 'DOL');
 
+  // Format responsible post office with zipcode: e.g. "ปณ.เรณูนคร 48170"
+  const poName = currentPerson?.ResponsiblePostoffice?.trim() || '';
+  const poZip = String(currentPerson?.ResponsibleZipcode || currentPerson?.zipcode || currentPerson?.Zipcode || '').trim();
+  const displayPostOffice = poName
+    ? (poZip && !poName.includes(poZip) ? `${poName} ${poZip}` : poName)
+    : (poZip || '');
+
   return (
     <>
       <header className="main-navbar python-theme-navbar">
@@ -474,9 +481,9 @@ export default function Navbar({
                           {strippedVendor && currentPerson?.Status && (
                             <span className="user-dropdown-role-chip" style={{ opacity: 0.85 }}>{currentPerson.Status}</span>
                           )}
-                          {currentPerson?.ResponsiblePostoffice && (
-                            <span className="user-dropdown-po-chip" title={currentPerson.ResponsiblePostoffice}>
-                              {currentPerson.ResponsiblePostoffice}
+                          {displayPostOffice && (
+                            <span className="user-dropdown-po-chip" title={`ที่ทำการไปรษณีย์รับผิดชอบ: ${displayPostOffice}`}>
+                              {displayPostOffice}
                             </span>
                           )}
                         </div>

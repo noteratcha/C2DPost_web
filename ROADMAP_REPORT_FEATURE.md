@@ -507,4 +507,10 @@
   - เพิ่มข้อความ `"Vendor : "` นำหน้าหมายเลข Vendor บนบรรทัดที่ 2 ของป้ายผู้ใช้งานใน Navbar (เช่น `Vendor : 212876`)
   - สร้างและใช้งานฟังก์ชัน `stripVendorZeros` เพื่อตัดเลข 0 ด้านหน้าของ Vendor ID ในทุกจุดของระบบ (Navbar, Admin Table, Edit Modal, Registration Modal, Export Excel/CSV, และ Google Sheet Sync)
 
+- [x] **4.91 แสดงรหัสไปรษณีย์ต่อท้ายชื่อที่ทำการไปรษณีย์ในป้ายข้อมูลผู้ใช้งาน (v2026.1001.1950)**
+  - แก้ไข `Navbar.jsx` ให้ดึงรหัสไปรษณีย์ (`ResponsibleZipcode` / `zipcode`) มาแสดงต่อท้ายชื่อที่ทำการไปรษณีย์ (`ResponsiblePostoffice`) ในชิปข้อมูลผู้ใช้งาน เช่น `ปณ.เรณูนคร 48170`
+  - ปรับขนาด `max-width` ของ `.user-dropdown-po-chip` เป็น `190px` ใน `Navbar.css` ป้องกันการถูกตัดทอนข้อความ
+  - ปรับปรุงข้อมูล Mock Fixtures ใน `App.jsx` ให้ครอบคลุมทั้งชื่อที่ทำการและรหัสไปรษณีย์
+
+
 

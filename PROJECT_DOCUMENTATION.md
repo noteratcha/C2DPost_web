@@ -1523,4 +1523,16 @@ if any(k in desc for k in ["ถึงที่ทำการปลายทา�
   - **Backend API (`api/index.py` & `api.js`)**: Endpoint `/api/admin/users` และการส่งออกรายงาน Excel/CSV ฟอร์แมตหมายเลข Vendor ให้ไม่มีเลข 0 นำหน้า
   - **Apps Script (`google_apps_script_vendor_setup.js`)**: ตัดเลข 0 ด้านหน้าก่อนบันทึกลงในคอลัมน์ R (18) ของ Google Sheet
 
+## 71. แสดงข้อมูลรหัสไปรษณีย์ต่อท้ายชื่อที่ทำการไปรษณีย์ในป้ายผู้ใช้งาน (v2026.1001.1950)
+- **การแสดงผลรหัสไปรษณีย์ต่อท้ายชื่อที่ทำการ (`Navbar.jsx`)**:
+  - ในกล่องการ์ดโปรไฟล์ผู้ใช้งาน (User Profile Dropdown Card) บริเวณชิปแสดงชื่อที่ทำการไปรษณีย์รับผิดชอบ (`user-dropdown-po-chip`) กำหนดให้แสดงรหัสไปรษณีย์ต่อท้ายชื่อที่ทำการ เช่น `ปณ.เรณูนคร 48170` (จากเดิมที่แสดงเฉพาะ `ปณ.เรณูนคร`)
+  - รองรับฟิลด์ข้อมูล `ResponsiblePostoffice` ควบคู่กับ `ResponsibleZipcode` (หรือ `zipcode` / `Zipcode`) จากฐานข้อมูล Google Sheet
+  - มีระบบตรวจสอบป้องกันการแสดงเลขไปรษณีย์ซ้ำซ้อน หากในชื่อที่ทำการมีรหัสไปรษณีย์ระบุไว้แล้ว
+  - ปรับ Tooltip ระบุชัดเจน: `ที่ทำการไปรษณีย์รับผิดชอบ: {displayPostOffice}`
+- **การปรับแต่ง CSS (`Navbar.css`)**:
+  - ขยาย `max-width` ของ `.user-dropdown-po-chip` จาก `135px` เป็น `190px` เพื่อรองรับความยาวของชื่อที่ทำการรวมรหัสไปรษณีย์ 5 หลักได้เต็มรูปแบบโดยไม่ถูกตัดทอน (Ellipsis)
+- **ข้อมูลผู้ใช้งานจำลอง (`App.jsx`)**:
+  - เพิ่ม `ResponsiblePostoffice: 'ปณ.เรณูนคร'` และ `ResponsibleZipcode: '48170'` ใน Demo User Fixture และ `ศป.ขอนแก่น 40000` ใน Admin User Fixture
+
+
 

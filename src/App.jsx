@@ -357,6 +357,8 @@ export default function App() {
         Prefix: 'ADM',
         VendorID: '10000000',
         Organization: 'ส่วน ทข.ปข.10 (ผู้ดูแลระบบกลาง)',
+        ResponsiblePostoffice: 'ศป.ขอนแก่น',
+        ResponsibleZipcode: '40000',
         Status: 'ADMIN'
       };
     }
@@ -367,6 +369,8 @@ export default function App() {
         Prefix: 'RN',
         VendorID: '10000001',
         Organization: 'สำนักงานที่ดินจังหวัดนครพนม สาขาเรณูนคร',
+        ResponsiblePostoffice: 'ปณ.เรณูนคร',
+        ResponsibleZipcode: '48170',
         Status: 'DOL'
       };
     }
