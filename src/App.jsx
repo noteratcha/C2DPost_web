@@ -17,6 +17,7 @@ import { SPREADSHEET_ID } from './config';
 import './App.css';
 
 const STORAGE_USER_KEY = 'c2dpost_web_user';
+const STORAGE_PERSON_KEY = 'c2dpost_web_person';
 const STORAGE_THEME_KEY = 'c2dpost_theme';
 
 // Session timeout: 1 hour (3600000 ms)
@@ -261,6 +262,7 @@ export default function App() {
   // Handle Logout with complete session cleanup
   const handleLogout = useCallback(() => {
     localStorage.removeItem(STORAGE_USER_KEY);
+    localStorage.removeItem(STORAGE_PERSON_KEY);
     sessionStorage.removeItem('c2dpost_deposit_report_cache');
     sessionStorage.removeItem('c2dpost_date_range_cache');
     sessionStorage.removeItem('c2dpost_dashboard_cache');
@@ -368,7 +370,27 @@ export default function App() {
         Status: 'DOL'
       };
     }
-    return people.find((p) => (p.UserName || '').toLowerCase() === (user || '').toLowerCase()) || null;
+    const found = people.find((p) => (p.UserName || '').toLowerCase() === (user || '').toLowerCase());
+    if (found) {
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem(STORAGE_PERSON_KEY, JSON.stringify(found));
+        } catch (e) {}
+      }
+      return found;
+    }
+    if (typeof window !== 'undefined' && user) {
+      try {
+        const cached = localStorage.getItem(STORAGE_PERSON_KEY);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if ((parsed?.UserName || '').toLowerCase() === user.toLowerCase()) {
+            return parsed;
+          }
+        }
+      } catch (e) {}
+    }
+    return null;
   }, [people, user, isDemo, isDemoAdmin]);
 
   const isAdmin = useMemo(() => {
@@ -397,6 +419,11 @@ export default function App() {
 
   const handleLogin = (username, personData) => {
     localStorage.setItem(STORAGE_USER_KEY, username);
+    if (personData) {
+      try {
+        localStorage.setItem(STORAGE_PERSON_KEY, JSON.stringify(personData));
+      } catch (e) {}
+    }
     setUser(username);
     syncCredentialsToExtension(
       username,

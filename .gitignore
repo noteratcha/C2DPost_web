@@ -1,8 +1,11 @@
 .vercel
 desktop.ini
 *.ini
+**/desktop.ini
 __pycache__/
 *.pyc
-
+node_modules/
+scratch/
+tools/
 .env*
 *unpacked/

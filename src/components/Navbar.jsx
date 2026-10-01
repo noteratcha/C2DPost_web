@@ -202,6 +202,20 @@ export default function Navbar({
     (apiOldStatus === 'danger' || apiNewStatus === 'danger') ? 'danger' :
     (apiOldStatus === 'loading' || apiNewStatus === 'loading') ? 'loading' : 'success';
 
+  // Extract and format Vendor ID (strip leading zeros: e.g. "0000212876" -> "212876")
+  const rawVendor = String(
+    currentPerson?.VendorID ||
+    currentPerson?.['Vendor ID'] ||
+    currentPerson?.vendor_id ||
+    currentPerson?.vendorId ||
+    currentPerson?.VendorId ||
+    currentPerson?.['เลข Vendor'] ||
+    currentPerson?.['เลข Vendor (Vendor ID)'] ||
+    ''
+  ).trim();
+  const strippedVendor = rawVendor ? (rawVendor.replace(/^0+/, '') || '0') : '';
+  const displayRoleOrVendor = strippedVendor || currentPerson?.Status || 'DOL';
+
   return (
     <>
       <header className="main-navbar python-theme-navbar">
@@ -410,7 +424,7 @@ export default function Navbar({
                   type="button"
                   className={`user-profile-badge ${isUserMenuOpen ? 'active' : ''}`}
                   onClick={() => setIsUserMenuOpen(prev => !prev)}
-                  title={`ผู้ใช้งาน: ${user} (คลิกเพื่อเปิดเมนู)`}
+                  title={`ผู้ใช้งาน: ${user}${strippedVendor ? ` | Vendor: ${strippedVendor}` : ''} (คลิกเพื่อเปิดเมนู)`}
                   aria-expanded={isUserMenuOpen}
                 >
                   <div className="user-avatar-badge">
@@ -423,8 +437,8 @@ export default function Navbar({
                     <span className="user-display-name" title={currentPerson ? currentPerson.UserName || user : user}>
                       {currentPerson ? currentPerson.UserName || user : user}
                     </span>
-                    <span className="user-display-role">
-                      {currentPerson?.Status || 'DOL'}
+                    <span className="user-display-role" title={rawVendor ? `Vendor ID: ${rawVendor} (แสดง: ${displayRoleOrVendor})` : (currentPerson?.Status || 'DOL')}>
+                      {displayRoleOrVendor}
                     </span>
                   </div>
                   <svg className={`user-badge-chevron ${isUserMenuOpen ? 'open' : ''}`} width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -450,7 +464,16 @@ export default function Navbar({
                           {orgName}
                         </div>
                         <div className="user-dropdown-badges">
-                          <span className="user-dropdown-role-chip">{currentPerson?.Status || 'DOL'}</span>
+                          {strippedVendor ? (
+                            <span className="user-dropdown-role-chip" title={`Vendor ID: ${rawVendor}`}>
+                              Vendor: {strippedVendor}
+                            </span>
+                          ) : (
+                            <span className="user-dropdown-role-chip">{currentPerson?.Status || 'DOL'}</span>
+                          )}
+                          {strippedVendor && currentPerson?.Status && (
+                            <span className="user-dropdown-role-chip" style={{ opacity: 0.85 }}>{currentPerson.Status}</span>
+                          )}
                           {currentPerson?.ResponsiblePostoffice && (
                             <span className="user-dropdown-po-chip" title={currentPerson.ResponsiblePostoffice}>
                               {currentPerson.ResponsiblePostoffice}
