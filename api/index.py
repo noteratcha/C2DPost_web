@@ -62,6 +62,7 @@ class RegisterUserRequest(BaseModel):
     contact3: Optional[str] = ""
     tel3: Optional[str] = ""
     pdpa: Optional[str] = "Yes"
+    is_update: Optional[bool] = False
 
 class SendEparcelRequest(BaseModel):
     username: str
@@ -2777,8 +2778,45 @@ def verify_user(req: VerifyUserRequest):
     import requests
     from requests.auth import HTTPBasicAuth
     import urllib3
+    import csv, io
     urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
     
+    target_user = req.username.strip()
+    target_pass = req.password.strip()
+
+    # 1. Look up existing profile from Google Sheet LoginC2DPost
+    sheet_csv_url = "https://docs.google.com/spreadsheets/d/1hiWww6BI7NCTAw3Ai3CjbzS8TWdIX2AAOj7P_2BxMcQ/export?format=csv&gid=0"
+    matched_user = None
+    try:
+        sc = requests.get(sheet_csv_url, timeout=5)
+        if sc.status_code == 200:
+            reader = csv.DictReader(io.StringIO(sc.text))
+            for row in reader:
+                u = (row.get("UserName") or "").strip().lower()
+                if u == target_user.lower():
+                    matched_user = {
+                        "username": row.get("UserName") or target_user,
+                        "password": row.get("Password") or "",
+                        "organization": row.get("Organization") or "",
+                        "vendor_id": row.get("VendorID") or "",
+                        "email": row.get("Email") or "",
+                        "postoffice": row.get("ResponsiblePostoffice") or "",
+                        "zipcode": row.get("ResponsibleZipcode") or "",
+                        "contact1": row.get("ContactPerson1") or "",
+                        "tel1": row.get("TelContactPerson1") or "",
+                        "contact2": row.get("ContactPerson2") or "",
+                        "tel2": row.get("TelContactPerson2") or "",
+                        "contact3": row.get("ContactPerson3") or "",
+                        "tel3": row.get("TelContactPerson3") or "",
+                        "status": row.get("Status") or "DOL",
+                        "type_barcode": row.get("TypeBarcode") or "EMS"
+                    }
+                    break
+    except Exception as se:
+        print(f"Sheet lookup warning: {se}")
+
+    # 2. Check credentials with Thailand Post API
+    post_api_valid = False
     url = "https://r_dservice.thailandpost.com/webservice/addItems"
     headers = {"Content-Type": "application/json"}
     try:
@@ -2786,20 +2824,65 @@ def verify_user(req: VerifyUserRequest):
             url, 
             json=[], 
             headers=headers, 
-            auth=HTTPBasicAuth(req.username.strip(), req.password.strip()), 
+            auth=HTTPBasicAuth(target_user, target_pass), 
             timeout=15, 
             verify=False
         )
         if r.status_code in (200, 201, 202):
-            return {"success": True, "valid": True, "message": "ตรวจสอบ Username และ Password ถูกต้อง"}
+            post_api_valid = True
         elif r.status_code == 401:
-            return {"success": True, "valid": False, "message": "Username หรือ Password ไม่ถูกต้อง"}
+            if matched_user and matched_user.get("password") == target_pass:
+                post_api_valid = True
+            else:
+                return {
+                    "success": True, 
+                    "valid": False, 
+                    "message": "Username หรือ Password ไม่ถูกต้อง",
+                    "exists_in_sheet": bool(matched_user)
+                }
         elif r.status_code == 403:
-            return {"success": False, "valid": False, "message": "ระบบไปรษณีย์ปฏิเสธการเชื่อมต่อ (403) กรุณาตรวจสอบสิทธิ์การใช้งาน API"}
+            if matched_user and matched_user.get("password") == target_pass:
+                post_api_valid = True
+            else:
+                return {
+                    "success": False, 
+                    "valid": False, 
+                    "message": "ระบบไปรษณีย์ปฏิเสธการเชื่อมต่อ (403) กรุณาตรวจสอบสิทธิ์การใช้งาน API",
+                    "exists_in_sheet": bool(matched_user)
+                }
         else:
-            return {"success": False, "valid": False, "message": f"ไม่สามารถตรวจสอบได้ ระบบไปรษณีย์ตอบสถานะ {r.status_code}: {r.text[:200]}"}
+            if matched_user and matched_user.get("password") == target_pass:
+                post_api_valid = True
+            else:
+                return {
+                    "success": False, 
+                    "valid": False, 
+                    "message": f"ไม่สามารถตรวจสอบได้ ระบบไปรษณีย์ตอบสถานะ {r.status_code}: {r.text[:200]}",
+                    "exists_in_sheet": bool(matched_user)
+                }
     except Exception as e:
-        return {"success": False, "valid": False, "message": f"เชื่อมต่อ API ล้มเหลว: {str(e)}"}
+        if matched_user and matched_user.get("password") == target_pass:
+            post_api_valid = True
+        else:
+            return {
+                "success": False, 
+                "valid": False, 
+                "message": f"เชื่อมต่อ API ล้มเหลว: {str(e)}",
+                "exists_in_sheet": bool(matched_user)
+            }
+
+    if post_api_valid:
+        safe_user_data = dict(matched_user) if matched_user else None
+        if safe_user_data and "password" in safe_user_data:
+            del safe_user_data["password"]
+            
+        return {
+            "success": True, 
+            "valid": True, 
+            "message": "ตรวจสอบ Username และ Password ถูกต้อง",
+            "exists_in_sheet": bool(matched_user),
+            "user_data": safe_user_data
+        }
 
 @app.post("/api/register_user")
 def register_user(req: RegisterUserRequest):
@@ -2807,22 +2890,23 @@ def register_user(req: RegisterUserRequest):
     target_user = req.username.strip()
     vendor_val = (req.vendor_id or req.vendorId or "").strip()
 
-    # Pre-check duplicate username in Google Sheet to avoid overwriting existing profiles
-    sheet_csv_url = "https://docs.google.com/spreadsheets/d/1hiWww6BI7NCTAw3Ai3CjbzS8TWdIX2AAOj7P_2BxMcQ/export?format=csv"
-    try:
-        sc = requests.get(sheet_csv_url, timeout=5)
-        if sc.status_code == 200:
-            lines = sc.text.splitlines()
-            for line in lines[1:]:
-                parts = line.split(",")
-                if parts and parts[0].strip().lower() == target_user.lower():
-                    return {
-                        "success": False,
-                        "error": "duplicate_username",
-                        "message": "❌ Username นี้ มีการลงทะเบียนแล้ว"
-                    }
-    except Exception:
-        pass
+    # Pre-check duplicate username in Google Sheet only if it is NOT an explicit profile update
+    if not req.is_update:
+        sheet_csv_url = "https://docs.google.com/spreadsheets/d/1hiWww6BI7NCTAw3Ai3CjbzS8TWdIX2AAOj7P_2BxMcQ/export?format=csv&gid=0"
+        try:
+            sc = requests.get(sheet_csv_url, timeout=5)
+            if sc.status_code == 200:
+                lines = sc.text.splitlines()
+                for line in lines[1:]:
+                    parts = line.split(",")
+                    if parts and parts[0].strip().lower() == target_user.lower():
+                        return {
+                            "success": False,
+                            "error": "duplicate_username",
+                            "message": "❌ Username นี้ มีการลงทะเบียนแล้ว (สามารถเลือกอัปเดตข้อมูลได้)"
+                        }
+        except Exception:
+            pass
 
     url = "https://script.google.com/macros/s/AKfycbwi9khFasbC7RYgsFya_pwTgOI-3B7jp2VIyoY_OVFV58ukjo1jyN_zKcQGfmxm1_8/exec"
     payload = {

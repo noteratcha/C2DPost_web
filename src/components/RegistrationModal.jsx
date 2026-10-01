@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { parseCsv } from '../utils/parseCsv';
+import { SPREADSHEET_ID } from '../config';
 import './RegistrationModal.css';
 
 const SCRIPT_REGISTER_URL = 'https://script.google.com/macros/s/AKfycbwi9khFasbC7RYgsFya_pwTgOI-3B7jp2VIyoY_OVFV58ukjo1jyN_zKcQGfmxm1_8/exec';
@@ -6,7 +8,7 @@ const POSTOFFICE_CSV_URL = 'https://docs.google.com/spreadsheets/d/12tt2MBVqBRMz
 
 let postOfficeCache = null;
 
-export default function RegistrationModal({ isOpen, onClose }) {
+export default function RegistrationModal({ isOpen, onClose, people = [] }) {
   // Section 1: ข้อมูลการเข้าสู่ระบบ
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -15,6 +17,7 @@ export default function RegistrationModal({ isOpen, onClose }) {
   const [errPass, setErrPass] = useState('');
   const [verifyingApi, setVerifyingApi] = useState(false);
   const [apiVerified, setApiVerified] = useState(false);
+  const [isExistingUser, setIsExistingUser] = useState(false);
   const [verifyStatus, setVerifyStatus] = useState({ text: '', type: '' }); // 'success' | 'fail' | 'error' | 'info'
 
   // Section 2: ข้อมูลหน่วยงาน
@@ -56,6 +59,7 @@ export default function RegistrationModal({ isOpen, onClose }) {
     if (isOpen) {
       // เปิดใหม่ทุกครั้งต้องเริ่มก่อน verify ใหม่ — กันฟอร์มค้าง disabled/ยิงซ้ำ (บั๊ก #24)
       setApiVerified(false);
+      setIsExistingUser(false);
       setVerifyingApi(false);
       setVerifyStatus({ text: '', type: '' });
       setShowPassword(false);
@@ -65,6 +69,7 @@ export default function RegistrationModal({ isOpen, onClose }) {
       setCountdown(null);
       setLblMsg({ text: '', type: '' });
       setBtnSubmitText('ลงทะเบียน');
+      setIsExistingUser(false);
     }
   }, [isOpen]);
 
@@ -80,6 +85,8 @@ export default function RegistrationModal({ isOpen, onClose }) {
     } else {
       setErrUser('');
     }
+    setApiVerified(false);
+    setIsExistingUser(false);
     setVerifyStatus({ text: '', type: '' });
     setLblMsg({ text: '', type: '' });
   };
@@ -95,7 +102,7 @@ export default function RegistrationModal({ isOpen, onClose }) {
     setLblMsg({ text: '', type: '' });
   };
 
-  // Section 1: Verify API Auth (Thailand Post addItems service)
+  // Section 1: Verify API Auth (Thailand Post addItems service) & Check Google Sheet
   const handleVerifyApi = async () => {
     const u = username.trim();
     const p = password.trim();
@@ -118,9 +125,122 @@ export default function RegistrationModal({ isOpen, onClose }) {
 
       if (data.valid) {
         setApiVerified(true);
-        setVerifyStatus({ text: '✅ ตรวจสอบ Username และ Password ถูกต้อง', type: 'success' });
+
+        // ตรวจสอบข้อมูลผู้ใช้เดิมจาก backend หรือจาก people prop หรือ Google Sheet
+        let foundData = data.user_data;
+        if (!foundData && people && people.length > 0) {
+          const matched = people.find(
+            person => (person.UserName || '').trim().toLowerCase() === u.toLowerCase()
+          );
+          if (matched) {
+            foundData = {
+              organization: matched.Organization || '',
+              vendor_id: matched.VendorID || matched.vendor_id || '',
+              email: matched.Email || '',
+              postoffice: matched.ResponsiblePostoffice || '',
+              zipcode: matched.ResponsibleZipcode || '',
+              contact1: matched.ContactPerson1 || '',
+              tel1: matched.TelContactPerson1 || '',
+              contact2: matched.ContactPerson2 || '',
+              tel2: matched.TelContactPerson2 || '',
+              contact3: matched.ContactPerson3 || '',
+              tel3: matched.TelContactPerson3 || ''
+            };
+          }
+        }
+
+        // Direct sheet lookup fallback if not found yet
+        if (!foundData) {
+          try {
+            const sheetUrl = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/export?format=csv&gid=0&_=${Date.now()}`;
+            const sRes = await fetch(sheetUrl);
+            if (sRes.ok) {
+              const sText = await sRes.text();
+              const parsed = parseCsv(sText);
+              const matched = parsed.find(
+                person => (person.UserName || '').trim().toLowerCase() === u.toLowerCase()
+              );
+              if (matched) {
+                foundData = {
+                  organization: matched.Organization || '',
+                  vendor_id: matched.VendorID || matched.vendor_id || '',
+                  email: matched.Email || '',
+                  postoffice: matched.ResponsiblePostoffice || '',
+                  zipcode: matched.ResponsibleZipcode || '',
+                  contact1: matched.ContactPerson1 || '',
+                  tel1: matched.TelContactPerson1 || '',
+                  contact2: matched.ContactPerson2 || '',
+                  tel2: matched.TelContactPerson2 || '',
+                  contact3: matched.ContactPerson3 || '',
+                  tel3: matched.TelContactPerson3 || ''
+                };
+              }
+            }
+          } catch (e) {
+            console.warn('Direct sheet lookup fallback failed:', e);
+          }
+        }
+
+        if (foundData) {
+          setIsExistingUser(true);
+
+          if (foundData.organization) {
+            setOrganization(foundData.organization);
+            setErrOrg('');
+          }
+          if (foundData.vendor_id) {
+            setVendorId(foundData.vendor_id);
+          }
+          if (foundData.email) {
+            setEmail(foundData.email);
+            setErrEmail('');
+          }
+          if (foundData.zipcode) {
+            setZipcode(foundData.zipcode);
+            setErrZip('');
+            setPoFound(true);
+          }
+          if (foundData.postoffice) {
+            setPostoffice(foundData.postoffice);
+          }
+
+          if (foundData.contact1) {
+            setContact1(foundData.contact1);
+            setErrContact1('');
+          }
+          if (foundData.tel1) {
+            setTel1(foundData.tel1);
+            setErrTel1('');
+          }
+
+          if (foundData.contact2 || foundData.tel2) {
+            setContact2(foundData.contact2 || '');
+            setTel2(foundData.tel2 || '');
+            setContactCount(prev => Math.max(prev, 2));
+          }
+
+          if (foundData.contact3 || foundData.tel3) {
+            setContact3(foundData.contact3 || '');
+            setTel3(foundData.tel3 || '');
+            setContactCount(3);
+          }
+
+          setBtnSubmitText('บันทึก / อัปเดตข้อมูล');
+          setVerifyStatus({
+            text: '✅ ตรวจสอบถูกต้อง (พบข้อมูลเดิมในระบบ - ดึงข้อมูลอัตโนมัติเรียบร้อยแล้ว)',
+            type: 'success'
+          });
+        } else {
+          setIsExistingUser(false);
+          setBtnSubmitText('ลงทะเบียน');
+          setVerifyStatus({
+            text: '✅ ตรวจสอบ Username และ Password ถูกต้อง',
+            type: 'success'
+          });
+        }
       } else {
         setApiVerified(false);
+        setIsExistingUser(false);
         setVerifyStatus({
           text: data.success === false && data.message ? `❌ ${data.message}` : '❌ Username หรือ Password ไม่ถูกต้อง',
           type: 'fail'
@@ -128,8 +248,41 @@ export default function RegistrationModal({ isOpen, onClose }) {
       }
     } catch (err) {
       console.error('Verify error:', err);
-      // Fallback: If backend is offline or static mode, check via direct POST or notification
-      setVerifyStatus({ text: '⚠️ เชื่อมต่อ API ล้มเหลว โปรดลองใหม่', type: 'error' });
+      // Fallback: If backend is offline, try checking against people or Google Sheet
+      let matched = (people || []).find(
+        person => (person.UserName || '').trim().toLowerCase() === u.toLowerCase()
+      );
+      if (matched && matched.Password === p) {
+        setApiVerified(true);
+        setIsExistingUser(true);
+        if (matched.Organization) setOrganization(matched.Organization);
+        if (matched.VendorID || matched.vendor_id) setVendorId(matched.VendorID || matched.vendor_id);
+        if (matched.Email) setEmail(matched.Email);
+        if (matched.ResponsibleZipcode) {
+          setZipcode(matched.ResponsibleZipcode);
+          setPoFound(true);
+        }
+        if (matched.ResponsiblePostoffice) setPostoffice(matched.ResponsiblePostoffice);
+        if (matched.ContactPerson1) setContact1(matched.ContactPerson1);
+        if (matched.TelContactPerson1) setTel1(matched.TelContactPerson1);
+        if (matched.ContactPerson2 || matched.TelContactPerson2) {
+          setContact2(matched.ContactPerson2 || '');
+          setTel2(matched.TelContactPerson2 || '');
+          setContactCount(prev => Math.max(prev, 2));
+        }
+        if (matched.ContactPerson3 || matched.TelContactPerson3) {
+          setContact3(matched.ContactPerson3 || '');
+          setTel3(matched.TelContactPerson3 || '');
+          setContactCount(3);
+        }
+        setBtnSubmitText('บันทึก / อัปเดตข้อมูล');
+        setVerifyStatus({
+          text: '✅ ตรวจสอบข้อมูลถูกต้อง (ดึงข้อมูลเดิมจากระบบเรียบร้อยแล้ว)',
+          type: 'success'
+        });
+      } else {
+        setVerifyStatus({ text: '⚠️ เชื่อมต่อ API ล้มเหลว โปรดลองใหม่', type: 'error' });
+      }
     } finally {
       setVerifyingApi(false);
     }
@@ -250,10 +403,11 @@ export default function RegistrationModal({ isOpen, onClose }) {
     }
 
     setSubmitting(true);
-    setBtnSubmitText('กำลังส่งข้อมูล...');
+    setBtnSubmitText(isExistingUser ? 'กำลังบันทึกข้อมูล...' : 'กำลังส่งข้อมูล...');
 
     const payload = {
-      action: 'register',
+      action: isExistingUser ? 'update_user' : 'register',
+      is_update: isExistingUser,
       username: username.trim(),
       UserName: username.trim(),
       password: password.trim(),
@@ -352,8 +506,11 @@ export default function RegistrationModal({ isOpen, onClose }) {
 
     let count = 10;
     setCountdown(count);
+    const successMsg = isExistingUser
+      ? `✅ บันทึกและอัปเดตข้อมูลผู้ใช้งาน C2DPost สำเร็จ!\n(ปิดหน้าต่างอัตโนมัติใน ${count} วินาที)`
+      : `✅ ลงทะเบียนขอสิทธิ์การใช้งาน C2DPost สำเร็จ!\n(ปิดหน้าต่างอัตโนมัติใน ${count} วินาที)`;
     setLblMsg({
-      text: `✅ ลงทะเบียนขอสิทธิ์การใช้งาน C2DPost สำเร็จ!\n(ปิดหน้าต่างอัตโนมัติใน ${count} วินาที)`,
+      text: successMsg,
       type: 'success'
     });
 
@@ -365,7 +522,9 @@ export default function RegistrationModal({ isOpen, onClose }) {
       } else {
         setCountdown(count);
         setLblMsg({
-          text: `✅ ลงทะเบียนขอสิทธิ์การใช้งาน C2DPost สำเร็จ!\n(ปิดหน้าต่างอัตโนมัติใน ${count} วินาที)`,
+          text: isExistingUser
+            ? `✅ บันทึกและอัปเดตข้อมูลผู้ใช้งาน C2DPost สำเร็จ!\n(ปิดหน้าต่างอัตโนมัติใน ${count} วินาที)`
+            : `✅ ลงทะเบียนขอสิทธิ์การใช้งาน C2DPost สำเร็จ!\n(ปิดหน้าต่างอัตโนมัติใน ${count} วินาที)`,
           type: 'success'
         });
       }

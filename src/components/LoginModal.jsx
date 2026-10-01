@@ -165,6 +165,7 @@ export default function LoginModal({ onLogin, people = [], loading = false, erro
       <RegistrationModal
         isOpen={showRegister}
         onClose={() => setShowRegister(false)}
+        people={people}
       />
     </div>
   );
