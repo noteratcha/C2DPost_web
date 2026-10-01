@@ -2976,6 +2976,72 @@ def register_user(req: RegisterUserRequest):
             "message": f"การเชื่อมต่อล้มเหลว: {str(e)}"
         }
 
+@app.get("/api/admin/users")
+def get_admin_users():
+    """
+    Fetches user data from Google Sheets LoginC2DPost with zero cache
+    and clean normalization of all fields including VendorID.
+    """
+    import requests, csv, io
+    sheet_url = "https://docs.google.com/spreadsheets/d/1hiWww6BI7NCTAw3Ai3CjbzS8TWdIX2AAOj7P_2BxMcQ/export?format=csv&gid=0"
+    try:
+        r = requests.get(sheet_url, headers={"Cache-Control": "no-cache", "Pragma": "no-cache"}, timeout=10)
+        if r.status_code != 200:
+            return JSONResponse(status_code=502, content={"success": False, "error": f"Sheet responded with {r.status_code}"})
+        
+        reader = csv.DictReader(io.StringIO(r.text))
+        users = []
+        for row in reader:
+            username = (row.get("UserName") or row.get("username") or "").strip()
+            if not username:
+                continue
+            
+            vid = (
+                row.get("VendorID") or
+                row.get("Vendor ID") or
+                row.get("vendor_id") or
+                row.get("vendorId") or
+                row.get("VendorId") or
+                row.get("เลข Vendor") or
+                row.get("เลข Vendor (Vendor ID)") or
+                ""
+            ).strip()
+
+            clean_user = {
+                "UserName": username,
+                "Password": (row.get("Password") or "").strip(),
+                "VendorID": vid,
+                "vendor_id": vid,
+                "Email": (row.get("Email") or "").strip(),
+                "Prefix": (row.get("Prefix") or "").strip(),
+                "Organization": (row.get("Organization") or "").strip(),
+                "ResponsiblePostoffice": (row.get("ResponsiblePostoffice") or "").strip(),
+                "ResponsibleZipcode": (row.get("ResponsibleZipcode") or "").strip(),
+                "ActivationDate": (row.get("ActivationDate") or "").strip(),
+                "ContactPerson1": (row.get("ContactPerson1") or "").strip(),
+                "TelContactPerson1": (row.get("TelContactPerson1") or "").strip(),
+                "ContactPerson2": (row.get("ContactPerson2") or "").strip(),
+                "TelContactPerson2": (row.get("TelContactPerson2") or "").strip(),
+                "ContactPerson3": (row.get("ContactPerson3") or "").strip(),
+                "TelContactPerson3": (row.get("TelContactPerson3") or "").strip(),
+                "Status": (row.get("Status") or "DOL").strip(),
+                "TypeBarcode": (row.get("TypeBarcode") or "EMS").strip(),
+                "Agree": (row.get("Agree") or "Yes").strip()
+            }
+            users.append(clean_user)
+        
+        return JSONResponse(
+            status_code=200,
+            content={"success": True, "users": users, "total": len(users)},
+            headers={"Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache"}
+        )
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"success": False, "error": str(e)},
+            headers={"Cache-Control": "no-cache, no-store, must-revalidate"}
+        )
+
 @app.post("/api/admin/update_user")
 async def admin_update_user(request: Request):
     """

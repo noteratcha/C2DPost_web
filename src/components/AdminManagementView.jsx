@@ -81,6 +81,13 @@ export default function AdminManagementView({
     return () => clearInterval(interval);
   }, [checkApiServices]);
 
+  // Automatically refresh users from Google Sheet when Admin Management view mounts
+  useEffect(() => {
+    if (onRefreshPeople) {
+      onRefreshPeople();
+    }
+  }, [onRefreshPeople]);
+
   // Lift services state up to parent (Navbar)
   useEffect(() => {
     if (onServicesChange) onServicesChange(services);
@@ -92,7 +99,7 @@ export default function AdminManagementView({
     setEditModalData({
       UserName: person.UserName || '',
       Password: person.Password || '',
-      VendorID: person.VendorID || person.vendor_id || '',
+      VendorID: person.VendorID || person['Vendor ID'] || person.vendor_id || person.vendorId || '',
       Email: person.Email || '',
       Prefix: person.Prefix || '',
       Organization: person.Organization || '',
@@ -184,7 +191,13 @@ export default function AdminManagementView({
       const res = await fetch('/api/admin/update_user', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'update_user', ...editModalData })
+        body: JSON.stringify({
+          action: 'update_user',
+          ...editModalData,
+          VendorID: editModalData.VendorID || '',
+          vendor_id: editModalData.VendorID || '',
+          vendorId: editModalData.VendorID || ''
+        })
       });
       const data = await res.json();
       if (data.status === 'success' || data.success) {
@@ -246,7 +259,7 @@ export default function AdminManagementView({
       const term = searchTerm.toLowerCase().trim();
 
       const u = (p.UserName || '').toLowerCase();
-      const vid = (p.VendorID || p.vendor_id || '').toLowerCase();
+      const vid = (p.VendorID || p['Vendor ID'] || p.vendor_id || p.vendorId || '').toLowerCase();
       const org = (p.Organization || '').toLowerCase();
       const po = (p.ResponsiblePostoffice || '').toLowerCase();
       const zip = (p.ResponsibleZipcode || '').toLowerCase();
@@ -517,7 +530,7 @@ export default function AdminManagementView({
                         </td>
 
                         <td className="col-password">{person.Password}</td>
-                        <td className="col-vendor">{person.VendorID || person.vendor_id || '-'}</td>
+                        <td className="col-vendor">{person.VendorID || person['Vendor ID'] || person.vendor_id || person.vendorId || '-'}</td>
                         <td className="col-prefix">{person.Prefix || '-'}</td>
                         <td className="col-org" title={person.Organization}>{person.Organization || '-'}</td>
                         <td className="col-po" title={person.ResponsiblePostoffice}>{person.ResponsiblePostoffice || '-'}</td>

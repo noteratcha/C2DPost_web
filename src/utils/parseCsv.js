@@ -1,12 +1,14 @@
 export function parseCsv(csvText) {
+  if (!csvText) return []
+  const text = csvText.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
   const lines = []
   let currentLine = ''
   let inQuotes = false
 
-  for (let i = 0; i < csvText.length; i++) {
-    const char = csvText[i]
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i]
     if (char === '"') {
-      if (inQuotes && csvText[i + 1] === '"') {
+      if (inQuotes && text[i + 1] === '"') {
         currentLine += '"'
         i++
       } else {
@@ -20,6 +22,7 @@ export function parseCsv(csvText) {
     }
   }
   if (currentLine) lines.push(currentLine)
+  if (lines.length === 0) return []
 
   const headers = splitLine(lines[0])
   const rows = []
@@ -32,6 +35,23 @@ export function parseCsv(csvText) {
     headers.forEach((h, idx) => {
       row[h.trim()] = values[idx] !== undefined ? values[idx].trim() : ''
     })
+
+    // Normalize vendor id field across possible variations
+    const vid = (
+      row['VendorID'] ||
+      row['Vendor ID'] ||
+      row['vendor_id'] ||
+      row['vendorId'] ||
+      row['VendorId'] ||
+      row['เลข Vendor'] ||
+      row['เลข Vendor (Vendor ID)'] ||
+      ''
+    ).trim()
+    row.VendorID = vid
+    row.vendor_id = vid
+    row['Vendor ID'] = vid
+    row.vendorId = vid
+
     rows.push(row)
   }
 

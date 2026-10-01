@@ -135,7 +135,7 @@ export default function RegistrationModal({ isOpen, onClose, people = [] }) {
           if (matched) {
             foundData = {
               organization: matched.Organization || '',
-              vendor_id: matched.VendorID || matched.vendor_id || '',
+              vendor_id: matched.VendorID || matched['Vendor ID'] || matched.vendor_id || matched.vendorId || '',
               email: matched.Email || '',
               postoffice: matched.ResponsiblePostoffice || '',
               zipcode: matched.ResponsibleZipcode || '',
@@ -163,7 +163,7 @@ export default function RegistrationModal({ isOpen, onClose, people = [] }) {
               if (matched) {
                 foundData = {
                   organization: matched.Organization || '',
-                  vendor_id: matched.VendorID || matched.vendor_id || '',
+                  vendor_id: matched.VendorID || matched['Vendor ID'] || matched.vendor_id || matched.vendorId || '',
                   email: matched.Email || '',
                   postoffice: matched.ResponsiblePostoffice || '',
                   zipcode: matched.ResponsibleZipcode || '',
@@ -256,7 +256,8 @@ export default function RegistrationModal({ isOpen, onClose, people = [] }) {
         setApiVerified(true);
         setIsExistingUser(true);
         if (matched.Organization) setOrganization(matched.Organization);
-        if (matched.VendorID || matched.vendor_id) setVendorId(matched.VendorID || matched.vendor_id);
+        const matchedVendor = matched.VendorID || matched['Vendor ID'] || matched.vendor_id || matched.vendorId || '';
+        if (matchedVendor) setVendorId(matchedVendor);
         if (matched.Email) setEmail(matched.Email);
         if (matched.ResponsibleZipcode) {
           setZipcode(matched.ResponsibleZipcode);

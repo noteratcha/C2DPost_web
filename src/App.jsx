@@ -308,13 +308,30 @@ export default function App() {
     };
   }, [user, resetInactivityTimer]);
 
-  // Load user data from Google Sheets
+  // Load user data from Google Sheets (via backend proxy or direct sheet fallback)
   const loadPeople = useCallback(async () => {
     setLoadingSheet(true);
     setSheetError(false);
-    const url = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/export?format=csv&gid=0&_=${Date.now()}`;
+
+    // 1. Try serverless backend proxy first (guaranteed fresh, no CORS/cache issues)
     try {
-      const res = await fetch(url);
+      const res = await fetch(`/api/admin/users?_t=${Date.now()}`, { cache: 'no-store' });
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.success && Array.isArray(data.users) && data.users.length > 0) {
+          setPeople(data.users);
+          setLoadingSheet(false);
+          return;
+        }
+      }
+    } catch (apiErr) {
+      console.warn('Backend /api/admin/users fallback to direct sheet:', apiErr);
+    }
+
+    // 2. Direct Google Sheets CSV fetch fallback
+    const url = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/export?format=csv&gid=0&_t=${Date.now()}`;
+    try {
+      const res = await fetch(url, { cache: 'no-store' });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const text = await res.text();
       setPeople(parseCsv(text));

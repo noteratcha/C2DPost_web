@@ -1492,7 +1492,14 @@ if any(k in desc for k in ["ถึงที่ทำการปลายทา�
   - ปรับเปลี่ยนปุ่มส่งข้อมูลเป็น "บันทึก / อัปเดตข้อมูล"
   - เมื่อผู้ใช้กดบันทึก ระบบจะส่งคำขอ `action: "update_user"` พร้อม `is_update: true` ทำให้สามารถแก้ไข/อัปเดตข้อมูลเลข Vendor หรือเบอร์โทรศัพท์ลง Google Sheet โดยไม่ติดเงื่อนไข Username ซ้ำ
 
-
-
-
-
+## 68. ระบบแสดงและโหลด Vendor ID อัตโนมัติในตารางแอดมินและโมดอลแก้ไข (v2026.1001.1850)
+- **การแสดงผล Vendor ID ในตารางผู้ใช้งานและโมดอล (`AdminManagementView.jsx`)**:
+  - ดึงข้อมูล Vendor ID จาก Google Sheet คอลัมน์ที่ 18 (R) มาแสดงในคอลัมน์ "Vendor ID" ของตารางผู้ใช้งานทุกรายการ
+  - เติมค่า Vendor ID ลงในช่อง "Vendor ID (เลข Vendor)" ในหน้าต่างป๊อปอัปแก้ไขข้อมูลผู้ใช้ (Edit User Modal) อัตโนมัติเมื่อคลิกแถวผู้ใช้
+  - ผูกคีย์ค้นหาใน Search Filter รองรับการค้นหาผู้ใช้ด้วยหมายเลข Vendor ID
+  - รองรับการเข้าถึงคีย์ทุกรูปแบบ (`VendorID`, `Vendor ID`, `vendor_id`, `vendorId`, `เลข Vendor`) ป้องกันปัญหาชื่อคีย์ต่างกัน
+- **ระบบ Auto-Refresh เมื่อเข้าสู่หน้า Admin**:
+  - เพิ่ม `useEffect` เรียก `onRefreshPeople()` ทันทีเมื่อผู้ดูแลระบบสลับเข้าสู่หน้าจัดการผู้ใช้ เพื่อให้ได้ข้อมูลล่าสุดจาก Google Sheets เสมอ
+- **Backend API Proxy สำหรับข้อมูลผู้ใช้ (`/api/admin/users`)**:
+  - เพิ่ม Endpoint `/api/admin/users` ดึงข้อมูลผู้ใช้จาก Google Sheet โดยตรงผ่านเซิร์ฟเวอร์ด้วย `Cache-Control: no-cache, no-store` ป้องกันการแคชของเบราว์เซอร์
+  - ฟังก์ชัน `loadPeople` ใน `App.jsx` จะเรียก Backend Proxy เป็นอันดับแรก พร้อมทั้งมีระบบ Fallback ไปยัง Google Sheets CSV ดั้งเดิมพร้อม `cache: 'no-store'`
