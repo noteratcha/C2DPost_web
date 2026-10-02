@@ -8,6 +8,71 @@ const POSTOFFICE_CSV_URL = 'https://docs.google.com/spreadsheets/d/12tt2MBVqBRMz
 
 let postOfficeCache = null;
 
+const loadPostOfficeMap = async (peopleList = []) => {
+  if (postOfficeCache && Object.keys(postOfficeCache).length > 0) {
+    return postOfficeCache;
+  }
+  const map = {};
+
+  // 1. Load from localStorage if present
+  try {
+    const localSaved = localStorage.getItem('c2dpost_custom_postoffices');
+    if (localSaved) {
+      const parsed = JSON.parse(localSaved);
+      Object.assign(map, parsed);
+    }
+  } catch (e) {
+    console.warn('Failed to load local custom postoffices', e);
+  }
+
+  // 2. Load from people prop (Sheet existing users)
+  if (Array.isArray(peopleList)) {
+    for (const p of peopleList) {
+      const z = (p.ResponsibleZipcode || p.zipcode || '').trim();
+      const po = (p.ResponsiblePostoffice || p.postoffice || '').trim();
+      if (z && po && !map[z]) {
+        map[z] = po;
+      }
+    }
+  }
+
+  // 3. Load from POSTOFFICE_CSV_URL (Area 10 base sheet)
+  try {
+    const res = await fetch(POSTOFFICE_CSV_URL);
+    if (res.ok) {
+      const text = await res.text();
+      for (const line of text.split('\n')) {
+        const cols = line.split(',');
+        if (cols.length >= 3) {
+          const z = (cols[0] || '').trim();
+          const name = (cols[2] || cols[1] || '').trim();
+          if (z && name && !map[z]) {
+            map[z] = name;
+          }
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('Failed to fetch POSTOFFICE_CSV_URL', e);
+  }
+
+  // 4. Load from backend /api/postoffices
+  try {
+    const apiRes = await fetch('/api/postoffices');
+    if (apiRes.ok) {
+      const data = await apiRes.json();
+      if (data.postoffices) {
+        Object.assign(map, data.postoffices);
+      }
+    }
+  } catch (e) {
+    console.warn('Failed to fetch /api/postoffices', e);
+  }
+
+  postOfficeCache = map;
+  return map;
+};
+
 export default function RegistrationModal({ isOpen, onClose, people = [] }) {
   // Section 1: ข้อมูลการเข้าสู่ระบบ
   const [username, setUsername] = useState('');
@@ -28,7 +93,10 @@ export default function RegistrationModal({ isOpen, onClose, people = [] }) {
   const [errEmail, setErrEmail] = useState('');
   const [zipcode, setZipcode] = useState('');
   const [errZip, setErrZip] = useState('');
+  const [infoZip, setInfoZip] = useState('');
   const [postoffice, setPostoffice] = useState('');
+  const [isCustomPo, setIsCustomPo] = useState(false);
+  const [errPo, setErrPo] = useState('');
   const [poFound, setPoFound] = useState(false);
 
   // Section 3: ข้อมูลผู้ประสานงาน
@@ -64,12 +132,18 @@ export default function RegistrationModal({ isOpen, onClose, people = [] }) {
       setVerifyStatus({ text: '', type: '' });
       setShowPassword(false);
       setVendorId('');
+      setIsCustomPo(false);
+      setErrPo('');
+      setInfoZip('');
     } else {
       if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
       setCountdown(null);
       setLblMsg({ text: '', type: '' });
       setBtnSubmitText('ลงทะเบียน');
       setIsExistingUser(false);
+      setIsCustomPo(false);
+      setErrPo('');
+      setInfoZip('');
     }
   }, [isOpen]);
 
@@ -300,54 +374,75 @@ export default function RegistrationModal({ isOpen, onClose, people = [] }) {
     setLblMsg({ text: '', type: '' });
   };
 
-  // Section 2: Zipcode query from Google Sheets CSV
+  // Section 2: Zipcode query from Google Sheets CSV & Custom DB
   const handleZipChange = async (val) => {
     const clean = val.replace(/\D/g, '').slice(0, 5);
     setZipcode(clean);
     setLblMsg({ text: '', type: '' });
+    setErrPo('');
 
     if (clean.length > 0 && clean.length < 5) {
       setErrZip('❌ รหัสไปรษณีย์ต้องเป็นตัวเลข 5 หลัก');
+      setInfoZip('');
       setPostoffice('');
+      setIsCustomPo(false);
       setPoFound(false);
     } else if (clean.length === 5) {
       setErrZip('');
+      setInfoZip('');
       setPostoffice('กำลังค้นหาข้อมูล...');
+      setIsCustomPo(false);
+      setPoFound(false);
       try {
-        if (!postOfficeCache) {
-          const res = await fetch(POSTOFFICE_CSV_URL);
-          const text = await res.text();
-          const map = {};
-          for (let line of text.split('\n')) {
-            const cols = line.split(',');
-            if (cols.length >= 3) {
-              const zip = (cols[0] || '').trim();
-              const name = (cols[2] || cols[1] || '').trim();
-              if (zip && !map[zip]) map[zip] = name;
-            }
-          }
-          postOfficeCache = map;
-        }
+        const map = await loadPostOfficeMap(people);
 
-        if (postOfficeCache[clean]) {
-          setPostoffice(postOfficeCache[clean]);
+        if (map[clean]) {
+          // พบรหัสไปรษณีย์ในฐานข้อมูลจริง -> ดึงชื่อที่ทำการอัตโนมัติ และล็อกห้ามแก้ไขเด็ดขาด
+          setPostoffice(map[clean]);
+          setIsCustomPo(false);
           setPoFound(true);
           setErrZip('');
+          setInfoZip('');
+          setErrPo('');
         } else {
+          // ต้องไม่พบรหัสไปรษณีย์นี้ในฐานข้อมูลนี้จริงๆ ถึงจะกรอกที่ช่องชื่อที่ทำการได้
           setPostoffice('');
+          setIsCustomPo(true);
           setPoFound(false);
-          setErrZip('❌ ไม่พบรหัสไปรษณีย์นี้ในฐานข้อมูล');
+          setErrZip('');
+          setInfoZip('ℹ️ ไม่พบรหัสนี้ในฐานข้อมูล กรุณากรอกชื่อที่ทำการในช่องด้านขวา');
+          setErrPo('');
         }
       } catch (e) {
         console.error(e);
         setPostoffice('');
+        setIsCustomPo(true);
         setPoFound(false);
-        setErrZip('❌ ไม่พบรหัสไปรษณีย์นี้ในฐานข้อมูล');
+        setErrZip('');
+        setInfoZip('ℹ️ ไม่พบรหัสนี้ในฐานข้อมูล กรุณากรอกชื่อที่ทำการในช่องด้านขวา');
+        setErrPo('');
       }
     } else {
       setErrZip('');
+      setInfoZip('');
       setPostoffice('');
+      setIsCustomPo(false);
       setPoFound(false);
+      setErrPo('');
+    }
+  };
+
+  // Section 2: Postoffice input handler (อนุญาตให้พิมพ์เฉพาะกรณีไม่พบในฐานข้อมูลเท่านั้น)
+  const handlePostofficeChange = (val) => {
+    if (!isCustomPo) return; // Strict lock: Only editable if custom
+    setPostoffice(val);
+    setLblMsg({ text: '', type: '' });
+    if (val.trim()) {
+      setPoFound(true);
+      setErrPo('');
+    } else {
+      setPoFound(false);
+      setErrPo('❌ กรุณาระบุชื่อที่ทำการ');
     }
   };
 
@@ -372,8 +467,13 @@ export default function RegistrationModal({ isOpen, onClose, people = [] }) {
     e.preventDefault();
     setLblMsg({ text: '', type: '' });
 
-    if (!poFound || !postoffice || postoffice === 'กำลังค้นหาข้อมูล...') {
-      setLblMsg({ text: '⚠️ กรุณาระบุรหัสไปรษณีย์ให้ถูกต้อง', type: 'error' });
+    if (!poFound || !postoffice || postoffice === 'กำลังค้นหาข้อมูล...' || !postoffice.trim()) {
+      if (isCustomPo) {
+        setErrPo('❌ กรุณาระบุชื่อที่ทำการ');
+        setLblMsg({ text: '⚠️ กรุณาระบุชื่อที่ทำการของรหัสไปรษณีย์นี้', type: 'error' });
+      } else {
+        setLblMsg({ text: '⚠️ กรุณาระบุรหัสไปรษณีย์ให้ถูกต้อง', type: 'error' });
+      }
       return;
     }
 
@@ -382,6 +482,30 @@ export default function RegistrationModal({ isOpen, onClose, people = [] }) {
       return;
     }
 
+    // Helper to persist custom post office to cache, localStorage, and backend
+    const persistCustomPo = () => {
+      if (zipcode.trim().length === 5 && postoffice.trim()) {
+        const cleanZip = zipcode.trim();
+        const poName = postoffice.trim();
+        if (!postOfficeCache) postOfficeCache = {};
+        postOfficeCache[cleanZip] = poName;
+        try {
+          const local = JSON.parse(localStorage.getItem('c2dpost_custom_postoffices') || '{}');
+          local[cleanZip] = poName;
+          localStorage.setItem('c2dpost_custom_postoffices', JSON.stringify(local));
+        } catch (err) {
+          console.warn('Failed to save to localStorage:', err);
+        }
+        if (isCustomPo) {
+          fetch('/api/postoffices', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ zipcode: cleanZip, postoffice: poName })
+          }).catch(err => console.warn('POST /api/postoffices error:', err));
+        }
+      }
+    };
+
     // Required fields check
     let hasEmpty = false;
     if (!username.trim()) { setErrUser('⚠️ กรุณากรอก Username'); hasEmpty = true; }
@@ -389,6 +513,7 @@ export default function RegistrationModal({ isOpen, onClose, people = [] }) {
     if (!organization.trim()) { setErrOrg('border-red'); hasEmpty = true; } else { setErrOrg(''); }
     if (!email.trim()) { setErrEmail('❌ รูปแบบอีเมลไม่ถูกต้อง'); hasEmpty = true; }
     if (!zipcode.trim() || zipcode.length < 5) { setErrZip('❌ รหัสไปรษณีย์ต้องเป็นตัวเลข 5 หลัก'); hasEmpty = true; }
+    if (isCustomPo && !postoffice.trim()) { setErrPo('❌ กรุณาระบุชื่อที่ทำการ'); hasEmpty = true; }
     if (!contact1.trim()) { setErrContact1('border-red'); hasEmpty = true; } else { setErrContact1(''); }
     if (!tel1.trim() || tel1.length < 10) { setErrTel1('❌ กรุณาระบุให้ครบ 10 หลัก'); hasEmpty = true; }
 
@@ -398,7 +523,7 @@ export default function RegistrationModal({ isOpen, onClose, people = [] }) {
     }
 
     // Check red borders / format errors
-    if (errUser || errPass || errEmail || errZip || errTel1 || errTel2 || errTel3) {
+    if (errUser || errPass || errEmail || errZip || errPo || errTel1 || errTel2 || errTel3) {
       setLblMsg({ text: '⚠️ ข้อมูลบางช่องยังไม่ถูกต้อง กรุณาแก้ไขช่องที่เป็นสีแดง', type: 'error' });
       return;
     }
@@ -450,6 +575,7 @@ export default function RegistrationModal({ isOpen, onClose, people = [] }) {
       const data = await res.json();
 
       if (data.result === 'SUCCESS' || data.success) {
+        persistCustomPo();
         handleSuccess();
       } else if (data.error === 'duplicate_username' || (data.message && data.message.includes('Username นี้'))) {
         handleDuplicate();
@@ -467,6 +593,7 @@ export default function RegistrationModal({ isOpen, onClose, people = [] }) {
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
           body: formData.toString()
         });
+        persistCustomPo();
         handleSuccess();
       } catch (fallbackErr) {
         console.error(fallbackErr);
@@ -498,6 +625,9 @@ export default function RegistrationModal({ isOpen, onClose, people = [] }) {
     setEmail('');
     setZipcode('');
     setPostoffice('');
+    setIsCustomPo(false);
+    setErrPo('');
+    setInfoZip('');
     setContact1('');
     setTel1('');
     setContact2('');
@@ -680,22 +810,30 @@ export default function RegistrationModal({ isOpen, onClose, people = [] }) {
                       type="text"
                       className={`reg-input ${errZip ? 'border-red' : ''}`}
                       maxLength={5}
+                      placeholder="(ตัวเลข 5 หลัก)"
                       value={zipcode}
                       onChange={(e) => handleZipChange(e.target.value)}
                       disabled={!apiVerified}
                     />
                     {errZip && <span className="reg-err-text">{errZip}</span>}
+                    {infoZip && <span className="reg-info-text">{infoZip}</span>}
                   </div>
                   <div className="reg-field">
-                    <label htmlFor="reg-po">ชื่อที่ทำการ *</label>
+                    <div className="reg-field-label-row">
+                      <label htmlFor="reg-po">ชื่อที่ทำการ *</label>
+                      {isCustomPo && <span className="badge-custom-po">เพิ่มใหม่</span>}
+                    </div>
                     <input
                       id="reg-po"
                       type="text"
-                      className="reg-input readonly-input"
+                      className={`reg-input ${isCustomPo ? 'custom-po-input' : 'readonly-input'} ${errPo ? 'border-red' : ''}`}
                       value={postoffice}
-                      readOnly
-                      disabled={true}
+                      onChange={(e) => handlePostofficeChange(e.target.value)}
+                      placeholder={isCustomPo ? '(ระบุชื่อที่ทำการ เช่น ปณ.นครราชสีมา)' : ''}
+                      readOnly={!isCustomPo}
+                      disabled={!apiVerified || (!isCustomPo && !postoffice)}
                     />
+                    {errPo && <span className="reg-err-text">{errPo}</span>}
                   </div>
                 </div>
               </div>
@@ -705,7 +843,11 @@ export default function RegistrationModal({ isOpen, onClose, people = [] }) {
             <div className={`reg-box-section ${!poFound ? 'section-locked' : ''}`}>
               <div className="reg-sec-header">
                 <h3>ข้อมูลผู้ประสานงาน</h3>
-                {!poFound && <span className="locked-pill">โปรดระบุรหัสไปรษณีย์ถูกต้องก่อน</span>}
+                {!poFound && (
+                  <span className="locked-pill">
+                    {isCustomPo ? 'โปรดระบุชื่อที่ทำการก่อน' : 'โปรดระบุรหัสไปรษณีย์ถูกต้องก่อน'}
+                  </span>
+                )}
               </div>
               <div className="reg-sec-content">
                 {/* Person 1 (Required) */}

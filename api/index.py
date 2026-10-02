@@ -64,6 +64,10 @@ class RegisterUserRequest(BaseModel):
     pdpa: Optional[str] = "Yes"
     is_update: Optional[bool] = False
 
+class CustomPostofficeRequest(BaseModel):
+    zipcode: str
+    postoffice: str
+
 class SendEparcelRequest(BaseModel):
     username: str
     password: str
@@ -2918,6 +2922,61 @@ def verify_user(req: VerifyUserRequest):
             "user_data": safe_user_data
         }
 
+CUSTOM_POSTOFFICES_FILE = os.path.join(os.path.dirname(__file__), "custom_postoffices.json")
+
+def _load_custom_postoffices():
+    mapping = {}
+    try:
+        if os.path.exists(CUSTOM_POSTOFFICES_FILE):
+            with open(CUSTOM_POSTOFFICES_FILE, "r", encoding="utf-8") as f:
+                mapping = json.load(f)
+    except Exception as e:
+        print(f"Error loading custom postoffices: {e}")
+    return mapping
+
+def _save_custom_postoffice(zipcode: str, name: str):
+    z = (zipcode or "").strip()
+    po = (name or "").strip()
+    if not z or not po:
+        return
+    try:
+        mapping = _load_custom_postoffices()
+        mapping[z] = po
+        with open(CUSTOM_POSTOFFICES_FILE, "w", encoding="utf-8") as f:
+            json.dump(mapping, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print(f"Error saving custom postoffice: {e}")
+
+@app.get("/api/postoffices")
+def get_custom_postoffices():
+    """Returns all known custom postoffices merged with existing user sheet data."""
+    import requests
+    mapping = _load_custom_postoffices()
+    try:
+        sheet_csv_url = "https://docs.google.com/spreadsheets/d/1hiWww6BI7NCTAw3Ai3CjbzS8TWdIX2AAOj7P_2BxMcQ/export?format=csv&gid=0"
+        sc = requests.get(sheet_csv_url, timeout=5)
+        if sc.status_code == 200:
+            lines = sc.text.splitlines()
+            if len(lines) > 1:
+                headers = [h.strip() for h in lines[0].split(",")]
+                po_idx = headers.index("ResponsiblePostoffice") if "ResponsiblePostoffice" in headers else 5
+                zip_idx = headers.index("ResponsibleZipcode") if "ResponsibleZipcode" in headers else 6
+                for line in lines[1:]:
+                    parts = [p.strip() for p in line.split(",")]
+                    if len(parts) > max(po_idx, zip_idx):
+                        z = parts[zip_idx]
+                        po = parts[po_idx]
+                        if z and po and z not in mapping:
+                            mapping[z] = po
+    except Exception as e:
+        print(f"Error reading postoffices from Google Sheet: {e}")
+    return {"success": True, "postoffices": mapping}
+
+@app.post("/api/postoffices")
+def add_custom_postoffice(req: CustomPostofficeRequest):
+    _save_custom_postoffice(req.zipcode, req.postoffice)
+    return {"success": True, "message": "บันทึกรหัสไปรษณีย์และชื่อที่ทำการเรียบร้อยแล้ว"}
+
 @app.post("/api/register_user")
 def register_user(req: RegisterUserRequest):
     import requests
@@ -2976,6 +3035,7 @@ def register_user(req: RegisterUserRequest):
         try:
             res_json = r.json()
             if res_json.get("status") == "success" or res_json.get("result") == "SUCCESS":
+                _save_custom_postoffice(req.zipcode, req.postoffice)
                 return {"success": True, "result": "SUCCESS", "message": res_json.get("message", "ลงทะเบียนสำเร็จ")}
             elif "มีคนใช้แล้ว" in str(res_json) or "Username นี้" in str(res_json):
                 return {"success": False, "error": "duplicate_username", "message": "❌ Username นี้ มีการลงทะเบียนแล้ว"}
@@ -2984,6 +3044,7 @@ def register_user(req: RegisterUserRequest):
         except:
             result = r.text.strip()
             if result == "SUCCESS":
+                _save_custom_postoffice(req.zipcode, req.postoffice)
                 return {"success": True, "result": "SUCCESS"}
             elif result.startswith("<!DOCTYPE html>") or "<html" in result.lower():
                 return {
