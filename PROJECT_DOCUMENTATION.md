@@ -1553,3 +1553,19 @@ if any(k in desc for k in ["ถึงที่ทำการปลายทา�
 
 
 
+
+
+## 74. เพิ่มข้อความแนะนำสีแดงเมื่อพบปัญหา e-Parcel Timeout สำหรับบัญชีขนาดใหญ่ (v2026.1002.0715)
+- **เพิ่มข้อความเตือนและคำแนะนำสีแดงประกอบการแจ้งเตือน (Red Suggestion Notice)**:
+  - เมื่อเกิดปัญหาการเชื่อมต่อ e-Parcel ล้มเหลวหรือหมดเวลาประมวลผล (Read timed out) เช่น บัญชี `Royalthai.pol` (สำนักงานตำรวจแห่งชาติ) ที่มีข้อมูลจราจรปริมาณมหาศาลทั่วประเทศ
+  - ระบบจะแสดงข้อความคำแนะนำเน้น **สีแดงเข้ม (#dc2626 / #f87171)** อย่างชัดเจน:
+    `"แนะนำให้ใช้แท็บ \"ตรวจสอบพัสดุ\" (Tracking) โดยค้นหาด้วยเลขบาร์โค้ดรายชิ้นหรือระบุเป็นกลุ่ม เพราะเนื่องจากข้อจำกัดของโครงสร้าง API ฝั่ง ปณท. ไม่รองรับการ Dump ข้อมูลระดับทั้งประเทศผ่าน Web Service แบบเรียลไทม์"`
+- **ปรับแต่ง UI/UX กล่องข้อความแจ้งเตือน (Alert Component Styling)**:
+  - **`DepositReportView.jsx` & `DepositReportModal.jsx` & `DashboardView.jsx`**:
+    - เมื่อ `api_notice` ระบุความล้มเหลวหรือเกิด Timeout ระบบจะเปลี่ยนกล่องแจ้งเตือนจากสีฟ้า (`.deposit-alert.info`) ให้เป็นกล่องสีแดงเตือนข้อผิดพลาด (`.deposit-alert.error`) พร้อมไอคอนเตือน (`!`)
+    - เพิ่มคลาส `.deposit-alert-body` และ `.deposit-alert-suggestion` แยกโครงสร้างข้อความหลักและคำแนะนำสีแดงพร้อมเส้นประคั่นสวยงาม
+  - **`DepositReportView.css`, `DepositReportModal.css`, `DashboardView.css`**:
+    - ปรับ `.deposit-alert` เป็น `align-items: flex-start` เพื่อให้ไอคอนจัดตำแหน่งกับบรรทัดแรกอย่างลงตัว
+    - เพิ่มสไตล์ `.deposit-alert-suggestion` กำหนดสีแดงสดเด่นชัดทั้งในโหมด Light Mode และ Dark Mode
+- **Backend API (`api/index.py`)**:
+  - กำหนดค่าคงที่ `SUGGESTION_TRACKING` และส่งกลับฟิลด์ `api_suggestion` พร้อมกับ `api_notice` ใน Endpoint `/api/reports/received` และ `/api/reports/dashboard`

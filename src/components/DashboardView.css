@@ -53,6 +53,78 @@
   to { transform: rotate(360deg); }
 }
 
+/* Alerts */
+.deposit-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  margin-bottom: 1rem;
+}
+
+.deposit-alert svg {
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.deposit-alert-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  flex: 1;
+}
+
+.deposit-alert-suggestion {
+  margin-top: 0.3rem;
+  padding-top: 0.35rem;
+  border-top: 1px dashed rgba(239, 68, 68, 0.35);
+  color: #dc2626 !important;
+  font-weight: 600;
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+
+[data-theme='dark'] .deposit-alert-suggestion {
+  color: #f87171 !important;
+  border-top-color: rgba(248, 113, 113, 0.3);
+}
+
+.deposit-alert.success {
+  background: rgba(16, 185, 129, 0.1);
+  color: #065f46;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+[data-theme='dark'] .deposit-alert.success {
+  background: rgba(16, 185, 129, 0.18);
+  color: #6ee7b7;
+}
+
+.deposit-alert.error {
+  background: rgba(239, 68, 68, 0.08);
+  color: #b91c1c;
+  border: 1px solid rgba(239, 68, 68, 0.25);
+}
+
+[data-theme='dark'] .deposit-alert.error {
+  background: rgba(239, 68, 68, 0.18);
+  color: #fca5a5;
+}
+
+.deposit-alert.info {
+  background: rgba(14, 165, 233, 0.08);
+  color: #0369a1;
+  border: 1px solid rgba(14, 165, 233, 0.25);
+}
+
+[data-theme='dark'] .deposit-alert.info {
+  background: rgba(14, 165, 233, 0.15);
+  color: #7dd3fc;
+}
+
 /* Stats Cards Grid matching DepositReportView */
 .deposit-stats-grid {
   display: grid;

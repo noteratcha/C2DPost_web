@@ -874,18 +874,41 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
               <line x1="12" y1="8" x2="12" y2="12"></line>
               <line x1="12" y1="16" x2="12.01" y2="16"></line>
             </svg>
-            <span>{error}</span>
+            <div className="deposit-alert-body">
+              <span>{error}</span>
+              {/timed out|นานเกินกำหนด/i.test(error) && (
+                <div className="deposit-alert-suggestion">
+                  แนะนำให้ใช้แท็บ "ตรวจสอบพัสดุ" (Tracking) โดยค้นหาด้วยเลขบาร์โค้ดรายชิ้นหรือระบุเป็นกลุ่ม เพราะเนื่องจากข้อจำกัดของโครงสร้าง API ฝั่ง ปณท. ไม่รองรับการ Dump ข้อมูลระดับทั้งประเทศผ่าน Web Service แบบเรียลไทม์
+                </div>
+              )}
+            </div>
           </div>
         )}
 
         {reportData?.api_notice && !/no receive product|no data/i.test(reportData.api_notice) && (
-          <div className="deposit-alert info">
+          <div className={`deposit-alert ${/ล้มเหลว|timed out|error|ผิดพลาด/i.test(reportData.api_notice) ? 'error' : 'info'}`}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <circle cx="12" cy="12" r="10"></circle>
-              <line x1="12" y1="8" x2="12" y2="12"></line>
-              <line x1="12" y1="8" x2="12.01" y2="8"></line>
+              {/ล้มเหลว|timed out|error|ผิดพลาด/i.test(reportData.api_notice) ? (
+                <>
+                  <line x1="12" y1="8" x2="12" y2="12"></line>
+                  <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                </>
+              ) : (
+                <>
+                  <line x1="12" y1="8" x2="12" y2="12"></line>
+                  <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                </>
+              )}
             </svg>
-            <span>{reportData.api_notice}</span>
+            <div className="deposit-alert-body">
+              <span>{reportData.api_notice}</span>
+              {(reportData.api_suggestion || /timed out|นานเกินกำหนด/i.test(reportData.api_notice)) && (
+                <div className="deposit-alert-suggestion">
+                  {reportData.api_suggestion || 'แนะนำให้ใช้แท็บ "ตรวจสอบพัสดุ" (Tracking) โดยค้นหาด้วยเลขบาร์โค้ดรายชิ้นหรือระบุเป็นกลุ่ม เพราะเนื่องจากข้อจำกัดของโครงสร้าง API ฝั่ง ปณท. ไม่รองรับการ Dump ข้อมูลระดับทั้งประเทศผ่าน Web Service แบบเรียลไทม์'}
+                </div>
+              )}
+            </div>
           </div>
         )}
 

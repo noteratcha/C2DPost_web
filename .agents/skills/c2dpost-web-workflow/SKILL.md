@@ -3028,3 +3028,26 @@ Each bug recorded must adhere to the standardized structure:
 
 
 
+
+---
+
+## 114. การรับมือกับบัญชีข้อมูลมหาศาลและระบบแจ้งเตือนเชิงรุก (High-Volume Account Resilience & Proactive Red Suggestion) (v2026.1002.0715)
+
+### 1. บริบทและพฤติกรรมของระบบไปรษณีย์ไทย (Empirical Discovery)
+- **บัญชีขนาดปกติ (เช่น `DOL.Renunakhon`)**: ดึงรายงาน `getAllOrderReceived` ได้สำเร็จใน **2.1 วินาที**
+- **การค้นหารายชิ้น (Indexed Single Lookup `getHistoryStatus`)**: บัญชีขนาดใหญ่อย่าง `Royalthai.pol` ตอบกลับสำเร็จใน **1.0 วินาที**
+- **บัญชีองค์กรระดับประเทศ (National Volume Account `Royalthai.pol`)**:
+  - สำนักงานตำรวจแห่งชาติมีข้อมูลใบสั่งจราจรสะสมหลักหลายล้านฉบับ
+  - API `getAllOrderReceived?date=DD/MM/YYYY` ฝั่งไปรษณีย์ไทยไม่มีระบบแบ่งหน้า (Pagination) หรือ Limit
+  - ฐานข้อมูลปลายทางใช้เวลาประมวลผลนานเกิน 90-120 วินาที ทำให้เกิด `Read timed out` เสมอ
+
+### 2. รูปแบบการออกแบบระบบแจ้งเตือน (Proactive Alert Pattern)
+1. **Dynamic Alert Box Styling**:
+   - เมื่อระบบตรวจพบข้อความผิดพลาดหรือ `timed out` ใน `api_notice` จะสลับคลาสจาก `.deposit-alert.info` (สีฟ้า) เป็น `.deposit-alert.error` (สีแดง) พร้อมเปลี่ยนไอคอนเป็นเครื่องหมายตกใจ `!` ทันที
+2. **Dedicated Red Suggestion Layout**:
+   - เพิ่มคลาส `.deposit-alert-body` และ `.deposit-alert-suggestion`
+   - กำหนดฟอนต์สีแดงสดเด่นชัด (`#dc2626` / `#f87171`) หนา `font-weight: 600` และมีเส้นประคั่น
+   - แสดงคำแนะนำแก่ผู้ใช้งานทันที:
+     `"แนะนำให้ใช้แท็บ \"ตรวจสอบพัสดุ\" (Tracking) โดยค้นหาด้วยเลขบาร์โค้ดรายชิ้นหรือระบุเป็นกลุ่ม เพราะเนื่องจากข้อจำกัดของโครงสร้าง API ฝั่ง ปณท. ไม่รองรับการ Dump ข้อมูลระดับทั้งประเทศผ่าน Web Service แบบเรียลไทม์"`
+3. **Multi-View Consistency**:
+   - ใช้งานรูปแบบนี้อย่างเป็นเอกภาพในทุกมุมมอง: `DepositReportView.jsx`, `DepositReportModal.jsx` และ `DashboardView.jsx`

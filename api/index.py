@@ -639,6 +639,11 @@ def _fetch_received_report_payload(req_date, req_end_date, req_username, req_pas
     raw_data = None
     api_error = None
     
+    SUGGESTION_TRACKING = (
+        'แนะนำให้ใช้แท็บ "ตรวจสอบพัสดุ" (Tracking) โดยค้นหาด้วยเลขบาร์โค้ดรายชิ้นหรือระบุเป็นกลุ่ม '
+        'เพราะเนื่องจากข้อจำกัดของโครงสร้าง API ฝั่ง ปณท. ไม่รองรับการ Dump ข้อมูลระดับทั้งประเทศผ่าน Web Service แบบเรียลไทม์'
+    )
+    
     if username and password and not is_demo_user:
         def fetch_date(d_str):
             url = f"https://r_dservice.thailandpost.com/webservice/getAllOrderReceived?date={d_str}"
@@ -693,7 +698,8 @@ def _fetch_received_report_payload(req_date, req_end_date, req_username, req_pas
             if "timed out" in err_str.lower():
                 return {
                     "items": [],
-                    "error": f"การเชื่อมต่อ e-Parcel ล้มเหลว ({d_str}): ระบบไปรษณีย์ไทยใช้เวลาประมวลผลนานเกินกำหนด (ระบบลองใหม่อัตโนมัติ {max_attempts} ครั้งแล้ว) เนื่องจากมีข้อมูลปริมาณมาก กรุณารอสักครู่แล้วกด 'อัปเดตข้อมูล' ใหม่อีกครั้ง ({err_str})"
+                    "error": f"การเชื่อมต่อ e-Parcel ล้มเหลว ({d_str}): ระบบไปรษณีย์ไทยใช้เวลาประมวลผลนานเกินกำหนด (ระบบลองใหม่อัตโนมัติ {max_attempts} ครั้งแล้ว) เนื่องจากมีข้อมูลปริมาณมาก กรุณารอสักครู่แล้วกด 'อัปเดตข้อมูล' ใหม่อีกครั้ง ({err_str})",
+                    "suggestion": SUGGESTION_TRACKING
                 }
             return {"items": [], "error": f"การเชื่อมต่อ e-Parcel ล้มเหลว ({d_str}): {err_str}"}
 
@@ -702,6 +708,7 @@ def _fetch_received_report_payload(req_date, req_end_date, req_username, req_pas
             batch_results = list(executor.map(fetch_date, target_dates))
 
         aggregated_items = []
+        api_suggestion = None
         for res in batch_results:
             if res.get("unauthorized"):
                 return JSONResponse(
@@ -720,6 +727,8 @@ def _fetch_received_report_payload(req_date, req_end_date, req_username, req_pas
                     api_error = notice
             elif res.get("error") and not api_error:
                 api_error = res["error"]
+                if res.get("suggestion"):
+                    api_suggestion = res["suggestion"]
 
         raw_data = aggregated_items
 
@@ -940,6 +949,7 @@ def _fetch_received_report_payload(req_date, req_end_date, req_username, req_pas
         "date_display": date_display,
         "is_mock": bool(is_demo_user),
         "api_notice": (api_error if not is_demo_user else None) if (api_error and not re.search(r"no\s*receive\s*product|no\s*data", str(api_error), re.IGNORECASE)) else None,
+        "api_suggestion": (api_suggestion if not is_demo_user else None),
         "summary": {
             "total_items": len(normalized_records),
             "total_weight": round(total_weight, 2),
@@ -1101,6 +1111,7 @@ def get_dashboard_report(req: DashboardRequest):
     records = payload.get("records") or []
     is_mock = bool(payload.get("is_mock"))
     api_notice = payload.get("api_notice") or None
+    api_suggestion = payload.get("api_suggestion") or None
     if api_notice and re.search(r"no\s*receive\s*product|no\s*data", str(api_notice), re.IGNORECASE):
         api_notice = None
 
@@ -1401,6 +1412,7 @@ def get_dashboard_report(req: DashboardRequest):
         "date_display": payload.get("date_display"),
         "is_mock": is_mock,
         "api_notice": api_notice,
+        "api_suggestion": api_suggestion,
         "summary": summary,
         "reasons": reasons,
         "return_reasons": return_reasons,
