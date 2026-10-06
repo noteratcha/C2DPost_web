@@ -626,15 +626,31 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
   );
   const { checks: signatureChecks, recheck: recheckSignature, loadImage: loadSignatureImage } =
     useSignatureChecks(deliveredBarcodesOnPage, signatureCheckEnabled);
-  const [signatureViewer, setSignatureViewer] = useState(null); // { barcode, receiver, image, loading }
+  // { barcode, receiver, image, relationship, officer, loading }
+  const [signatureViewer, setSignatureViewer] = useState(null);
 
   const openSignatureViewer = async (item) => {
     const bc = item.barcode.toUpperCase();
-    const cached = signatureChecks[bc]?.image;
-    setSignatureViewer({ barcode: bc, receiver: item.receiver_name, image: cached || '', loading: !cached });
-    if (!cached) {
-      const img = await loadSignatureImage(bc);
-      setSignatureViewer((prev) => (prev && prev.barcode === bc ? { ...prev, image: img, loading: false } : prev));
+    const check = signatureChecks[bc] || {};
+    setSignatureViewer({
+      barcode: bc,
+      receiver: item.receiver_name,
+      image: check.image || '',
+      relationship: check.relationship || '',
+      officer: check.officer || '',
+      loading: !check.image
+    });
+    if (!check.image) {
+      const res = await loadSignatureImage(bc);
+      setSignatureViewer((prev) => (prev && prev.barcode === bc
+        ? {
+            ...prev,
+            image: res.image || '',
+            relationship: res.relationship || prev.relationship,
+            officer: res.officer || prev.officer,
+            loading: false
+          }
+        : prev));
     }
   };
 
@@ -654,7 +670,7 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
           type="button"
           className="sig-check-badge sig-yes"
           onClick={() => openSignatureViewer(item)}
-          title="พบลายเซ็นผู้รับในใบตอบรับ e-AR — คลิกเพื่อดูรูปลายเซ็น"
+          title={`พบลายเซ็นผู้รับในใบตอบรับ e-AR${check.relationship ? ` (ความสัมพันธ์: ${check.relationship})` : ''} — คลิกเพื่อดูรูปลายเซ็น`}
         >
           ✍️ มีลายเซ็น
         </button>
@@ -666,7 +682,7 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
           type="button"
           className="sig-check-badge sig-no"
           onClick={() => recheckSignature(bc)}
-          title="ใบตอบรับ e-AR ของรายการนี้ไม่มีรูปลายเซ็นผู้รับ — คลิกเพื่อตรวจสอบใหม่"
+          title={`ใบตอบรับ e-AR ของรายการนี้ไม่มีรูปลายเซ็นผู้รับ${check.relationship ? ` (ความสัมพันธ์: ${check.relationship})` : ''} — คลิกเพื่อตรวจสอบใหม่`}
         >
           ✕ ไม่พบลายเซ็น
         </button>
@@ -1676,12 +1692,26 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
               <button type="button" className="sig-viewer-close" onClick={() => setSignatureViewer(null)} title="ปิด">✕</button>
             </div>
             <div className="sig-viewer-body">
-              {signatureViewer.loading ? (
+              {signatureViewer.loading && !signatureViewer.image ? (
                 <div className="sig-viewer-loading"><span className="sig-spinner"></span> กำลังโหลดรูปลายเซ็น...</div>
               ) : signatureViewer.image ? (
                 <img src={signatureViewer.image} alt={`ลายเซ็นผู้รับ ${signatureViewer.barcode}`} />
               ) : (
                 <div className="sig-viewer-loading">ไม่พบรูปลายเซ็นในใบตอบรับ e-AR</div>
+              )}
+            </div>
+            <div className="sig-viewer-meta">
+              <div className="sig-viewer-meta-row">
+                <span className="sig-viewer-meta-label">ความสัมพันธ์กับผู้รับ</span>
+                <span className="sig-viewer-relationship">
+                  {signatureViewer.relationship || (signatureViewer.loading ? 'กำลังโหลด...' : 'ไม่ระบุในใบตอบรับ')}
+                </span>
+              </div>
+              {signatureViewer.officer && (
+                <div className="sig-viewer-meta-row">
+                  <span className="sig-viewer-meta-label">เจ้าหน้าที่นำจ่าย</span>
+                  <span>{signatureViewer.officer}</span>
+                </div>
               )}
             </div>
           </div>

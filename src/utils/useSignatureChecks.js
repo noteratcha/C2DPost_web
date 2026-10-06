@@ -27,7 +27,9 @@ function saveCache(map) {
   try {
     const slim = {};
     Object.entries(map).forEach(([bc, v]) => {
-      if (v && (v.state === 'yes' || v.state === 'no')) slim[bc] = { state: v.state };
+      if (v && (v.state === 'yes' || v.state === 'no')) {
+        slim[bc] = { state: v.state, relationship: v.relationship || '', officer: v.officer || '' };
+      }
     });
     sessionStorage.setItem(SIG_CACHE_KEY, JSON.stringify(slim));
   } catch {
@@ -38,9 +40,10 @@ function saveCache(map) {
 /**
  * @param {string[]} barcodes - delivered barcodes currently visible
  * @param {boolean} enabled - false on devices without the extension (mobile)
- * @returns {{ checks: Object<string, {state: 'loading'|'yes'|'no'|'error', image?: string}>,
+ * @returns {{ checks: Object<string, {state: 'loading'|'yes'|'no'|'error', image?: string,
+ *                                     relationship?: string, officer?: string}>,
  *             recheck: (barcode: string) => void,
- *             loadImage: (barcode: string) => Promise<string> }}
+ *             loadImage: (barcode: string) => Promise<{image?: string, relationship?: string, officer?: string}> }}
  */
 export function useSignatureChecks(barcodes, enabled = true) {
   const [checks, setChecks] = useState(loadCache);
@@ -59,9 +62,10 @@ export function useSignatureChecks(barcodes, enabled = true) {
     let next;
     try {
       const res = await fetchEarDetailsClient(bc);
+      const meta = { relationship: res?.relationship || '', officer: res?.delivery_officer || '' };
       if (!res) next = { state: 'error' };
-      else if (res.signature_image) next = { state: 'yes', image: res.signature_image };
-      else next = { state: 'no' };
+      else if (res.signature_image) next = { state: 'yes', image: res.signature_image, ...meta };
+      else next = { state: 'no', ...meta };
     } catch {
       next = { state: 'error' };
     }
@@ -99,12 +103,12 @@ export function useSignatureChecks(barcodes, enabled = true) {
     setRetryTick((t) => t + 1);
   }, []);
 
-  // Image for a "yes" result restored from sessionStorage (image not persisted)
+  // Image (+ relationship / officer) for a "yes" result restored from sessionStorage
+  // (the image itself is not persisted)
   const loadImage = useCallback(async (bc) => {
     const current = checksRef.current[bc];
-    if (current?.image) return current.image;
-    const res = await runCheck(bc);
-    return res?.image || '';
+    if (current?.image) return current;
+    return (await runCheck(bc)) || {};
   }, [runCheck]);
 
   return { checks, recheck, loadImage };

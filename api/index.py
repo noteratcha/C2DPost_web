@@ -1661,8 +1661,18 @@ def _parse_ear_pdf_content(pdf_bytes: bytes) -> dict:
         if candidates:
             candidates.sort(key=lambda x: x[0], reverse=True)
             best_score, best_img, best_im = candidates[0]
-            # Handheld PDA saves signature in vertical orientation; rotate 90° to make it upright
-            if best_im.height > best_im.width:
+            # The handheld always stores a portrait canvas, but recipients sign either across it
+            # (strokes already horizontal) or with the device turned sideways (strokes run top to
+            # bottom). Decide from the ink bounding box, not the canvas shape: rotate only when the
+            # pen strokes are taller than wide. (Rotating every portrait canvas stacked readable
+            # signatures vertically, e.g. BC434909649TH.)
+            ink_box = best_im.getbbox()
+            if ink_box:
+                ink_w = ink_box[2] - ink_box[0]
+                ink_h = ink_box[3] - ink_box[1]
+                if ink_h > ink_w:
+                    best_im = best_im.rotate(90, expand=True)
+            elif best_im.height > best_im.width:
                 best_im = best_im.rotate(90, expand=True)
 
             # Auto-trim transparent whitespace margins around pen strokes
@@ -2200,12 +2210,18 @@ def _build_tracking_page2_pdf(info):
             im_buf = io.BytesIO()
             im.save(im_buf, format="PNG")
             im_buf.seek(0)
-            sig_img_elem = RLImage(im_buf, width=4.5 * cm, height=2.2 * cm)
+            # Fit inside the 4.5 x 2.2 cm box keeping the original aspect ratio
+            # (fixed width+height squashed/stretched the pen strokes)
+            box_w, box_h = 4.5 * cm, 2.2 * cm
+            iw, ih = im.size
+            scale = min(box_w / iw, box_h / ih) if iw and ih else 1
+            sig_img_elem = RLImage(im_buf, width=iw * scale, height=ih * scale)
         except Exception:
             sig_img_elem = None
 
     if not sig_img_elem:
-        sig_img_elem = Paragraph(apply_thai_pua("<font color='#059669'><b>[ มีการลงนามอิเล็กทรอนิกส์ในระบบ e-AR ]</b></font><br/><font color='#64748b' size='7'>บันทึกผ่านเครื่อง Handheld จนท.นำจ่าย</font>"), tbl_cell_center)
+        # No signature image (e-AR carries Thailand Post's "NO SIGNATURE" placeholder or none)
+        sig_img_elem = Paragraph(apply_thai_pua("<font color='#64748b'><b>[ ไม่พบรูปลายเซ็นผู้รับในใบตอบรับ e-AR ]</b></font>"), tbl_cell_center)
 
     ear_box_data = [
         [
