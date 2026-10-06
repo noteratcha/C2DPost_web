@@ -594,10 +594,9 @@ export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
             </div>
             <div>
               <h2 className="deposit-page-title">สถิติ</h2>
-              <p className="deposit-page-subtitle">
-                สรุปผลการรับฝากและการนำจ่าย ดูอัตราสำเร็จ/ไม่สำเร็จ และสาเหตุการส่งคืนตามจังหวัด
-                {currentPerson?.Organization ? ` • ${currentPerson.Organization}` : ''}
-              </p>
+              {currentPerson?.Organization && (
+                <p className="deposit-page-subtitle">{currentPerson.Organization}</p>
+              )}
             </div>
           </div>
         </div>

@@ -1581,6 +1581,24 @@ def get_dashboard_report(req: DashboardRequest):
     }
 
 
+def _looks_like_real_signature(im) -> bool:
+    """
+    True when an extracted e-AR image contains real pen strokes.
+    Real signatures: dark strokes (>= 0.3% near-black pixels) with little mid-gray.
+    Thailand Post's "NO SIGNATURE" placeholder: gray artwork with no near-black pixels.
+    Blank signature-box crops: almost all white.
+    """
+    try:
+        gray = im.convert("L")
+        hist = gray.histogram()
+        total = sum(hist) or 1
+        dark = sum(hist[:90]) / total
+        mid = sum(hist[90:235]) / total
+        return dark >= 0.003 and mid < dark * 3
+    except Exception:
+        return False
+
+
 def _parse_ear_pdf_content(pdf_bytes: bytes) -> dict:
     """
     Robustly parses e-AR PDF bytes.
@@ -1591,7 +1609,9 @@ def _parse_ear_pdf_content(pdf_bytes: bytes) -> dict:
         "status": "",
         "relationship": "",
         "delivery_officer": "",
-        "signature_image": ""
+        "signature_image": "",
+        # True when the e-AR carries Thailand Post's "NO SIGNATURE" placeholder / empty box
+        "signature_missing": False
     }
     if not pdf_bytes or len(pdf_bytes) < 300:
         return data
@@ -1656,15 +1676,20 @@ def _parse_ear_pdf_content(pdf_bytes: bytes) -> dict:
             # Composite onto crisp white background
             bg = Image.new("RGBA", best_im.size, (255, 255, 255, 255))
             final_im = Image.alpha_composite(bg, best_im.convert("RGBA")).convert("RGB")
-            buf = io.BytesIO()
-            final_im.save(buf, format="PNG")
-            b64_str = base64.b64encode(buf.getvalue()).decode("utf-8")
-            data["signature_image"] = f"data:image/png;base64,{b64_str}"
+            if _looks_like_real_signature(final_im):
+                buf = io.BytesIO()
+                final_im.save(buf, format="PNG")
+                b64_str = base64.b64encode(buf.getvalue()).decode("utf-8")
+                data["signature_image"] = f"data:image/png;base64,{b64_str}"
+            else:
+                # "NO SIGNATURE" placeholder artwork -> not a signature
+                data["signature_missing"] = True
     except Exception:
         pass
 
     # Fallback to PyMuPDF signature box clip if pypdf didn't get signature
-    if not data["signature_image"]:
+    # (skipped when the placeholder was already identified)
+    if not data["signature_image"] and not data["signature_missing"]:
         try:
             import fitz
             doc = fitz.open(stream=pdf_bytes, filetype="pdf")
@@ -1674,10 +1699,14 @@ def _parse_ear_pdf_content(pdf_bytes: bytes) -> dict:
             im = Image.open(io.BytesIO(pix.tobytes("png")))
             if im.height > im.width:
                 im = im.rotate(90, expand=True)
-            buf = io.BytesIO()
-            im.save(buf, format="PNG")
-            b64_str = base64.b64encode(buf.getvalue()).decode("utf-8")
-            data["signature_image"] = f"data:image/png;base64,{b64_str}"
+            if _looks_like_real_signature(im):
+                buf = io.BytesIO()
+                im.save(buf, format="PNG")
+                b64_str = base64.b64encode(buf.getvalue()).decode("utf-8")
+                data["signature_image"] = f"data:image/png;base64,{b64_str}"
+            else:
+                # Signature box is blank -> no signature
+                data["signature_missing"] = True
         except Exception:
             pass
 

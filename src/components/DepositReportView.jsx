@@ -6,6 +6,8 @@ import TrackingTimelineModal from './TrackingTimelineModal';
 import TrackingInquiryView from './TrackingInquiryView';
 import ThaiDateInput from './ThaiDateInput';
 import { APP_VERSION } from '../config';
+import { useSignatureChecks } from '../utils/useSignatureChecks';
+import { isMobileDevice } from '../utils/browserEnv';
 import './DepositReportView.css';
 
 // Shared cache key for date range sync across pages
@@ -612,6 +614,74 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
     return filteredRecords.slice(startIdx, startIdx + PAGE_SIZE);
   }, [filteredRecords, currentPage, PAGE_SIZE]);
 
+  // Signature verification for delivered parcels on the current page (via e-AR)
+  const signatureCheckEnabled = useMemo(() => !isMobileDevice(), []);
+  const deliveredBarcodesOnPage = useMemo(
+    () => paginatedRecords
+      .filter((r) => r.barcode && getDeliveryStatusInfo(r).key === 'delivered')
+      .map((r) => r.barcode.toUpperCase()),
+    [paginatedRecords]
+  );
+  const { checks: signatureChecks, recheck: recheckSignature, loadImage: loadSignatureImage } =
+    useSignatureChecks(deliveredBarcodesOnPage, signatureCheckEnabled);
+  const [signatureViewer, setSignatureViewer] = useState(null); // { barcode, receiver, image, loading }
+
+  const openSignatureViewer = async (item) => {
+    const bc = item.barcode.toUpperCase();
+    const cached = signatureChecks[bc]?.image;
+    setSignatureViewer({ barcode: bc, receiver: item.receiver_name, image: cached || '', loading: !cached });
+    if (!cached) {
+      const img = await loadSignatureImage(bc);
+      setSignatureViewer((prev) => (prev && prev.barcode === bc ? { ...prev, image: img, loading: false } : prev));
+    }
+  };
+
+  const renderSignatureBadge = (item) => {
+    const bc = item.barcode.toUpperCase();
+    const check = signatureChecks[bc];
+    if (!check || check.state === 'loading') {
+      return (
+        <span className="sig-check-badge sig-loading" title="กำลังตรวจสอบลายเซ็นจากใบตอบรับ e-AR">
+          <span className="sig-spinner"></span>กำลังตรวจลายเซ็น
+        </span>
+      );
+    }
+    if (check.state === 'yes') {
+      return (
+        <button
+          type="button"
+          className="sig-check-badge sig-yes"
+          onClick={() => openSignatureViewer(item)}
+          title="พบลายเซ็นผู้รับในใบตอบรับ e-AR — คลิกเพื่อดูรูปลายเซ็น"
+        >
+          ✍️ มีลายเซ็น
+        </button>
+      );
+    }
+    if (check.state === 'no') {
+      return (
+        <button
+          type="button"
+          className="sig-check-badge sig-no"
+          onClick={() => recheckSignature(bc)}
+          title="ใบตอบรับ e-AR ของรายการนี้ไม่มีรูปลายเซ็นผู้รับ — คลิกเพื่อตรวจสอบใหม่"
+        >
+          ✕ ไม่พบลายเซ็น
+        </button>
+      );
+    }
+    return (
+      <button
+        type="button"
+        className="sig-check-badge sig-error"
+        onClick={() => recheckSignature(bc)}
+        title="ดึงใบตอบรับ e-AR ไม่สำเร็จ (ยังไม่มี e-AR หรือ Extension ไม่ตอบสนอง) — คลิกเพื่อลองใหม่"
+      >
+        ? ตรวจไม่ได้
+      </button>
+    );
+  };
+
   // Page index numbers for table footer
   const startItemIndex = filteredRecords.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
   const endItemIndex = Math.min(currentPage * PAGE_SIZE, filteredRecords.length);
@@ -838,10 +908,9 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
             </div>
             <div>
               <h2 className="deposit-page-title">รายงานสถานะไปรษณีย์ (e-Parcel Status Report)</h2>
-              <p className="deposit-page-subtitle">
-                ตรวจสอบสถานะพัสดุที่ไปรษณีย์ไทยรับฝากเข้าระบบ e-Parcel และค้นหาไทม์ไลน์ด้วยเลขบาร์โค้ด (ใส่ได้หลายหมายเลข)
-                {currentPerson?.Organization ? ` • ${currentPerson.Organization}` : ''}
-              </p>
+              {currentPerson?.Organization && (
+                <p className="deposit-page-subtitle">{currentPerson.Organization}</p>
+              )}
             </div>
           </div>
         </div>
@@ -1398,6 +1467,9 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
                             {statusInfo.icon && <span className="status-pill-icon">{statusInfo.icon}</span>}
                             <span className="status-pill-text">{statusInfo.smartLabel}</span>
                           </span>
+                          {signatureCheckEnabled && statusInfo.key === 'delivered' && item.barcode && (
+                            <div className="sig-check-row">{renderSignatureBadge(item)}</div>
+                          )}
                         </td>
                       </tr>
                     );
@@ -1585,6 +1657,33 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
             requestLiveTracking([bcode]);
           }}
         />
+      )}
+
+      {/* Recipient signature viewer (from e-AR) */}
+      {signatureViewer && (
+        <div className="sig-viewer-overlay" onClick={() => setSignatureViewer(null)}>
+          <div className="sig-viewer-box" onClick={(e) => e.stopPropagation()}>
+            <div className="sig-viewer-header">
+              <div>
+                <div className="sig-viewer-title">ลายเซ็นผู้รับ (จากใบตอบรับ e-AR)</div>
+                <div className="sig-viewer-sub">
+                  <span className="table-barcode-pill">{signatureViewer.barcode}</span>
+                  {signatureViewer.receiver ? ` • ${signatureViewer.receiver}` : ''}
+                </div>
+              </div>
+              <button type="button" className="sig-viewer-close" onClick={() => setSignatureViewer(null)} title="ปิด">✕</button>
+            </div>
+            <div className="sig-viewer-body">
+              {signatureViewer.loading ? (
+                <div className="sig-viewer-loading"><span className="sig-spinner"></span> กำลังโหลดรูปลายเซ็น...</div>
+              ) : signatureViewer.image ? (
+                <img src={signatureViewer.image} alt={`ลายเซ็นผู้รับ ${signatureViewer.barcode}`} />
+              ) : (
+                <div className="sig-viewer-loading">ไม่พบรูปลายเซ็นในใบตอบรับ e-AR</div>
+              )}
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Extension Guidance Modal for e-AR */}
