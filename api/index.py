@@ -2155,7 +2155,8 @@ def _build_tracking_page2_pdf(info):
 
     for idx, ev in enumerate(events):
         is_last = (idx == len(events) - 1)
-        seq_label = f"{idx + 1} ✓" if is_last else str(idx + 1)
+        # Tahoma has no U+2713/U+2714 (rendered as a box); U+221A "√" exists in Tahoma and reads as a check
+        seq_label = f"{idx + 1} <font color='#059669'><b>√</b></font>" if is_last else str(idx + 1)
         dt = _xml_escape(str(ev.get("datetime") or "-").strip())
         loc = _xml_escape(str(ev.get("location") or "-").strip())
         desc = _xml_escape(str(ev.get("status_description") or "-").strip())
@@ -2269,6 +2270,13 @@ def _combine_ear_and_tracking_pdf(ear_pdf_bytes, info):
     total_pages = len(merged_doc)
     for pno in range(total_pages):
         p = merged_doc[pno]
+        # Thailand Post's e-AR content stream changes the CTM (y-axis flip) without q/Q,
+        # so anything appended afterwards rendered upside down at the top of the page.
+        # Wrap the original content in q ... Q first so our footer uses default coordinates.
+        try:
+            p.wrap_contents()
+        except Exception:
+            pass
         pw = p.rect.width
         ph = p.rect.height
         y_pos = ph - 10 if ph > 100 else 832

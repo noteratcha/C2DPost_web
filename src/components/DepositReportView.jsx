@@ -434,9 +434,11 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
       return;
     }
 
-    // First time opening without cache -> fetch today's report
-    handleFetchReport(todayIso, todayIso);
-  }, [todayIso, handleFetchReport, cachedState]);
+    // First time opening without cache -> fetch the range shown in the date inputs
+    // (restored from the shared date-range cache, e.g. "เดือนนี้" chosen on the dashboard;
+    // defaults to today). Fetching only today here made the table disagree with the inputs.
+    handleFetchReport(startDate, endDate);
+  }, [startDate, endDate, handleFetchReport, cachedState]);
 
   // Quick date shortcuts handler
   const handleSetQuickDate = (type) => {
