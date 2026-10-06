@@ -63,22 +63,49 @@
   }
 }
 
+/* Logo row: [C2DPost] -> [Chrome], equal round badges */
+.browser-gate-logo-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.browser-gate-logo-badge {
+  width: 76px;
+  height: 76px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 8px 20px -6px rgba(15, 23, 42, 0.18);
+}
+
+:root[data-theme="dark"] .browser-gate-logo-badge {
+  background: #f8fafc;
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
 .browser-gate-logo {
-  width: 64px;
-  height: 64px;
+  width: 58px;
+  height: 58px;
   object-fit: contain;
-  margin: 0 auto 8px;
   display: block;
 }
 
-.browser-gate-icon {
-  display: flex;
-  justify-content: center;
-  margin-bottom: 12px;
+.browser-gate-chrome {
+  width: 52px;
+  height: 52px;
+  display: block;
 }
 
-.browser-gate-icon svg {
-  filter: drop-shadow(0 6px 14px rgba(15, 23, 42, 0.18));
+.browser-gate-logo-arrow {
+  display: flex;
+  color: #10b981;
 }
 
 .browser-gate-title {

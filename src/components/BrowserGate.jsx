@@ -39,16 +39,26 @@ export default function BrowserGate() {
       <div className="browser-gate-layout">
       {/* Left card: open this site in Google Chrome */}
       <div className="gate-card browser-gate-card">
-        <img src="/logo.png" alt="C2DPost" className="browser-gate-logo" />
-
-        <div className="browser-gate-icon" aria-hidden="true">
-          <svg width="44" height="44" viewBox="0 0 48 48">
-            <circle cx="24" cy="24" r="22" fill="#ffffff" />
-            <path d="M24 2a22 22 0 0 1 19.05 11H24a11 11 0 0 0-9.53 5.5L6.95 5.98A21.94 21.94 0 0 1 24 2z" fill="#ea4335" />
-            <path d="M43.05 13A22 22 0 0 1 24 46l9.53-16.5A11 11 0 0 0 33.53 18.5 10.9 10.9 0 0 0 24 13z" fill="#fbbc04" />
-            <path d="M24 46A22 22 0 0 1 6.95 5.98l9.52 16.5A11 11 0 0 0 33.53 29.5z" fill="#34a853" />
-            <circle cx="24" cy="24" r="8.5" fill="#4285f4" stroke="#ffffff" strokeWidth="3" />
-          </svg>
+        {/* Logo row: C2DPost -> opens with -> Google Chrome */}
+        <div className="browser-gate-logo-row" aria-hidden="true">
+          <div className="browser-gate-logo-badge">
+            <img src="/logo.png" alt="" className="browser-gate-logo" />
+          </div>
+          <div className="browser-gate-logo-arrow">
+            <svg width="28" height="16" viewBox="0 0 28 16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="2" y1="8" x2="25" y2="8"></line>
+              <polyline points="19 2 25 8 19 14"></polyline>
+            </svg>
+          </div>
+          <div className="browser-gate-logo-badge">
+            <svg className="browser-gate-chrome" viewBox="0 0 48 48">
+              <circle cx="24" cy="24" r="20" fill="#ffffff" />
+              <path fill="#ea4335" d="M24 4C16.6 4 10.1 8 6.68 14l8.66 15A10 10 0 0 1 24 14h17.32C37.9 8 31.4 4 24 4z" />
+              <path fill="#34a853" d="M15.34 29 6.68 14A20 20 0 0 0 24 44l8.66-15a10 10 0 0 1-17.32 0z" />
+              <path fill="#fbbc04" d="M41.32 14H24a10 10 0 0 1 8.66 15L24 44A20 20 0 0 0 41.32 14z" />
+              <circle cx="24" cy="24" r="8" fill="#4285f4" />
+            </svg>
+          </div>
         </div>
 
         <h2 className="browser-gate-title">กรุณาเปิดเว็บไซต์นี้ด้วย Google Chrome</h2>
