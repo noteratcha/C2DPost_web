@@ -1,7 +1,7 @@
 /* BrowserGate.css — "Open in Google Chrome" page (reuses .gate-screen / .gate-card from ExtensionGate.css) */
 
 .browser-gate-card {
-  max-width: 560px;
+  max-width: 600px;
 }
 
 .browser-gate-logo {
@@ -138,6 +138,127 @@
   background: rgba(15, 23, 42, 0.75);
   border-color: #334155;
   color: #f8fafc;
+}
+
+/* One-time setup: default browser / desktop shortcut */
+.browser-gate-setup {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px dashed rgba(100, 116, 139, 0.35);
+  text-align: left;
+}
+
+.browser-gate-setup-title {
+  font-family: 'Prompt', sans-serif;
+  font-size: 0.95rem;
+  font-weight: 700;
+  margin-bottom: 10px;
+  text-align: center;
+}
+
+.browser-gate-details {
+  margin-bottom: 10px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 12px;
+  background: rgba(248, 250, 252, 0.8);
+  overflow: hidden;
+}
+
+:root[data-theme="dark"] .browser-gate-details {
+  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(15, 23, 42, 0.55);
+}
+
+.browser-gate-details > summary {
+  cursor: pointer;
+  padding: 11px 14px;
+  font-family: 'Prompt', sans-serif;
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: #065f46;
+  list-style-position: inside;
+}
+
+:root[data-theme="dark"] .browser-gate-details > summary {
+  color: #6ee7b7;
+}
+
+.browser-gate-details[open] > summary {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.browser-gate-details > ol,
+.browser-gate-details > .browser-gate-note,
+.browser-gate-details > .browser-gate-os,
+.browser-gate-details > .btn-browser-gate-settings {
+  margin-left: 14px;
+  margin-right: 14px;
+}
+
+.browser-gate-details ol {
+  margin-top: 6px;
+  margin-bottom: 10px;
+  padding-left: 1.2rem;
+  font-size: 0.84rem;
+  line-height: 1.75;
+}
+
+.browser-gate-note {
+  margin-top: 10px;
+  margin-bottom: 10px;
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+:root[data-theme="dark"] .browser-gate-note {
+  color: #94a3b8;
+}
+
+.btn-browser-gate-settings {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 10px;
+  padding: 9px 14px;
+  border-radius: 10px;
+  border: 1.5px solid #059669;
+  background: rgba(5, 150, 105, 0.08);
+  color: #065f46;
+  font-family: 'Prompt', sans-serif;
+  font-size: 0.84rem;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap !important;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.btn-browser-gate-settings:hover {
+  background: #059669;
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+:root[data-theme="dark"] .btn-browser-gate-settings {
+  color: #6ee7b7;
+  border-color: #10b981;
+}
+
+.browser-gate-os {
+  padding-top: 4px;
+}
+
+.browser-gate-os-name {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: rgba(66, 133, 244, 0.1);
+  color: #1a73e8;
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+:root[data-theme="dark"] .browser-gate-os-name {
+  color: #8ab4f8;
+  background: rgba(66, 133, 244, 0.2);
 }
 
 @media (max-width: 480px) {

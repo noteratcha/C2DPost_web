@@ -1690,3 +1690,10 @@ if any(k in desc for k in ["ถึงที่ทำการปลายทา�
 - `vercel.json` maxDuration 120 → 300; `getAllOrderReceived` รอได้ 235s, fallback แบ่งช่วงเวลาใช้เวลาที่เหลือ, deadline รวม 285s
 - "Order not found" ถือเป็นไม่มีข้อมูล (ไม่ใช่ error); ถ้าเต็มเวลาแล้วไม่ได้ข้อมูล แสดงกล่องแดงอธิบายสาเหตุ + แนะนำค้นรายชิ้น
 - หน้าจอโหลดแจ้ง "บัญชีที่มีข้อมูลจำนวนมากอาจใช้เวลาถึง 5 นาที"; หน้าสถิติข้ามการ enrich รายชิ้นถ้าดึงรายงานนานเกิน 90s (`fetch_seconds`)
+
+---
+
+## 89. หน้า "เปิดด้วย Google Chrome": วิธีตั้ง Chrome เป็นเบราว์เซอร์เริ่มต้น + สร้างไอคอนบนเดสก์ท็อป (v2026.1006.1522)
+
+- กล่อง "ครั้งต่อไปไม่ต้องคัดลอกลิงก์ (ทำครั้งเดียว)": วิธีที่ 1 ตั้ง Chrome เป็นค่าเริ่มต้น (Windows 11 / Windows 10 / จากในเมนู Chrome / macOS) พร้อมปุ่มเปิดหน้า Windows "แอปเริ่มต้น" (`ms-settings:defaultapps`); วิธีที่ 2 สร้างทางลัด C2DPost บนเดสก์ท็อปผ่านเมนู Chrome (Cast, save, and share → Create shortcut)
+- หมายเหตุ: หน้าเว็บสั่งเปิด Chrome จากเบราว์เซอร์อื่นบน Windows ไม่ได้ (Chrome ไม่ลงทะเบียน URL protocol เช่น `googlechrome:` ต่างจาก Edge ที่มี `microsoft-edge:`)

@@ -13,6 +13,9 @@ const CHROME_DOWNLOAD_URL = 'https://www.google.com/chrome/';
 export default function BrowserGate() {
   const [copied, setCopied] = useState(false);
   const browserName = detectBrowserName();
+  const ua = typeof navigator !== 'undefined' ? navigator.userAgent || '' : '';
+  const isWindows = /Windows/i.test(ua);
+  const isMac = /Macintosh|Mac OS X/i.test(ua);
   const siteUrl = typeof window !== 'undefined' ? window.location.origin + '/' : SITE_URL;
 
   const handleCopy = async () => {
@@ -76,6 +79,70 @@ export default function BrowserGate() {
         >
           ดาวน์โหลด Google Chrome
         </a>
+
+        {/* One-time setup so users never land here again */}
+        <div className="browser-gate-setup">
+          <div className="browser-gate-setup-title">ครั้งต่อไปไม่ต้องคัดลอกลิงก์ (ทำครั้งเดียว)</div>
+
+          <details className="browser-gate-details" open>
+            <summary>วิธีที่ 1: ตั้ง Google Chrome เป็นเบราว์เซอร์เริ่มต้น</summary>
+            <p className="browser-gate-note">
+              ลิงก์ที่คลิกจาก LINE อีเมล หรือเอกสาร จะเปิดด้วย Chrome โดยอัตโนมัติ
+            </p>
+
+            {isWindows && (
+              <a className="btn-browser-gate-settings" href="ms-settings:defaultapps">
+                เปิดหน้าตั้งค่า "แอปเริ่มต้น" ของ Windows
+              </a>
+            )}
+
+            <div className="browser-gate-os">
+              <div className="browser-gate-os-name">Windows 11</div>
+              <ol>
+                <li>กดปุ่มด้านบน หรือไปที่ <strong>Start → Settings → Apps → Default apps</strong></li>
+                <li>พิมพ์ค้นหา <strong>Google Chrome</strong> ในช่องค้นหาแอป แล้วคลิกเลือก</li>
+                <li>กดปุ่ม <strong>Set default</strong> (ตั้งค่าเริ่มต้น) ที่ด้านบนของหน้า</li>
+              </ol>
+            </div>
+
+            <div className="browser-gate-os">
+              <div className="browser-gate-os-name">Windows 10</div>
+              <ol>
+                <li>กดปุ่มด้านบน หรือไปที่ <strong>Start → Settings → Apps → Default apps</strong></li>
+                <li>ที่หัวข้อ <strong>Web browser</strong> คลิกไอคอน Microsoft Edge</li>
+                <li>เลือก <strong>Google Chrome</strong> จากรายการ</li>
+              </ol>
+            </div>
+
+            <div className="browser-gate-os">
+              <div className="browser-gate-os-name">หรือตั้งจากใน Chrome</div>
+              <ol>
+                <li>เปิด Chrome → เมนู <strong>⋮</strong> (มุมขวาบน) → <strong>Settings</strong> (การตั้งค่า)</li>
+                <li>เลือก <strong>Default browser</strong> (เบราว์เซอร์เริ่มต้น) → กด <strong>Make default</strong> (ตั้งเป็นค่าเริ่มต้น)</li>
+              </ol>
+            </div>
+
+            {isMac && (
+              <div className="browser-gate-os">
+                <div className="browser-gate-os-name">macOS</div>
+                <ol>
+                  <li><strong>System Settings → Desktop &amp; Dock</strong></li>
+                  <li>ที่ <strong>Default web browser</strong> เลือก <strong>Google Chrome</strong></li>
+                </ol>
+              </div>
+            )}
+          </details>
+
+          <details className="browser-gate-details">
+            <summary>วิธีที่ 2: สร้างไอคอน C2DPost บนเดสก์ท็อป (เปิดด้วย Chrome เสมอ)</summary>
+            <ol>
+              <li>เปิดเว็บไซต์นี้ใน <strong>Google Chrome</strong></li>
+              <li>เมนู <strong>⋮</strong> → <strong>Cast, save, and share</strong> (บันทึกและแชร์) → <strong>Create shortcut...</strong> (สร้างทางลัด)</li>
+              <li>ตั้งชื่อ <strong>C2DPost</strong> แล้วกด <strong>Create</strong> (สร้าง)</li>
+              <li>ครั้งต่อไปดับเบิลคลิกไอคอน C2DPost บนเดสก์ท็อปได้เลย</li>
+            </ol>
+          </details>
+        </div>
       </div>
     </div>
   );
