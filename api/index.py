@@ -653,6 +653,7 @@ def _fetch_received_report_payload(req_date, req_end_date, req_username, req_pas
     raw_data = None
     api_error = None
     used_duration_mode = False
+    duration_debug_out = []
     
     SUGGESTION_TRACKING = (
         'แนะนำให้ค้นหาด้วยเลขบาร์โค้ด (รายชิ้นหรือหลายหมายเลข) ในช่องค้นหาของหน้า "รายงานสถานะ" '
@@ -734,13 +735,23 @@ def _fetch_received_report_payload(req_date, req_end_date, req_username, req_pas
                 return {"unauthorized": True}
             items = []
             failed_slots = []
+            notices = []
+            slot_summary = []
             for r in slot_results:
-                items.extend(r.get("items") or [])
+                slot_label = f"{r['slot'][0]}-{r['slot'][1]}"
+                slot_items = r.get("items") or []
+                items.extend(slot_items)
                 if r.get("failed"):
-                    failed_slots.append(f"{r['slot'][0]}-{r['slot'][1]}")
-            result = {"items": items, "duration_mode": True, "date": d_str,
-                      "slots_total": len(DURATION_SLOTS), "failed_slots": failed_slots}
-            return result
+                    failed_slots.append(slot_label)
+                notice = str(r.get("notice") or "").strip()
+                if notice and notice not in notices:
+                    notices.append(notice)  # Thailand Post errorDetail (was silently dropped before)
+                slot_summary.append({"slot": slot_label, "count": len(slot_items),
+                                     "failed": r.get("reason") if r.get("failed") else None,
+                                     "notice": notice or None})
+            return {"items": items, "duration_mode": True, "date": d_str,
+                    "slots_total": len(DURATION_SLOTS), "failed_slots": failed_slots,
+                    "notices": notices, "slot_summary": slot_summary}
 
         def fetch_date(d_str):
             url = f"https://r_dservice.thailandpost.com/webservice/getAllOrderReceived?date={d_str}"
@@ -775,6 +786,8 @@ def _fetch_received_report_payload(req_date, req_end_date, req_username, req_pas
         api_suggestion = None
         duration_dates = []
         duration_failures = []
+        duration_notices = []
+        duration_debug = []
         for res in batch_results:
             if res.get("unauthorized"):
                 return JSONResponse(
@@ -787,6 +800,12 @@ def _fetch_received_report_payload(req_date, req_end_date, req_username, req_pas
                 )
             if res.get("duration_mode"):
                 duration_dates.append(res["date"])
+                unique_codes = {str(it.get("barcode") or "").strip() for it in (res.get("items") or [])}
+                duration_debug.append({"date": res["date"], "items": len(unique_codes - {""}),
+                                       "slots": res.get("slot_summary") or []})
+                for n in res.get("notices") or []:
+                    if n not in duration_notices:
+                        duration_notices.append(n)
                 if res.get("failed_slots"):
                     duration_failures.append(f"{res['date']} เวลา {', '.join(res['failed_slots'])} น.")
             if res.get("items"):
@@ -804,6 +823,7 @@ def _fetch_received_report_payload(req_date, req_end_date, req_username, req_pas
 
         raw_data = aggregated_items
         used_duration_mode = bool(duration_dates)
+        duration_debug_out = duration_debug
 
         if duration_failures and not api_error:
             api_error = (
@@ -813,11 +833,24 @@ def _fetch_received_report_payload(req_date, req_end_date, req_username, req_pas
             )
             api_suggestion = SUGGESTION_TRACKING
         elif duration_dates and not api_error:
-            api_error = (
-                "บัญชีนี้มีข้อมูลปริมาณมาก ระบบจึงดึงข้อมูลแบบแบ่งช่วงเวลา (ทีละ 2 ชั่วโมง) "
-                "ตามเวลาที่ส่งข้อมูลรายการเข้าระบบ e-Parcel ของวันที่ " + ", ".join(duration_dates)
-                + " ผลลัพธ์อาจต่างจากรายงานรับฝากหน้าเคาน์เตอร์เล็กน้อย"
-            )
+            duration_total = sum(d["items"] for d in duration_debug)
+            if duration_total == 0 and duration_notices:
+                api_error = (
+                    "ระบบดึงข้อมูลแบบแบ่งช่วงเวลา (บัญชีมีข้อมูลปริมาณมาก) แต่ระบบไปรษณีย์ไทยตอบกลับ: "
+                    + " | ".join(duration_notices[:3])
+                )
+            elif duration_total == 0:
+                api_error = (
+                    "บัญชีนี้มีข้อมูลปริมาณมาก ระบบจึงดึงข้อมูลแบบแบ่งช่วงเวลา (ทีละ 2 ชั่วโมง ครบ 24 ชั่วโมง) "
+                    "แต่ไม่พบรายการที่ส่งข้อมูลเข้าระบบ e-Parcel ในวันที่ " + ", ".join(duration_dates)
+                    + " (โหมดนี้นับตามวันที่สร้างรายการ ไม่ใช่วันที่ ปณ. รับฝาก) ลองเลือก \"เมื่อวาน\" หรือช่วงวันที่ก่อนหน้า"
+                )
+            else:
+                api_error = (
+                    f"บัญชีนี้มีข้อมูลปริมาณมาก ระบบจึงดึงข้อมูลแบบแบ่งช่วงเวลา (ทีละ 2 ชั่วโมง) ได้ {duration_total:,} รายการ "
+                    "ตามเวลาที่ส่งข้อมูลรายการเข้าระบบ e-Parcel ของวันที่ " + ", ".join(duration_dates)
+                    + " ผลลัพธ์อาจต่างจากรายงานรับฝากหน้าเคาน์เตอร์เล็กน้อย"
+                )
 
     # If live API wasn't called or failed, only use demo data for explicit demo user
     if raw_data is None:
@@ -1034,6 +1067,7 @@ def _fetch_received_report_payload(req_date, req_end_date, req_username, req_pas
         "date": clean_date,
         "end_date": clean_end_date,
         "date_display": date_display,
+        "fetch_debug": duration_debug_out,
         "fetch_mode": "duration" if used_duration_mode else "full_day",
         "is_mock": bool(is_demo_user),
         "api_notice": (api_error if not is_demo_user else None) if (api_error and not re.search(r"no\s*receive\s*product|no\s*data", str(api_error), re.IGNORECASE)) else None,
