@@ -605,6 +605,7 @@ def _fetch_received_report_payload(req_date, req_end_date, req_username, req_pas
     import time
     from datetime import datetime, timedelta
     from concurrent.futures import ThreadPoolExecutor
+    import threading
     import requests
     from requests.auth import HTTPBasicAuth
     import urllib3
@@ -651,6 +652,7 @@ def _fetch_received_report_payload(req_date, req_end_date, req_username, req_pas
     
     raw_data = None
     api_error = None
+    used_duration_mode = False
     
     SUGGESTION_TRACKING = (
         'แนะนำให้ค้นหาด้วยเลขบาร์โค้ด (รายชิ้นหรือหลายหมายเลข) ในช่องค้นหาของหน้า "รายงานสถานะ" '
@@ -658,63 +660,112 @@ def _fetch_received_report_payload(req_date, req_end_date, req_username, req_pas
     )
     
     if username and password and not is_demo_user:
-        def fetch_date(d_str):
-            url = f"https://r_dservice.thailandpost.com/webservice/getAllOrderReceived?date={d_str}"
-            max_attempts = 2
-            timeout_per_attempt = 55
-            last_err = None
+        # ---- Time budget (Vercel maxDuration = 120s) ----
+        # 1) getAllOrderReceived once (whole day). Large national accounts time out here.
+        # 2) On timeout -> getOrderByDurationTime split into 2-hour windows queried in parallel,
+        #    each returning a much smaller result set. Overall deadline keeps us under 120s.
+        request_started = time.monotonic()
+        DEADLINE_SECONDS = 108
+        FULL_DAY_TIMEOUT = 45
+        SLOT_TIMEOUT_MAX = 50
+        # Windows overlap at the boundary (stopTime is hh:mm); duplicates are removed by barcode later
+        DURATION_SLOTS = [(f"{h:02d}:00", f"{h + 2:02d}:00" if h + 2 < 24 else "23:59") for h in range(0, 24, 2)]
+        auth = HTTPBasicAuth(username, password)
+        slot_semaphore = threading.Semaphore(12)  # max concurrent slot calls to Thailand Post
 
-            for attempt in range(1, max_attempts + 1):
+        def remaining_seconds():
+            return DEADLINE_SECONDS - (time.monotonic() - request_started)
+
+        def parse_tp_list(response):
+            """Normalize Thailand Post list responses -> {'items': [...]} / {'items': [], 'notice': ...}."""
+            try:
+                resp_json = response.json()
+            except Exception:
+                return {"items": []}
+            if isinstance(resp_json, list):
+                if len(resp_json) > 0 and isinstance(resp_json[0], dict) and resp_json[0].get("errorCode"):
+                    err_detail = str(resp_json[0].get("errorDetail") or "")
+                    if re.search(r"no\s*receive\s*product|no\s*data", err_detail, re.IGNORECASE):
+                        return {"items": []}
+                    return {"items": [], "notice": err_detail}
+                return {"items": resp_json}
+            if isinstance(resp_json, dict) and isinstance(resp_json.get("data"), list):
+                return {"items": resp_json["data"]}
+            if isinstance(resp_json, dict) and resp_json.get("errorCode"):
+                err_detail = str(resp_json.get("errorDetail") or "")
+                if re.search(r"no\s*receive\s*product|no\s*data", err_detail, re.IGNORECASE):
+                    return {"items": []}
+                return {"items": [], "notice": err_detail}
+            return {"items": []}
+
+        def is_timeout_error(e):
+            return isinstance(e, requests.exceptions.Timeout) or "timed out" in str(e).lower()
+
+        def fetch_slot(d_str, slot):
+            start_t, stop_t = slot
+            with slot_semaphore:
+                budget = min(SLOT_TIMEOUT_MAX, remaining_seconds())
+                if budget < 5:
+                    return {"slot": slot, "items": [], "failed": True, "reason": "deadline"}
                 try:
-                    response = requests.get(
-                        url,
+                    response = requests.post(
+                        "https://r_dservice.thailandpost.com/webservice/getOrderByDurationTime",
+                        json={"date": d_str, "startTime": start_t, "stopTime": stop_t},
                         headers={"Content-Type": "application/json"},
-                        auth=HTTPBasicAuth(username, password),
-                        timeout=timeout_per_attempt,
+                        auth=auth,
+                        timeout=budget,
                         verify=False
                     )
                     if response.status_code == 401:
-                        return {"unauthorized": True}
-                    if response.status_code == 200:
-                        try:
-                            resp_json = response.json()
-                            if isinstance(resp_json, list):
-                                if len(resp_json) > 0 and isinstance(resp_json[0], dict) and resp_json[0].get("errorCode"):
-                                    err_detail = str(resp_json[0].get("errorDetail") or "")
-                                    if re.search(r"no\s*receive\s*product|no\s*data", err_detail, re.IGNORECASE):
-                                        return {"items": []}
-                                    return {"items": [], "notice": err_detail}
-                                return {"items": resp_json}
-                            elif isinstance(resp_json, dict) and "data" in resp_json and isinstance(resp_json["data"], list):
-                                return {"items": resp_json["data"]}
-                            elif isinstance(resp_json, dict) and resp_json.get("errorCode"):
-                                err_detail = str(resp_json.get("errorDetail") or "")
-                                if re.search(r"no\s*receive\s*product|no\s*data", err_detail, re.IGNORECASE):
-                                    return {"items": []}
-                                return {"items": [], "notice": err_detail}
-                            return {"items": []}
-                        except Exception:
-                            return {"items": []}
-                    return {"items": [], "error": f"API ตอบกลับสถานะ {response.status_code}"}
+                        return {"slot": slot, "unauthorized": True}
+                    if response.status_code != 200:
+                        return {"slot": slot, "items": [], "failed": True, "reason": f"HTTP {response.status_code}"}
+                    parsed = parse_tp_list(response)
+                    parsed["slot"] = slot
+                    return parsed
                 except Exception as e:
-                    last_err = e
-                    err_str = str(e)
-                    is_timeout = "timed out" in err_str.lower() or isinstance(e, requests.exceptions.Timeout)
-                    if is_timeout and attempt < max_attempts:
-                        # Attempt 1 timed out: Thailand Post database has begun caching the query.
-                        # Wait 1s and retry immediately on attempt 2 to catch the completed cache!
-                        time.sleep(1)
-                        continue
-                    break
+                    return {"slot": slot, "items": [], "failed": True,
+                            "reason": "timeout" if is_timeout_error(e) else str(e)}
 
-            err_str = str(last_err) if last_err else "ไม่ทราบสาเหตุ"
-            if "timed out" in err_str.lower():
-                return {
-                    "items": [],
-                    "error": f"การเชื่อมต่อ e-Parcel ล้มเหลว ({d_str}): ระบบไปรษณีย์ไทยใช้เวลาประมวลผลนานเกินกำหนด (ระบบลองใหม่อัตโนมัติ {max_attempts} ครั้งแล้ว) เนื่องจากมีข้อมูลปริมาณมาก กรุณารอสักครู่แล้วกด 'อัปเดตข้อมูล' ใหม่อีกครั้ง ({err_str})",
-                    "suggestion": SUGGESTION_TRACKING
-                }
-            return {"items": [], "error": f"การเชื่อมต่อ e-Parcel ล้มเหลว ({d_str}): {err_str}"}
+        def fetch_date_by_duration(d_str):
+            with ThreadPoolExecutor(max_workers=len(DURATION_SLOTS)) as slot_ex:
+                slot_results = list(slot_ex.map(lambda sl: fetch_slot(d_str, sl), DURATION_SLOTS))
+            if any(r.get("unauthorized") for r in slot_results):
+                return {"unauthorized": True}
+            items = []
+            failed_slots = []
+            for r in slot_results:
+                items.extend(r.get("items") or [])
+                if r.get("failed"):
+                    failed_slots.append(f"{r['slot'][0]}-{r['slot'][1]}")
+            result = {"items": items, "duration_mode": True, "date": d_str,
+                      "slots_total": len(DURATION_SLOTS), "failed_slots": failed_slots}
+            return result
+
+        def fetch_date(d_str):
+            url = f"https://r_dservice.thailandpost.com/webservice/getAllOrderReceived?date={d_str}"
+            budget = min(FULL_DAY_TIMEOUT, remaining_seconds())
+            if budget < 5:
+                return {"items": [], "error": f"การเชื่อมต่อ e-Parcel ล้มเหลว ({d_str}): หมดเวลาประมวลผลของคำขอนี้ กรุณาเลือกช่วงวันที่สั้นลง",
+                        "suggestion": SUGGESTION_TRACKING}
+            try:
+                response = requests.get(
+                    url,
+                    headers={"Content-Type": "application/json"},
+                    auth=auth,
+                    timeout=budget,
+                    verify=False
+                )
+                if response.status_code == 401:
+                    return {"unauthorized": True}
+                if response.status_code == 200:
+                    return parse_tp_list(response)
+                return {"items": [], "error": f"API ตอบกลับสถานะ {response.status_code}"}
+            except Exception as e:
+                if is_timeout_error(e):
+                    # Whole-day query is too heavy for this account -> split by time windows
+                    return fetch_date_by_duration(d_str)
+                return {"items": [], "error": f"การเชื่อมต่อ e-Parcel ล้มเหลว ({d_str}): {e}"}
 
         workers = min(len(target_dates), 5)
         with ThreadPoolExecutor(max_workers=workers) as executor:
@@ -722,6 +773,8 @@ def _fetch_received_report_payload(req_date, req_end_date, req_username, req_pas
 
         aggregated_items = []
         api_suggestion = None
+        duration_dates = []
+        duration_failures = []
         for res in batch_results:
             if res.get("unauthorized"):
                 return JSONResponse(
@@ -732,8 +785,14 @@ def _fetch_received_report_payload(req_date, req_end_date, req_username, req_pas
                         "message": "ชื่อผู้ใช้หรือรหัสผ่านสำหรับระบบไปรษณีย์ e-Parcel ไม่ถูกต้อง"
                     }
                 )
+            if res.get("duration_mode"):
+                duration_dates.append(res["date"])
+                if res.get("failed_slots"):
+                    duration_failures.append(f"{res['date']} เวลา {', '.join(res['failed_slots'])} น.")
             if res.get("items"):
                 aggregated_items.extend(res["items"])
+            elif res.get("duration_mode"):
+                pass
             elif res.get("notice") and not api_error:
                 notice = str(res["notice"])
                 if not re.search(r"no\s*receive\s*product|no\s*data", notice, re.IGNORECASE):
@@ -744,6 +803,21 @@ def _fetch_received_report_payload(req_date, req_end_date, req_username, req_pas
                     api_suggestion = res["suggestion"]
 
         raw_data = aggregated_items
+        used_duration_mode = bool(duration_dates)
+
+        if duration_failures and not api_error:
+            api_error = (
+                "ดึงข้อมูลได้ไม่ครบ (ผิดพลาดบางช่วงเวลา): ระบบไปรษณีย์ไทยตอบกลับไม่ทันในวันที่ "
+                + "; ".join(duration_failures)
+                + " — รายการที่แสดงอาจไม่ครบ กรุณากด 'อัปเดตข้อมูล' อีกครั้ง หรือเลือกช่วงวันที่สั้นลง"
+            )
+            api_suggestion = SUGGESTION_TRACKING
+        elif duration_dates and not api_error:
+            api_error = (
+                "บัญชีนี้มีข้อมูลปริมาณมาก ระบบจึงดึงข้อมูลแบบแบ่งช่วงเวลา (ทีละ 2 ชั่วโมง) "
+                "ตามเวลาที่ส่งข้อมูลรายการเข้าระบบ e-Parcel ของวันที่ " + ", ".join(duration_dates)
+                + " ผลลัพธ์อาจต่างจากรายงานรับฝากหน้าเคาน์เตอร์เล็กน้อย"
+            )
 
     # If live API wasn't called or failed, only use demo data for explicit demo user
     if raw_data is None:
@@ -960,6 +1034,7 @@ def _fetch_received_report_payload(req_date, req_end_date, req_username, req_pas
         "date": clean_date,
         "end_date": clean_end_date,
         "date_display": date_display,
+        "fetch_mode": "duration" if used_duration_mode else "full_day",
         "is_mock": bool(is_demo_user),
         "api_notice": (api_error if not is_demo_user else None) if (api_error and not re.search(r"no\s*receive\s*product|no\s*data", str(api_error), re.IGNORECASE)) else None,
         "api_suggestion": (api_suggestion if not is_demo_user else None),
@@ -1131,6 +1206,9 @@ def get_dashboard_report(req: DashboardRequest):
     username = (req.username or "").strip()
     password = (req.password or "").strip()
     is_live = bool(username and password and username.lower() != "demo")
+    # The duration-window fallback already used most of the 120s budget -> skip extra enrichment
+    if payload.get("fetch_mode") == "duration":
+        is_live = False
 
     # For large live datasets (more than 35) the received endpoint only enriches up to 35 records.
     # Refresh conclusion statuses for the rest via the batch endpoint (getOrderByBarcodes).
