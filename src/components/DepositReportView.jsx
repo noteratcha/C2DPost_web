@@ -5,6 +5,7 @@ import { downloadBatchEar } from '../utils/earService';
 import TrackingTimelineModal from './TrackingTimelineModal';
 import TrackingInquiryView from './TrackingInquiryView';
 import ThaiDateInput from './ThaiDateInput';
+import { APP_VERSION } from '../config';
 import './DepositReportView.css';
 
 // Shared cache key for date range sync across pages
@@ -41,7 +42,13 @@ function getCachedDepositState() {
   try {
     const raw = sessionStorage.getItem(DEPOSIT_REPORT_CACHE_KEY);
     if (!raw) return null;
-    return JSON.parse(raw);
+    const parsed = JSON.parse(raw);
+    // Data cached by an older deploy (e.g. an old error notice) must not be restored
+    if (!parsed || parsed.appVersion !== APP_VERSION) {
+      sessionStorage.removeItem(DEPOSIT_REPORT_CACHE_KEY);
+      return null;
+    }
+    return parsed;
   } catch (err) {
     console.warn('Error reading deposit report cache:', err);
     return null;
@@ -50,7 +57,7 @@ function getCachedDepositState() {
 
 function setCachedDepositState(data) {
   try {
-    sessionStorage.setItem(DEPOSIT_REPORT_CACHE_KEY, JSON.stringify(data));
+    sessionStorage.setItem(DEPOSIT_REPORT_CACHE_KEY, JSON.stringify({ ...data, appVersion: APP_VERSION }));
   } catch (err) {
     console.warn('Error writing deposit report cache:', err);
   }

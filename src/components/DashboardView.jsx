@@ -3,6 +3,7 @@ import { fetchDashboardReport } from '../utils/api';
 import ThaiDateInput from './ThaiDateInput';
 import ReasonDetailModal from './ReasonDetailModal';
 import { THAILAND_VIEWBOX, THAILAND_PROVINCES } from '../data/thailandMapData';
+import { APP_VERSION } from '../config';
 import './DashboardView.css';
 
 const DASHBOARD_CACHE_KEY = 'c2dpost_dashboard_cache';
@@ -12,7 +13,13 @@ function getCachedDashboardState() {
   try {
     const raw = sessionStorage.getItem(DASHBOARD_CACHE_KEY);
     if (!raw) return null;
-    return JSON.parse(raw);
+    const parsed = JSON.parse(raw);
+    // Data cached by an older deploy (e.g. an old error notice) must not be restored
+    if (!parsed || parsed.appVersion !== APP_VERSION) {
+      sessionStorage.removeItem(DASHBOARD_CACHE_KEY);
+      return null;
+    }
+    return parsed;
   } catch (err) {
     console.warn('Error reading dashboard cache:', err);
     return null;
@@ -21,7 +28,7 @@ function getCachedDashboardState() {
 
 function setCachedDashboardState(data) {
   try {
-    sessionStorage.setItem(DASHBOARD_CACHE_KEY, JSON.stringify(data));
+    sessionStorage.setItem(DASHBOARD_CACHE_KEY, JSON.stringify({ ...data, appVersion: APP_VERSION }));
   } catch (err) {
     console.warn('Error writing dashboard cache:', err);
   }
