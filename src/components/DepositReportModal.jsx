@@ -580,7 +580,7 @@ export default function DepositReportModal({ isOpen, onClose, currentPerson, onS
               <span>{error}</span>
               {/timed out|นานเกินกำหนด/i.test(error) && (
                 <div className="deposit-alert-suggestion">
-                  แนะนำให้ใช้แท็บ "ตรวจสอบพัสดุ" (Tracking) โดยค้นหาด้วยเลขบาร์โค้ดรายชิ้นหรือระบุเป็นกลุ่ม เพราะเนื่องจากข้อจำกัดของโครงสร้าง API ฝั่ง ปณท. ไม่รองรับการ Dump ข้อมูลระดับทั้งประเทศผ่าน Web Service แบบเรียลไทม์
+                  แนะนำให้ค้นหาด้วยเลขบาร์โค้ด (รายชิ้นหรือหลายหมายเลข) ในช่องค้นหาของหน้า "รายงานสถานะ" เพราะเนื่องจากข้อจำกัดของโครงสร้าง API ฝั่ง ปณท. ไม่รองรับการ Dump ข้อมูลระดับทั้งประเทศผ่าน Web Service แบบเรียลไทม์
                 </div>
               )}
             </div>
@@ -610,7 +610,7 @@ export default function DepositReportModal({ isOpen, onClose, currentPerson, onS
               </span>
               {(reportData.api_suggestion || /timed out|นานเกินกำหนด/i.test(reportData.api_notice)) && (
                 <div className="deposit-alert-suggestion">
-                  {reportData.api_suggestion || 'แนะนำให้ใช้แท็บ "ตรวจสอบพัสดุ" (Tracking) โดยค้นหาด้วยเลขบาร์โค้ดรายชิ้นหรือระบุเป็นกลุ่ม เพราะเนื่องจากข้อจำกัดของโครงสร้าง API ฝั่ง ปณท. ไม่รองรับการ Dump ข้อมูลระดับทั้งประเทศผ่าน Web Service แบบเรียลไทม์'}
+                  {reportData.api_suggestion || 'แนะนำให้ค้นหาด้วยเลขบาร์โค้ด (รายชิ้นหรือหลายหมายเลข) ในช่องค้นหาของหน้า "รายงานสถานะ" เพราะเนื่องจากข้อจำกัดของโครงสร้าง API ฝั่ง ปณท. ไม่รองรับการ Dump ข้อมูลระดับทั้งประเทศผ่าน Web Service แบบเรียลไทม์'}
                 </div>
               )}
             </div>

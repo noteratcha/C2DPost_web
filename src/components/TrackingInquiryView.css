@@ -1689,3 +1689,15 @@
   }
 }
 
+
+/* Embedded mode (inside DepositReportView unified search) */
+.tracking-embedded-root {
+  width: 100%;
+}
+
+.tracking-embedded-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  width: 100%;
+}

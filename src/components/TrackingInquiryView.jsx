@@ -251,7 +251,13 @@ function getDetailedStepInfo(ev) {
   };
 }
 
-export default function TrackingInquiryView({ currentPerson, records = [], initialBarcode = '', onSwitchToWorkspace }) {
+/**
+ * Tracking inquiry results.
+ * - Full-page mode (legacy): own header + multiline search card.
+ * - Embedded mode (`embedded`): results only, driven by `searchRequest` ({ barcodes, nonce })
+ *   from the unified search box in DepositReportView.
+ */
+export default function TrackingInquiryView({ currentPerson, records = [], initialBarcode = '', onSwitchToWorkspace, embedded = false, searchRequest = null }) {
   const [barcodeInput, setBarcodeInput] = useState(initialBarcode || '');
   const [searchItems, setSearchItems] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -264,6 +270,8 @@ export default function TrackingInquiryView({ currentPerson, records = [], initi
   const [isDownloadingEar, setIsDownloadingEar] = useState(false);
   const [earProgressText, setEarProgressText] = useState('');
   const [openingEarBarcode, setOpeningEarBarcode] = useState(null);
+  // Sequence id of the latest search; older responses are ignored
+  const searchSeqRef = useRef(0);
 
   const handleOpenEarPdf = async (e, bcode, item) => {
     if (e && e.preventDefault) e.preventDefault();
@@ -333,6 +341,7 @@ export default function TrackingInquiryView({ currentPerson, records = [], initi
       return;
     }
 
+    const seq = ++searchSeqRef.current;
     setLoading(true);
     setError('');
     // Reset expanded state so cards stay collapsed by default as requested
@@ -378,6 +387,8 @@ export default function TrackingInquiryView({ currentPerson, records = [], initi
           }
         })
       );
+
+      if (seq !== searchSeqRef.current) return;
 
       const updated = initialItems.map((item, idx) => {
         const settled = results[idx];
@@ -426,14 +437,23 @@ export default function TrackingInquiryView({ currentPerson, records = [], initi
         }
       });
     } catch (err) {
-      setError(err.message || 'เกิดข้อผิดพลาดในการค้นหา');
+      if (seq === searchSeqRef.current) setError(err.message || 'เกิดข้อผิดพลาดในการค้นหา');
     } finally {
-      setLoading(false);
+      if (seq === searchSeqRef.current) setLoading(false);
     }
   }, [parsedBarcodes, availableBarcodes, currentPerson]);
 
+  // Embedded mode: run search whenever the parent issues a new request
+  useEffect(() => {
+    if (!embedded || !searchRequest || !Array.isArray(searchRequest.barcodes) || searchRequest.barcodes.length === 0) return;
+    setBarcodeInput(searchRequest.barcodes.join('\n'));
+    handleSearch(searchRequest.barcodes);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [embedded, searchRequest?.nonce]);
+
   // Initial trigger
   useEffect(() => {
+    if (embedded) return;
     if (initialBarcode && searchItems.length === 0) {
       setBarcodeInput(initialBarcode);
       handleSearch([initialBarcode]);
@@ -442,7 +462,7 @@ export default function TrackingInquiryView({ currentPerson, records = [], initi
       setBarcodeInput(firstBcode);
       handleSearch([firstBcode]);
     }
-  }, [initialBarcode, availableBarcodes, searchItems.length, barcodeInput, handleSearch]);
+  }, [embedded, initialBarcode, availableBarcodes, searchItems.length, barcodeInput, handleSearch]);
 
   // Summary counts across searched items
   const summary = useMemo(() => {
@@ -532,10 +552,14 @@ export default function TrackingInquiryView({ currentPerson, records = [], initi
     setBarcodeInput(all);
   };
 
-  return (
-    <main className="tracking-page-main python-layout-main">
-      <div className="tracking-page-container python-container">
+  const RootTag = embedded ? 'section' : 'main';
 
+  return (
+    <RootTag className={embedded ? 'tracking-embedded-root' : 'tracking-page-main python-layout-main'}>
+      <div className={embedded ? 'tracking-embedded-container' : 'tracking-page-container python-container'}>
+
+        {!embedded && (
+        <>
         {/* Page Top Header Banner */}
         <div className="tracking-page-header-card">
           <div className="tracking-page-title-group">
@@ -659,6 +683,9 @@ export default function TrackingInquiryView({ currentPerson, records = [], initi
             </div>
           )}
         </div>
+
+        </>
+        )}
 
         {/* Global Alert Notice */}
         {error && (
@@ -1172,6 +1199,6 @@ export default function TrackingInquiryView({ currentPerson, records = [], initi
           <span>{earProgressText}</span>
         </div>
       )}
-    </main>
+    </RootTag>
   );
 }

@@ -6,7 +6,6 @@ import ActionToolbar from './components/ActionToolbar';
 import PreviewGrid from './components/PreviewGrid';
 import AdminManagementView from './components/AdminManagementView';
 import DepositReportView from './components/DepositReportView';
-import TrackingInquiryView from './components/TrackingInquiryView';
 import DashboardView from './components/DashboardView';
 import DepositReportModal from './components/DepositReportModal';
 import TrackingTimelineModal from './components/TrackingTimelineModal';
@@ -58,7 +57,9 @@ export default function App() {
   const [activePage, setActivePage] = useState(() => {
     if (typeof window !== 'undefined' && !isDemoAdmin) {
       const pageParam = new URLSearchParams(window.location.search).get('page');
-      if (['workspace', 'deposit-report', 'tracking', 'dashboard'].includes(pageParam)) {
+      // 'tracking' was merged into 'deposit-report' (unified search)
+      if (pageParam === 'tracking') return 'deposit-report';
+      if (['workspace', 'deposit-report', 'dashboard'].includes(pageParam)) {
         return pageParam;
       }
     }
@@ -1064,7 +1065,9 @@ export default function App() {
     }
   };
 
-  // 10. Handle View Tracking Timeline (single barcode) -> Opens dedicated tracking page
+  const handleTrackingBarcodeConsumed = useCallback(() => setSelectedTrackingBarcode(''), []);
+
+  // 10. Handle View Tracking Timeline (single barcode) -> Opens status report page with live tracking
   const handleViewTracking = (row) => {
     const barcode = String(row.BARCODE_NO || '').trim();
     if (!barcode) {
@@ -1072,7 +1075,7 @@ export default function App() {
       return;
     }
     setSelectedTrackingBarcode(barcode);
-    setActivePage('tracking');
+    setActivePage('deposit-report');
   };
 
   // 11. Handle Auto-Reconcile (batch check received status vs post office)
@@ -1322,20 +1325,9 @@ export default function App() {
               currentPerson={currentPerson}
               onSyncRecords={handleSyncFromDepositReport}
               onSwitchToWorkspace={() => setActivePage('workspace')}
-              onOpenTrackingPage={(bcode) => {
-                setSelectedTrackingBarcode(bcode);
-                setActivePage('tracking');
-              }}
-            />
-          )}
-
-          {/* Page 3: ตรวจสอบพัสดุ (Tracking Inquiry) */}
-          {activePage === 'tracking' && (
-            <TrackingInquiryView
-              currentPerson={currentPerson}
-              records={records}
-              initialBarcode={selectedTrackingBarcode}
-              onSwitchToWorkspace={() => setActivePage('workspace')}
+              workspaceRecords={records}
+              initialTrackingBarcode={selectedTrackingBarcode}
+              onTrackingBarcodeConsumed={handleTrackingBarcodeConsumed}
             />
           )}
 

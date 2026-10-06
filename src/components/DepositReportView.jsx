@@ -3,6 +3,7 @@ import { fetchReceivedReport, exportDepositReportExcel, exportDepositReportPdf, 
 import { formatStationWithZipcode } from '../utils/postalUtils';
 import { downloadBatchEar } from '../utils/earService';
 import TrackingTimelineModal from './TrackingTimelineModal';
+import TrackingInquiryView from './TrackingInquiryView';
 import ThaiDateInput from './ThaiDateInput';
 import './DepositReportView.css';
 
@@ -10,6 +11,12 @@ import './DepositReportView.css';
 const DATE_RANGE_CACHE_KEY = 'c2dpost_date_range_cache';
 
 const DEPOSIT_REPORT_CACHE_KEY = 'c2dpost_deposit_report_cache';
+
+// Thailand Post 13-digit barcode, e.g. EF193867005TH
+const BARCODE_PATTERN = /[A-Z]{2}\d{9}[A-Z]{2}/g;
+
+// Delay before auto-querying barcodes that are not in the loaded report
+const LIVE_TRACKING_DEBOUNCE_MS = 700;
 
 function getCachedDateRange() {
   try {
@@ -181,7 +188,7 @@ export function getDeliveryStatusInfo(item) {
   };
 }
 
-export default function DepositReportView({ currentPerson, onSyncRecords, onSwitchToWorkspace, onOpenTrackingPage }) {
+export default function DepositReportView({ currentPerson, onSyncRecords, onSwitchToWorkspace, workspaceRecords = [], initialTrackingBarcode = '', onTrackingBarcodeConsumed }) {
   // Date shortcut calculations
   const todayIso = useMemo(() => toInputDateFormat(new Date()), []);
   const yesterdayIso = useMemo(() => {
@@ -237,6 +244,8 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
   const [searchQuery, setSearchQuery] = useState(() => cachedState?.searchQuery || '');
   const [filterTab, setFilterTab] = useState(() => cachedState?.filterTab || 'all');
   const [selectedTrackingItem, setSelectedTrackingItem] = useState(null);
+  // Live tracking request for the embedded TrackingInquiryView ({ barcodes, nonce })
+  const [trackingRequest, setTrackingRequest] = useState(null);
 
   // Batch e-AR download & selection state
   const [selectedBarcodes, setSelectedBarcodes] = useState(new Set());
@@ -472,6 +481,77 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
   }, [startDate, endDate, searchQuery, filterTab]);
 
   // Filtered records based on search and tab
+  // Unified search: barcodes typed/pasted into the search box
+  const queryBarcodes = useMemo(() => {
+    const found = searchQuery.toUpperCase().match(BARCODE_PATTERN) || [];
+    return Array.from(new Set(found));
+  }, [searchQuery]);
+
+  const reportBarcodeSet = useMemo(() => {
+    const set = new Set();
+    (reportData?.records || []).forEach((r) => {
+      if (r.barcode) set.add(r.barcode.toUpperCase());
+    });
+    return set;
+  }, [reportData]);
+
+  const missingBarcodes = useMemo(
+    () => queryBarcodes.filter((b) => !reportBarcodeSet.has(b)),
+    [queryBarcodes, reportBarcodeSet]
+  );
+
+  const requestLiveTracking = useCallback((barcodes) => {
+    if (!barcodes || barcodes.length === 0) return;
+    setTrackingRequest({ barcodes, nonce: Date.now() });
+  }, []);
+
+  // Barcodes not found in the report -> query Thailand Post automatically
+  const missingKey = missingBarcodes.join(',');
+  useEffect(() => {
+    if (!missingKey) return undefined;
+    const timer = setTimeout(() => {
+      setTrackingRequest((prev) => {
+        if (prev && prev.barcodes.join(',') === missingKey) return prev;
+        return { barcodes: missingKey.split(','), nonce: Date.now() };
+      });
+    }, LIVE_TRACKING_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [missingKey]);
+
+  // Clearing barcodes from the search box closes the live results
+  useEffect(() => {
+    if (queryBarcodes.length === 0) setTrackingRequest(null);
+  }, [queryBarcodes.length]);
+
+  // Barcode handed over from another page (e.g. workspace table)
+  useEffect(() => {
+    if (!initialTrackingBarcode) return;
+    const bcode = String(initialTrackingBarcode).trim().toUpperCase();
+    setSearchQuery(bcode);
+    setFilterTab('all');
+    requestLiveTracking([bcode]);
+    if (onTrackingBarcodeConsumed) onTrackingBarcodeConsumed();
+  }, [initialTrackingBarcode, onTrackingBarcodeConsumed, requestLiveTracking]);
+
+  const handleSearchPaste = (e) => {
+    const text = e.clipboardData?.getData('text') || '';
+    if (!/[\r\n]/.test(text)) return;
+    e.preventDefault();
+    const joined = text.split(/[\r\n]+/).map((t) => t.trim()).filter(Boolean).join(', ');
+    // Replace the current selection (e.g. select-all + paste) instead of always appending
+    const el = e.currentTarget;
+    const start = el.selectionStart ?? searchQuery.length;
+    const end = el.selectionEnd ?? searchQuery.length;
+    setSearchQuery(searchQuery.slice(0, start) + joined + searchQuery.slice(end));
+  };
+
+  const handleSearchKeyDown = (e) => {
+    if (e.key === 'Enter' && queryBarcodes.length > 0) {
+      e.preventDefault();
+      requestLiveTracking(queryBarcodes);
+    }
+  };
+
   const filteredRecords = useMemo(() => {
     if (!reportData || !reportData.records) return [];
     let list = reportData.records;
@@ -486,7 +566,10 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
       list = list.filter((r) => getDeliveryStatusInfo(r).key === 'received');
     }
 
-    if (searchQuery.trim()) {
+    if (queryBarcodes.length > 0) {
+      const wanted = new Set(queryBarcodes);
+      list = list.filter((r) => r.barcode && wanted.has(r.barcode.toUpperCase()));
+    } else if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase().trim();
       list = list.filter(
         (r) =>
@@ -505,7 +588,7 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
     }
 
     return list;
-  }, [reportData, filterTab, searchQuery]);
+  }, [reportData, filterTab, searchQuery, queryBarcodes]);
 
   // Total pages and clamping
   const totalPages = Math.max(1, Math.ceil(filteredRecords.length / PAGE_SIZE));
@@ -749,7 +832,7 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
             <div>
               <h2 className="deposit-page-title">รายงานสถานะไปรษณีย์ (e-Parcel Status Report)</h2>
               <p className="deposit-page-subtitle">
-                ตรวจสอบและติดตามสถานะรายการพัสดุที่ไปรษณีย์ไทยลงรับเข้าระบบ e-Parcel แล้วแบบเรียลไทม์
+                ตรวจสอบสถานะพัสดุที่ไปรษณีย์ไทยรับฝากเข้าระบบ e-Parcel และค้นหาไทม์ไลน์ด้วยเลขบาร์โค้ด (ใส่ได้หลายหมายเลข)
                 {currentPerson?.Organization ? ` • ${currentPerson.Organization}` : ''}
               </p>
             </div>
@@ -878,7 +961,7 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
               <span>{error}</span>
               {/timed out|นานเกินกำหนด/i.test(error) && (
                 <div className="deposit-alert-suggestion">
-                  แนะนำให้ใช้แท็บ "ตรวจสอบพัสดุ" (Tracking) โดยค้นหาด้วยเลขบาร์โค้ดรายชิ้นหรือระบุเป็นกลุ่ม เพราะเนื่องจากข้อจำกัดของโครงสร้าง API ฝั่ง ปณท. ไม่รองรับการ Dump ข้อมูลระดับทั้งประเทศผ่าน Web Service แบบเรียลไทม์
+                  แนะนำให้ค้นหาด้วยเลขบาร์โค้ด (รายชิ้นหรือหลายหมายเลข) ในช่องค้นหาของหน้า "รายงานสถานะ" เพราะเนื่องจากข้อจำกัดของโครงสร้าง API ฝั่ง ปณท. ไม่รองรับการ Dump ข้อมูลระดับทั้งประเทศผ่าน Web Service แบบเรียลไทม์
                 </div>
               )}
             </div>
@@ -905,7 +988,7 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
               <span>{reportData.api_notice}</span>
               {(reportData.api_suggestion || /timed out|นานเกินกำหนด/i.test(reportData.api_notice)) && (
                 <div className="deposit-alert-suggestion">
-                  {reportData.api_suggestion || 'แนะนำให้ใช้แท็บ "ตรวจสอบพัสดุ" (Tracking) โดยค้นหาด้วยเลขบาร์โค้ดรายชิ้นหรือระบุเป็นกลุ่ม เพราะเนื่องจากข้อจำกัดของโครงสร้าง API ฝั่ง ปณท. ไม่รองรับการ Dump ข้อมูลระดับทั้งประเทศผ่าน Web Service แบบเรียลไทม์'}
+                  {reportData.api_suggestion || 'แนะนำให้ค้นหาด้วยเลขบาร์โค้ด (รายชิ้นหรือหลายหมายเลข) ในช่องค้นหาของหน้า "รายงานสถานะ" เพราะเนื่องจากข้อจำกัดของโครงสร้าง API ฝั่ง ปณท. ไม่รองรับการ Dump ข้อมูลระดับทั้งประเทศผ่าน Web Service แบบเรียลไทม์'}
                 </div>
               )}
             </div>
@@ -1076,21 +1159,74 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
               <input
                 type="text"
                 className="deposit-search-input"
-                placeholder="ค้นหาบาร์โค้ด, เลขคำขอ, หรือชื่อผู้รับ..."
+                placeholder="ค้นหา/วางเลขบาร์โค้ด (หลายหมายเลขได้), เลขคำขอ, ชื่อผู้รับ..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                onPaste={handleSearchPaste}
+                onKeyDown={handleSearchKeyDown}
+                title="วางเลขบาร์โค้ดได้หลายหมายเลข (บรรทัดละ 1 หรือคั่นด้วย ,) หมายเลขที่ไม่อยู่ในรายงานจะค้นหาจากไปรษณีย์ไทยให้อัตโนมัติ กด Enter เพื่อค้นไทม์ไลน์ทุกหมายเลข"
               />
               {searchQuery && (
                 <button
                   type="button"
                   className="btn-clear-search"
-                  onClick={() => setSearchQuery('')}
+                  onClick={() => {
+                    setSearchQuery('');
+                    setTrackingRequest(null);
+                  }}
                 >
                   ✕
                 </button>
               )}
             </div>
           </div>
+
+          {queryBarcodes.length > 0 && (
+            <div className="deposit-barcode-hint-bar">
+              <span className="barcode-hint-text">
+                ตรวจพบเลขบาร์โค้ด <strong>{queryBarcodes.length}</strong> หมายเลข
+                {missingBarcodes.length > 0 && (
+                  <> • ไม่อยู่ในรายงานช่วงวันที่นี้ <strong>{missingBarcodes.length}</strong> หมายเลข (ค้นจากไปรษณีย์ไทยให้อัตโนมัติ)</>
+                )}
+              </span>
+              <button
+                type="button"
+                className="btn-live-tracking"
+                onClick={() => requestLiveTracking(queryBarcodes)}
+                title="ค้นหาไทม์ไลน์สถานะล่าสุดจากไปรษณีย์ไทยของทุกหมายเลขในช่องค้นหา"
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4">
+                  <circle cx="11" cy="11" r="8"></circle>
+                  <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+                <span>ดูไทม์ไลน์จากไปรษณีย์ ({queryBarcodes.length})</span>
+              </button>
+            </div>
+          )}
+
+          {trackingRequest && (
+            <div className="deposit-live-tracking-panel">
+              <div className="live-tracking-panel-header">
+                <span className="live-tracking-panel-title">
+                  ผลค้นหาสถานะจากไปรษณีย์ไทย ({trackingRequest.barcodes.length} หมายเลข)
+                </span>
+                <button
+                  type="button"
+                  className="btn-close-live-tracking"
+                  onClick={() => setTrackingRequest(null)}
+                  title="ปิดผลค้นหา"
+                >
+                  ✕
+                </button>
+              </div>
+              <TrackingInquiryView
+                embedded
+                searchRequest={trackingRequest}
+                currentPerson={currentPerson}
+                records={workspaceRecords}
+              />
+            </div>
+          )}
 
           <div className="deposit-table-scroll">
             <table className="deposit-data-table">
@@ -1145,7 +1281,9 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
                         </svg>
                         <p className="empty-title">ไม่พบรายการพัสดุรับฝาก</p>
                         <p className="empty-desc">
-                          {searchQuery
+                          {queryBarcodes.length > 0 && missingBarcodes.length === queryBarcodes.length
+                            ? 'เลขบาร์โค้ดที่ค้นหาไม่อยู่ในรายงานช่วงวันที่นี้ ดูผลสถานะจากไปรษณีย์ไทยด้านบน'
+                            : searchQuery
                             ? `ไม่พบข้อมูลที่ตรงกับคำค้นหา "${searchQuery}"`
                             : `ไม่มีรายการที่ไปรษณีย์ไทยรับฝากเข้าระบบในช่วงวันที่ ${dateDisplay}`}
                         </p>
@@ -1430,11 +1568,12 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
           currentPerson={currentPerson}
           onClose={() => setSelectedTrackingItem(null)}
           onTrackingUpdated={handleTrackingUpdated}
-          onOpenTrackingPage={onOpenTrackingPage ? () => {
-            const bcode = selectedTrackingItem.barcode;
+          onOpenTrackingPage={() => {
+            const bcode = String(selectedTrackingItem.barcode || '').toUpperCase();
             setSelectedTrackingItem(null);
-            onOpenTrackingPage(bcode);
-          } : undefined}
+            setSearchQuery(bcode);
+            requestLiveTracking([bcode]);
+          }}
         />
       )}
 

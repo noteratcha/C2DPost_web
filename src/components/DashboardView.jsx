@@ -5,6 +5,7 @@ import { THAILAND_VIEWBOX, THAILAND_PROVINCES } from '../data/thailandMapData';
 import './DashboardView.css';
 
 const DASHBOARD_CACHE_KEY = 'c2dpost_dashboard_cache';
+const PROVINCE_PAGE_SIZE = 15;
 
 function getCachedDashboardState() {
   try {
@@ -145,6 +146,7 @@ export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
   const [data, setData] = useState(() => cachedState?.data || null);
   const [lockedProvince, setLockedProvince] = useState(null);
   const [hoveredProvince, setHoveredProvince] = useState(null);
+  const [provincePage, setProvincePage] = useState(1);
   const [tooltip, setTooltip] = useState({
     visible: false,
     x: 0,
@@ -239,6 +241,49 @@ export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
   };
   const reasons = Array.isArray(data?.reasons) ? data.reasons : [];
   const provinces = Array.isArray(data?.provinces) ? data.provinces : [];
+
+  // Province ranking pagination (15 items per page)
+  const provinceTotalPages = Math.max(1, Math.ceil(provinces.length / PROVINCE_PAGE_SIZE));
+
+  useEffect(() => {
+    setProvincePage(1);
+  }, [data]);
+
+  useEffect(() => {
+    if (provincePage > provinceTotalPages) {
+      setProvincePage(provinceTotalPages);
+    }
+  }, [provincePage, provinceTotalPages]);
+
+  // Locking a province (map or table) shows its row in the ranking table
+  useEffect(() => {
+    if (!lockedProvince) return;
+    const key = normalizeProvinceName(lockedProvince);
+    const idx = provinces.findIndex((p) => normalizeProvinceName(p.province) === key);
+    if (idx >= 0) setProvincePage(Math.floor(idx / PROVINCE_PAGE_SIZE) + 1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lockedProvince]);
+
+  const paginatedProvinces = useMemo(() => {
+    const startIdx = (provincePage - 1) * PROVINCE_PAGE_SIZE;
+    return provinces.slice(startIdx, startIdx + PROVINCE_PAGE_SIZE);
+  }, [provinces, provincePage]);
+
+  const provinceStartIndex = provinces.length === 0 ? 0 : (provincePage - 1) * PROVINCE_PAGE_SIZE + 1;
+  const provinceEndIndex = Math.min(provincePage * PROVINCE_PAGE_SIZE, provinces.length);
+
+  const provincePageNumbers = useMemo(() => {
+    if (provinceTotalPages <= 7) {
+      return Array.from({ length: provinceTotalPages }, (_, i) => i + 1);
+    }
+    if (provincePage <= 4) {
+      return [1, 2, 3, 4, 5, '...', provinceTotalPages];
+    }
+    if (provincePage >= provinceTotalPages - 3) {
+      return [1, '...', provinceTotalPages - 4, provinceTotalPages - 3, provinceTotalPages - 2, provinceTotalPages - 1, provinceTotalPages];
+    }
+    return [1, '...', provincePage - 1, provincePage, provincePage + 1, '...', provinceTotalPages];
+  }, [provinceTotalPages, provincePage]);
 
   // Build lookup from normalized province name -> stats
   const provinceStatsByKey = useMemo(() => {
@@ -589,7 +634,7 @@ export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
               <span>{error}</span>
               {/timed out|นานเกินกำหนด/i.test(error) && (
                 <div className="deposit-alert-suggestion">
-                  แนะนำให้ใช้แท็บ "ตรวจสอบพัสดุ" (Tracking) โดยค้นหาด้วยเลขบาร์โค้ดรายชิ้นหรือระบุเป็นกลุ่ม เพราะเนื่องจากข้อจำกัดของโครงสร้าง API ฝั่ง ปณท. ไม่รองรับการ Dump ข้อมูลระดับทั้งประเทศผ่าน Web Service แบบเรียลไทม์
+                  แนะนำให้ค้นหาด้วยเลขบาร์โค้ด (รายชิ้นหรือหลายหมายเลข) ในช่องค้นหาของหน้า "รายงานสถานะ" เพราะเนื่องจากข้อจำกัดของโครงสร้าง API ฝั่ง ปณท. ไม่รองรับการ Dump ข้อมูลระดับทั้งประเทศผ่าน Web Service แบบเรียลไทม์
                 </div>
               )}
             </div>
@@ -615,7 +660,7 @@ export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
               <span>{data.api_notice}</span>
               {(data.api_suggestion || /timed out|นานเกินกำหนด/i.test(data.api_notice)) && (
                 <div className="deposit-alert-suggestion">
-                  {data.api_suggestion || 'แนะนำให้ใช้แท็บ "ตรวจสอบพัสดุ" (Tracking) โดยค้นหาด้วยเลขบาร์โค้ดรายชิ้นหรือระบุเป็นกลุ่ม เพราะเนื่องจากข้อจำกัดของโครงสร้าง API ฝั่ง ปณท. ไม่รองรับการ Dump ข้อมูลระดับทั้งประเทศผ่าน Web Service แบบเรียลไทม์'}
+                  {data.api_suggestion || 'แนะนำให้ค้นหาด้วยเลขบาร์โค้ด (รายชิ้นหรือหลายหมายเลข) ในช่องค้นหาของหน้า "รายงานสถานะ" เพราะเนื่องจากข้อจำกัดของโครงสร้าง API ฝั่ง ปณท. ไม่รองรับการ Dump ข้อมูลระดับทั้งประเทศผ่าน Web Service แบบเรียลไทม์'}
                 </div>
               )}
             </div>
@@ -821,8 +866,8 @@ export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
                     </div>
                   </div>
 
-                  <div className="dash-province-detail">
-                    {activeProvinceDetail ? (
+                  {activeProvinceDetail && (
+                    <div className="dash-province-detail">
                       <div className={`dash-province-detail-inner ${lockedProvince ? 'is-locked' : ''}`}>
                         <div className="dash-pd-name-row">
                           <div className="dash-pd-name">
@@ -857,15 +902,8 @@ export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
                           <div className="dash-pd-stat total"><span className="dot t-slate"></span> รวมทั้งหมด <strong>{activeProvinceDetail.count ?? 0}</strong></div>
                         </div>
                       </div>
-                    ) : (
-                      <div className="dash-pd-placeholder">
-                        <div className="dash-pd-placeholder-icon">🗺️</div>
-                        <div className="dash-pd-placeholder-title">เลือกดูข้อมูลจังหวัด</div>
-                        <div>เลื่อนเมาส์ชี้บนแผนที่เพื่อดูสรุป หรือคลิกที่จังหวัดเพื่อล็อคข้อมูล</div>
-                        <span className="dash-pd-hint">สามารถคลิกเลือกจากตารางจัดอันดับด้านขวาได้เช่นกัน</span>
-                      </div>
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -889,7 +927,7 @@ export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
                       </tr>
                     </thead>
                     <tbody>
-                      {provinces.map((p) => {
+                      {paginatedProvinces.map((p) => {
                         const isLocked = lockedProvince && normalizeProvinceName(lockedProvince) === normalizeProvinceName(p.province);
                         const isHovered = hoveredProvince && normalizeProvinceName(hoveredProvince) === normalizeProvinceName(p.province);
                         const rate = p.success_rate == null ? '' : `${formatPct(p.success_rate)}%`;
@@ -927,6 +965,55 @@ export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
                     </tbody>
                   </table>
                 </div>
+
+                {provinces.length > 0 && (
+                  <div className="dash-ranking-footer">
+                    <div className="footer-records-count">
+                      แสดง <strong>{provinceStartIndex} - {provinceEndIndex}</strong> จากทั้งหมด <strong>{provinces.length}</strong> จังหวัด
+                    </div>
+
+                    {provinceTotalPages > 1 && (
+                      <div className="deposit-pagination-controls">
+                        <button
+                          type="button"
+                          className="btn-pagination prev"
+                          disabled={provincePage === 1}
+                          onClick={() => setProvincePage((p) => Math.max(1, p - 1))}
+                          title="หน้าก่อนหน้า"
+                        >
+                          ‹ ก่อนหน้า
+                        </button>
+
+                        <div className="pagination-page-numbers">
+                          {provincePageNumbers.map((p, idx) =>
+                            p === '...' ? (
+                              <span key={`ellipsis-${idx}`} className="pagination-ellipsis">…</span>
+                            ) : (
+                              <button
+                                key={p}
+                                type="button"
+                                className={`btn-pagination-page ${provincePage === p ? 'active' : ''}`}
+                                onClick={() => setProvincePage(p)}
+                              >
+                                {p}
+                              </button>
+                            )
+                          )}
+                        </div>
+
+                        <button
+                          type="button"
+                          className="btn-pagination next"
+                          disabled={provincePage === provinceTotalPages}
+                          onClick={() => setProvincePage((p) => Math.min(provinceTotalPages, p + 1))}
+                          title="หน้าถัดไป"
+                        >
+                          ถัดไป ›
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 

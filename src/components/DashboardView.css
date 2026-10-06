@@ -359,6 +359,27 @@
   width: 100%;
 }
 
+/* Province ranking pagination footer (15 per page) */
+.dash-ranking-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-top: 0.85rem;
+  font-family: 'Prompt', sans-serif;
+  font-size: 0.82rem;
+  color: var(--text-muted, #64748b);
+}
+
+.dash-ranking-footer .footer-records-count {
+  white-space: nowrap !important;
+}
+
+.dash-ranking-footer .deposit-pagination-controls {
+  flex-wrap: wrap;
+}
+
 .dash-map-card {
   display: flex;
   flex-direction: column;
@@ -887,45 +908,6 @@
 .t-red { background: #e11d48; }
 .t-amber { background: #d97706; }
 .t-slate { background: #64748b; }
-
-.dash-pd-placeholder {
-  font-size: 0.85rem;
-  font-family: 'Prompt', sans-serif;
-  color: var(--text-muted, #64748b);
-  border: 1px dashed var(--border-color, rgba(0, 0, 0, 0.14));
-  border-radius: 12px;
-  padding: 1.8rem 1.25rem;
-  line-height: 1.6;
-  text-align: center;
-}
-
-[data-theme='dark'] .dash-pd-placeholder {
-  border-color: rgba(255, 255, 255, 0.12);
-  color: #94a3b8;
-}
-
-.dash-pd-placeholder-icon {
-  font-size: 1.8rem;
-  margin-bottom: 0.4rem;
-}
-
-.dash-pd-placeholder-title {
-  font-weight: 700;
-  font-size: 0.95rem;
-  color: var(--text-main, #0f172a);
-  margin-bottom: 0.3rem;
-}
-
-[data-theme='dark'] .dash-pd-placeholder-title {
-  color: #f8fafc;
-}
-
-.dash-pd-hint {
-  font-size: 0.78rem;
-  opacity: 0.8;
-  display: block;
-  margin-top: 0.45rem;
-}
 
 /* 3. Ranking Table Card */
 .dash-ranking-card {

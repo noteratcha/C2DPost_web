@@ -667,7 +667,7 @@
 .deposit-search-wrap {
   position: relative;
   width: 100%;
-  max-width: 320px;
+  max-width: 420px;
 }
 
 .deposit-search-wrap .search-icon {
@@ -1881,3 +1881,112 @@
   background: #475569;
 }
 
+/* Unified search: barcode hint bar + embedded live tracking results */
+.deposit-barcode-hint-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  padding: 0.6rem 1.25rem;
+  font-size: 0.8rem;
+  color: var(--text-muted, #64748b);
+  background: rgba(16, 185, 129, 0.06);
+  border-bottom: 1px solid var(--border-color, rgba(0, 0, 0, 0.08));
+}
+
+[data-theme='dark'] .deposit-barcode-hint-bar {
+  color: #94a3b8;
+  background: rgba(16, 185, 129, 0.1);
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+
+.barcode-hint-text strong {
+  color: #059669;
+}
+
+[data-theme='dark'] .barcode-hint-text strong {
+  color: #34d399;
+}
+
+.btn-live-tracking {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.38rem 0.8rem;
+  border-radius: 7px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  font-family: 'Prompt', sans-serif;
+  background: rgba(255, 255, 255, 0.95);
+  color: #065f46;
+  border: 1.5px solid #059669;
+  cursor: pointer;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  white-space: nowrap !important;
+}
+
+.btn-live-tracking:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(5, 150, 105, 0.22);
+}
+
+[data-theme='dark'] .btn-live-tracking {
+  background: rgba(15, 23, 42, 0.75);
+  color: #34d399;
+  border-color: #10b981;
+}
+
+.deposit-live-tracking-panel {
+  padding: 1rem 1.25rem 1.1rem;
+  border-bottom: 1px solid var(--border-color, rgba(0, 0, 0, 0.08));
+  background: var(--bg-card-sub, #f8fafc);
+  animation: trackFadeIn 0.2s ease-out;
+}
+
+[data-theme='dark'] .deposit-live-tracking-panel {
+  background: rgba(15, 23, 42, 0.55);
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+
+.live-tracking-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+
+.live-tracking-panel-title {
+  font-family: 'Prompt', sans-serif;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text-main, #0f172a);
+  white-space: nowrap !important;
+}
+
+[data-theme='dark'] .live-tracking-panel-title {
+  color: #f8fafc;
+}
+
+.btn-close-live-tracking {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  border: 1px solid var(--border-color, #cbd5e1);
+  background: var(--bg-card, #ffffff);
+  color: var(--text-muted, #64748b);
+  cursor: pointer;
+  font-size: 0.8rem;
+  transition: all 0.15s ease;
+}
+
+.btn-close-live-tracking:hover {
+  color: #e11d48;
+  border-color: #e11d48;
+}
+
+[data-theme='dark'] .btn-close-live-tracking {
+  background: #0f172a;
+  border-color: #334155;
+  color: #94a3b8;
+}
