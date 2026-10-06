@@ -36,6 +36,8 @@ export default function BrowserGate() {
 
   return (
     <div className="gate-screen">
+      <div className="browser-gate-layout">
+      {/* Left card: open this site in Google Chrome */}
       <div className="gate-card browser-gate-card">
         <img src="/logo.png" alt="C2DPost" className="browser-gate-logo" />
 
@@ -79,10 +81,14 @@ export default function BrowserGate() {
         >
           ดาวน์โหลด Google Chrome
         </a>
+      </div>
 
-        {/* One-time setup so users never land here again */}
+      {/* Right card: one-time setup so users never land here again */}
+      <div className="gate-card browser-gate-guide-card">
         <div className="browser-gate-setup">
-          <div className="browser-gate-setup-title">ครั้งต่อไปไม่ต้องคัดลอกลิงก์ (ทำครั้งเดียว)</div>
+          <div className="browser-gate-guide-icon" aria-hidden="true">💡</div>
+          <div className="browser-gate-setup-title">ครั้งต่อไปไม่ต้องคัดลอกลิงก์</div>
+          <p className="browser-gate-setup-sub">ทำครั้งเดียวต่อเครื่อง เลือกวิธีใดวิธีหนึ่ง</p>
 
           <details className="browser-gate-details" open>
             <summary>วิธีที่ 1: ตั้ง Google Chrome เป็นเบราว์เซอร์เริ่มต้น</summary>
@@ -133,7 +139,7 @@ export default function BrowserGate() {
             )}
           </details>
 
-          <details className="browser-gate-details">
+          <details className="browser-gate-details" open>
             <summary>วิธีที่ 2: สร้างไอคอน C2DPost บนเดสก์ท็อป (เปิดด้วย Chrome เสมอ)</summary>
             <ol>
               <li>เปิดเว็บไซต์นี้ใน <strong>Google Chrome</strong></li>
@@ -143,6 +149,7 @@ export default function BrowserGate() {
             </ol>
           </details>
         </div>
+      </div>
       </div>
     </div>
   );

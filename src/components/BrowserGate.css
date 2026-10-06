@@ -1,7 +1,66 @@
 /* BrowserGate.css — "Open in Google Chrome" page (reuses .gate-screen / .gate-card from ExtensionGate.css) */
 
+/* Two cards side by side on computers, width follows the screen */
+.browser-gate-layout {
+  width: min(94vw, 1600px);
+  margin: auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+  gap: clamp(16px, 2vw, 28px);
+  align-items: stretch;
+}
+
+.browser-gate-layout > .gate-card {
+  max-width: none;
+  width: auto;
+  margin: 0;
+}
+
 .browser-gate-card {
-  max-width: 600px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.browser-gate-guide-card {
+  text-align: left;
+}
+
+.browser-gate-guide-icon {
+  width: 48px;
+  height: 48px;
+  margin: 0 auto 8px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  background: rgba(5, 150, 105, 0.1);
+}
+
+.browser-gate-setup-sub {
+  margin: -4px 0 14px;
+  text-align: center;
+  font-size: 0.82rem;
+  color: #64748b;
+}
+
+:root[data-theme="dark"] .browser-gate-setup-sub {
+  color: #94a3b8;
+}
+
+/* Tablet / phone: stack the cards (current single-column look) */
+@media (max-width: 960px) {
+  .browser-gate-layout {
+    width: min(100%, 600px);
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .browser-gate-layout > .gate-card {
+    padding: 24px 18px;
+  }
 }
 
 .browser-gate-logo {
@@ -43,6 +102,7 @@
 
 .browser-gate-detected {
   display: inline-block;
+  align-self: center;
   margin-bottom: 16px;
   padding: 6px 14px;
   border-radius: 999px;
@@ -142,17 +202,14 @@
 
 /* One-time setup: default browser / desktop shortcut */
 .browser-gate-setup {
-  margin-top: 18px;
-  padding-top: 16px;
-  border-top: 1px dashed rgba(100, 116, 139, 0.35);
   text-align: left;
 }
 
 .browser-gate-setup-title {
   font-family: 'Prompt', sans-serif;
-  font-size: 0.95rem;
+  font-size: 1.2rem;
   font-weight: 700;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
   text-align: center;
 }
 
