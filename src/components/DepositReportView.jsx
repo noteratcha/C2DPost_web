@@ -1274,6 +1274,7 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
                       <div className="loading-spinner-wrap">
                         <span className="spinner-medium"></span>
                         <p>กำลังดึงข้อมูลรายงานจากไปรษณีย์ไทย e-Parcel...</p>
+                        <p className="loading-slow-hint">บัญชีที่มีข้อมูลจำนวนมากอาจใช้เวลาถึง 5 นาที กรุณาอย่าปิดหน้านี้</p>
                       </div>
                     </td>
                   </tr>

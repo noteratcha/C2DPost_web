@@ -708,6 +708,7 @@ export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
           <div className="dash-empty dash-loading-state">
             <span className="spinner-medium"></span>
             <p>กำลังดึงข้อมูลสถิติประจำเดือนนี้...</p>
+            <p className="loading-slow-hint">บัญชีที่มีข้อมูลจำนวนมากอาจใช้เวลาถึง 5 นาที กรุณาอย่าปิดหน้านี้</p>
           </div>
         )}
 

@@ -426,3 +426,10 @@ body {
     padding-top: 10px;
   }
 }
+
+/* Long-running report fetch hint (large accounts can take up to 5 minutes) */
+.loading-slow-hint {
+  margin-top: 6px;
+  font-size: 0.78rem;
+  color: var(--text-muted, #64748b);
+}

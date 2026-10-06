@@ -654,6 +654,7 @@ def _fetch_received_report_payload(req_date, req_end_date, req_username, req_pas
     api_error = None
     used_duration_mode = False
     duration_debug_out = []
+    fetch_seconds = 0.0
     
     SUGGESTION_TRACKING = (
         'แนะนำให้ค้นหาด้วยเลขบาร์โค้ด (รายชิ้นหรือหลายหมายเลข) ในช่องค้นหาของหน้า "รายงานสถานะ" '
@@ -661,14 +662,16 @@ def _fetch_received_report_payload(req_date, req_end_date, req_username, req_pas
     )
     
     if username and password and not is_demo_user:
-        # ---- Time budget (Vercel maxDuration = 120s) ----
-        # 1) getAllOrderReceived once (whole day). Large national accounts time out here.
-        # 2) On timeout -> getOrderByDurationTime split into 2-hour windows queried in parallel,
-        #    each returning a much smaller result set. Overall deadline keeps us under 120s.
+        # ---- Time budget (Vercel maxDuration = 300s) ----
+        # 1) getAllOrderReceived once (whole day), waiting up to ~4 minutes: national accounts
+        #    (e.g. Royalthai.pol) deposit at the counter without e-Parcel preload, so this is the
+        #    only endpoint that has their data — it is just slow.
+        # 2) On timeout -> getOrderByDurationTime split into 2-hour windows (helps accounts that
+        #    preload via addItems; returns "Order not found" for counter-only accounts).
         request_started = time.monotonic()
-        DEADLINE_SECONDS = 108
-        FULL_DAY_TIMEOUT = 45
-        SLOT_TIMEOUT_MAX = 50
+        DEADLINE_SECONDS = 285
+        FULL_DAY_TIMEOUT = 235
+        SLOT_TIMEOUT_MAX = 45
         # Windows overlap at the boundary (stopTime is hh:mm); duplicates are removed by barcode later
         DURATION_SLOTS = [(f"{h:02d}:00", f"{h + 2:02d}:00" if h + 2 < 24 else "23:59") for h in range(0, 24, 2)]
         auth = HTTPBasicAuth(username, password)
@@ -686,16 +689,16 @@ def _fetch_received_report_payload(req_date, req_end_date, req_username, req_pas
             if isinstance(resp_json, list):
                 if len(resp_json) > 0 and isinstance(resp_json[0], dict) and resp_json[0].get("errorCode"):
                     err_detail = str(resp_json[0].get("errorDetail") or "")
-                    if re.search(r"no\s*receive\s*product|no\s*data", err_detail, re.IGNORECASE):
-                        return {"items": []}
+                    if re.search(r"no\s*receive\s*product|no\s*data|order\s*not\s*found", err_detail, re.IGNORECASE):
+                        return {"items": [], "no_data": True}
                     return {"items": [], "notice": err_detail}
                 return {"items": resp_json}
             if isinstance(resp_json, dict) and isinstance(resp_json.get("data"), list):
                 return {"items": resp_json["data"]}
             if isinstance(resp_json, dict) and resp_json.get("errorCode"):
                 err_detail = str(resp_json.get("errorDetail") or "")
-                if re.search(r"no\s*receive\s*product|no\s*data", err_detail, re.IGNORECASE):
-                    return {"items": []}
+                if re.search(r"no\s*receive\s*product|no\s*data|order\s*not\s*found", err_detail, re.IGNORECASE):
+                    return {"items": [], "no_data": True}
                 return {"items": [], "notice": err_detail}
             return {"items": []}
 
@@ -823,6 +826,7 @@ def _fetch_received_report_payload(req_date, req_end_date, req_username, req_pas
 
         raw_data = aggregated_items
         used_duration_mode = bool(duration_dates)
+        fetch_seconds = round(time.monotonic() - request_started, 1)
         duration_debug_out = duration_debug
 
         if duration_failures and not api_error:
@@ -840,11 +844,15 @@ def _fetch_received_report_payload(req_date, req_end_date, req_username, req_pas
                     + " | ".join(duration_notices[:3])
                 )
             elif duration_total == 0:
+                # Full-day report timed out and the account has no e-Parcel preload data
+                # (typical of counter-only national accounts) -> nothing else we can query.
                 api_error = (
-                    "บัญชีนี้มีข้อมูลปริมาณมาก ระบบจึงดึงข้อมูลแบบแบ่งช่วงเวลา (ทีละ 2 ชั่วโมง ครบ 24 ชั่วโมง) "
-                    "แต่ไม่พบรายการที่ส่งข้อมูลเข้าระบบ e-Parcel ในวันที่ " + ", ".join(duration_dates)
-                    + " (โหมดนี้นับตามวันที่สร้างรายการ ไม่ใช่วันที่ ปณ. รับฝาก) ลองเลือก \"เมื่อวาน\" หรือช่วงวันที่ก่อนหน้า"
+                    "ดึงรายงานรับฝากล้มเหลว: ระบบไปรษณีย์ไทยใช้เวลาประมวลผลรายงานของวันที่ "
+                    + ", ".join(duration_dates)
+                    + " นานเกิน 4 นาที (บัญชีมีข้อมูลปริมาณมาก) และบัญชีนี้ไม่มีข้อมูลที่ส่งล่วงหน้าผ่าน e-Parcel "
+                    "ให้ดึงแบบแบ่งช่วงเวลา กรุณาลองใหม่ภายหลัง หรือตรวจสอบเป็นรายชิ้นด้วยเลขบาร์โค้ด"
                 )
+                api_suggestion = SUGGESTION_TRACKING
             else:
                 api_error = (
                     f"บัญชีนี้มีข้อมูลปริมาณมาก ระบบจึงดึงข้อมูลแบบแบ่งช่วงเวลา (ทีละ 2 ชั่วโมง) ได้ {duration_total:,} รายการ "
@@ -1068,6 +1076,7 @@ def _fetch_received_report_payload(req_date, req_end_date, req_username, req_pas
         "end_date": clean_end_date,
         "date_display": date_display,
         "fetch_debug": duration_debug_out,
+        "fetch_seconds": fetch_seconds,
         "fetch_mode": "duration" if used_duration_mode else "full_day",
         "is_mock": bool(is_demo_user),
         "api_notice": (api_error if not is_demo_user else None) if (api_error and not re.search(r"no\s*receive\s*product|no\s*data", str(api_error), re.IGNORECASE)) else None,
@@ -1241,7 +1250,7 @@ def get_dashboard_report(req: DashboardRequest):
     password = (req.password or "").strip()
     is_live = bool(username and password and username.lower() != "demo")
     # The duration-window fallback already used most of the 120s budget -> skip extra enrichment
-    if payload.get("fetch_mode") == "duration":
+    if payload.get("fetch_mode") == "duration" or (payload.get("fetch_seconds") or 0) > 90:
         is_live = False
 
     # For large live datasets (more than 35) the received endpoint only enriches up to 35 records.

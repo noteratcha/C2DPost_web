@@ -822,6 +822,7 @@ export default function DepositReportModal({ isOpen, onClose, currentPerson, onS
                   <td colSpan="10" className="deposit-loading-cell">
                     <span className="deposit-spinner large"></span>
                     <p>กำลังดึงข้อมูลรายงานจากไปรษณีย์ไทย...</p>
+                    <p className="loading-slow-hint">บัญชีที่มีข้อมูลจำนวนมากอาจใช้เวลาถึง 5 นาที กรุณาอย่าปิดหน้านี้</p>
                   </td>
                 </tr>
               ) : filteredRecords.length === 0 ? (
