@@ -1229,7 +1229,7 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
           )}
 
           <div className="deposit-table-scroll">
-            <table className="deposit-data-table">
+            <table className="deposit-data-table deposit-data-table--cards">
               <thead>
                 <tr>
                   <th style={{ width: '40px', textAlign: 'center' }}>
@@ -1309,7 +1309,7 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
                     const isRowSelected = selectedBarcodes.has(item.barcode);
                     return (
                       <tr key={item.barcode || globalIdx} className={`row-status-${statusInfo.key} ${isRowSelected ? 'row-selected' : ''}`}>
-                        <td style={{ textAlign: 'center' }}>
+                        <td style={{ textAlign: 'center' }} className="cell-select">
                           {isDelivered && item.barcode ? (
                             <input
                               type="checkbox"
@@ -1327,8 +1327,8 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
                             />
                           )}
                         </td>
-                        <td style={{ textAlign: 'center' }}>{globalIdx}</td>
-                        <td>
+                        <td style={{ textAlign: 'center' }} className="cell-index">{globalIdx}</td>
+                        <td className="cell-barcode">
                           {item.barcode ? (
                             <button
                               type="button"
@@ -1342,7 +1342,7 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
                             <span className="table-barcode-pill">-</span>
                           )}
                         </td>
-                        <td>{item.inv_no || '-'}</td>
+                        <td className="cell-invno" data-label="เลขที่คำขอ">{item.inv_no || '-'}</td>
                         <td className="cell-receiver-name">{item.receiver_name || '-'}</td>
                         <td className="cell-address">
                           {item.receiver_address}{' '}
@@ -1350,10 +1350,10 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
                           {item.receiver_province ? `จ.${item.receiver_province}` : ''}{' '}
                           {item.receiver_zipcode || ''}
                         </td>
-                        <td style={{ textAlign: 'right' }}>
+                        <td style={{ textAlign: 'right' }} className="cell-weight" data-label="น้ำหนัก">
                           {item.weight ? `${item.weight}g` : '-'}
                         </td>
-                        <td style={{ textAlign: 'right' }} className="cell-fee">
+                        <td style={{ textAlign: 'right' }} className="cell-fee" data-label="ค่าบริการ">
                           {item.fee !== undefined && item.fee !== null && item.fee !== ''
                             ? `${Number(item.fee).toLocaleString('th-TH', { minimumFractionDigits: Number(item.fee) % 1 === 0 ? 0 : 2, maximumFractionDigits: 2 })}`
                             : '-'}
@@ -1376,6 +1376,8 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
                         </td>
                         <td 
                           style={{ textAlign: 'center' }}
+                          className="cell-station"
+                          data-label="ปณ./สถานที่"
                           title={`สถานที่ล่าสุด: ${formatStationWithZipcode(item.latest_station || item.received_postoffice, item)}${item.received_postoffice ? `\n(ปณ.รับฝาก: ${formatStationWithZipcode(item.received_postoffice, item)})` : ''}`}
                         >
                           {formatStationWithZipcode(item.latest_station || item.received_postoffice, item)}

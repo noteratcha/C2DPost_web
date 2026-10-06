@@ -1,0 +1,428 @@
+/* responsive.css — Responsive Layout System (imported last in main.jsx)
+ *
+ * 1. Fluid page width: every page/navbar/footer shares one max width and gutter
+ *    that follow the screen width (full-width on 1920px, capped on ultrawide).
+ * 2. Breakpoints:
+ *    - <= 1100px  tablet / small laptop
+ *    - <= 900px   navbar wraps into 2 rows (tabs become a scrollable bar)
+ *    - <= 900px   report table rows become cards
+ *    - <= 640px   phone: stacked controls, 2-column stat cards
+ */
+
+:root {
+  --page-max-width: 1880px;
+  --page-gutter: clamp(12px, 2vw, 32px);
+}
+
+/* ===== 1. Fluid page width ===== */
+.navbar-container,
+.footer-container,
+.python-container,
+.deposit-page-container,
+.tracking-page-container,
+.admin-management-container {
+  max-width: var(--page-max-width);
+}
+
+.navbar-container,
+.deposit-page-container,
+.tracking-page-container,
+.admin-management-container {
+  padding-left: var(--page-gutter);
+  padding-right: var(--page-gutter);
+}
+
+.main-content.python-layout-main,
+.main-footer {
+  padding-left: var(--page-gutter);
+  padding-right: var(--page-gutter);
+}
+
+html,
+body {
+  overflow-x: hidden;
+}
+
+/* ===== 2. Tablet / small laptop (<= 1100px) ===== */
+@media (max-width: 1100px) {
+  .deposit-control-card {
+    align-items: stretch;
+  }
+
+  .deposit-control-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .deposit-table-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .deposit-filter-tabs {
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .deposit-filter-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* DepositReportModal.css also sets this class to width: 320px */
+  .deposit-search-wrap {
+    width: 100%;
+    max-width: none;
+  }
+
+  /* 6 KPI cards -> 3 per row (instead of 4 + 2) */
+  .deposit-stats-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* ===== 3. Navbar wraps into two rows (<= 900px) ===== */
+@media (max-width: 900px) {
+  /* Fixed 66px height cannot hold 2 rows */
+  .main-navbar.python-theme-navbar {
+    height: auto;
+    min-height: 66px;
+  }
+
+  .navbar-container {
+    flex-wrap: wrap;
+    row-gap: 8px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+
+  /* Row 1: brand (shrinks, ellipsis) + user/hamburger (fixed) */
+  .navbar-left-group {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .navbar-right {
+    flex: 0 0 auto;
+  }
+
+  .brand-identity-stack {
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .header-office-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+  }
+
+  .navbar-nav-tabs {
+    order: 3;
+    flex: 1 1 100%;
+    overflow-x: auto;
+    justify-content: flex-start;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .navbar-nav-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .navbar-nav-tabs .nav-tab-btn {
+    flex: 0 0 auto;
+  }
+
+  .navbar-right {
+    gap: 8px;
+  }
+
+  .navbar-api-health {
+    display: none !important;
+  }
+}
+
+/* ===== 3b. Report table rows become cards (<= 900px) ===== */
+@media (max-width: 900px) {
+  /* Report table -> stacked cards */
+  .deposit-data-table--cards thead {
+    display: none;
+  }
+
+  .deposit-data-table--cards,
+  .deposit-data-table--cards tbody {
+    display: block;
+    width: 100%;
+  }
+
+  .deposit-data-table--cards tbody tr {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem 0.5rem;
+    padding: 0.8rem 0.85rem;
+    border-bottom: 1px solid var(--border-color, rgba(0, 0, 0, 0.08));
+  }
+
+  .deposit-data-table--cards tbody td {
+    display: block;
+    padding: 0;
+    border: none !important;
+    text-align: left !important;
+    background: transparent !important;
+  }
+
+  .deposit-data-table--cards td.table-loading-cell,
+  .deposit-data-table--cards td.table-empty-cell {
+    width: 100%;
+    padding: 1.5rem 0;
+    text-align: center !important;
+  }
+
+  .deposit-data-table--cards .cell-select { order: 1; }
+  .deposit-data-table--cards .cell-index { display: none; }
+  .deposit-data-table--cards .cell-barcode { order: 2; flex: 1 1 auto; min-width: 0; }
+  .deposit-data-table--cards .cell-status-wrapper { order: 3; margin-left: auto; }
+  .deposit-data-table--cards .cell-receiver-name { order: 4; flex: 1 1 100%; font-weight: 600; }
+  .deposit-data-table--cards .cell-address { order: 5; flex: 1 1 100%; font-size: 0.8rem; color: var(--text-muted, #64748b); }
+  .deposit-data-table--cards .cell-timestamp { order: 6; }
+  .deposit-data-table--cards .cell-station { order: 7; }
+  .deposit-data-table--cards .cell-invno { order: 8; }
+  .deposit-data-table--cards .cell-weight { order: 9; }
+  .deposit-data-table--cards .cell-fee { order: 10; }
+
+  /* Small meta chips with their column label */
+  .deposit-data-table--cards td[data-label] {
+    font-size: 0.74rem;
+    padding: 0.18rem 0.5rem;
+    border-radius: 6px;
+    background: var(--bg-card-sub, #f1f5f9) !important;
+    white-space: nowrap;
+  }
+
+  [data-theme='dark'] .deposit-data-table--cards td[data-label] {
+    background: rgba(255, 255, 255, 0.06) !important;
+  }
+
+  .deposit-data-table--cards td[data-label]::before {
+    content: attr(data-label) ' ';
+    color: var(--text-muted, #64748b);
+    font-weight: 500;
+  }
+
+  .deposit-data-table--cards .cell-timestamp .timestamp-badge {
+    font-size: 0.74rem;
+  }
+}
+
+/* ===== 4. Phone (<= 640px) ===== */
+@media (max-width: 640px) {
+  /* Navbar: avatar-only user badge, compact brand */
+  .user-info-stack {
+    display: none !important;
+  }
+
+  .brand-logo-img {
+    width: 38px;
+    height: 38px;
+  }
+
+  .header-office-title {
+    font-size: 0.74rem;
+  }
+
+  /* Page shell */
+  .deposit-page-main,
+  .tracking-page-main {
+    padding-top: 0.85rem;
+  }
+
+  .deposit-page-container,
+  .tracking-page-container {
+    gap: 0.85rem;
+  }
+
+  .deposit-page-header-card {
+    padding: 0.9rem 1rem;
+  }
+
+  .deposit-page-title-group {
+    gap: 0.7rem;
+    align-items: flex-start;
+  }
+
+  .deposit-page-icon-badge {
+    width: 38px;
+    height: 38px;
+    flex-shrink: 0;
+  }
+
+  .deposit-page-title {
+    font-size: 1.05rem;
+  }
+
+  .deposit-page-subtitle {
+    font-size: 0.76rem;
+  }
+
+  /* Date range & actions: full-width stacked controls */
+  .deposit-control-card {
+    padding: 0.85rem;
+    gap: 0.75rem;
+  }
+
+  .deposit-date-group,
+  .deposit-date-range-group {
+    width: 100%;
+    gap: 0.6rem;
+  }
+
+  .deposit-date-item {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .deposit-date-item > :last-child {
+    flex: 1;
+    max-width: 220px;
+  }
+
+  .deposit-quick-date-btns {
+    width: 100%;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .deposit-quick-date-btns::-webkit-scrollbar {
+    display: none;
+  }
+
+  .deposit-quick-date-btns > * {
+    flex: 0 0 auto;
+  }
+
+  .deposit-control-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .deposit-control-actions > * {
+    width: 100%;
+    justify-content: center;
+  }
+
+  /* KPI cards: 2 per row */
+  .deposit-stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.6rem;
+  }
+
+  .deposit-stat-card {
+    padding: 0.7rem 0.75rem;
+    gap: 0.6rem;
+  }
+
+  .deposit-stat-card .stat-card-icon {
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
+  }
+
+  .deposit-stat-card .stat-value {
+    font-size: 1.1rem;
+  }
+
+  /* Table toolbar */
+  .deposit-table-toolbar {
+    padding: 0.75rem;
+  }
+
+  .deposit-barcode-hint-bar,
+  .deposit-live-tracking-panel {
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+  }
+
+  /* Table footer: count, pagination, actions stacked */
+  .deposit-table-footer {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+    padding: 0.85rem;
+  }
+
+  .deposit-table-footer .footer-records-count {
+    text-align: center;
+  }
+
+  .deposit-table-footer .deposit-pagination-controls,
+  .dash-ranking-footer .deposit-pagination-controls {
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .deposit-footer-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+  }
+
+  .deposit-footer-actions > * {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .deposit-footer-actions > :first-child {
+    grid-column: 1 / -1;
+  }
+
+  /* Tracking result cards: status pills move under the barcode */
+  .tracking-card-header {
+    padding: 0.8rem 0.9rem;
+    gap: 0.5rem;
+  }
+
+  .tracking-card-header .card-header-left {
+    flex: 1 1 100%;
+  }
+
+  .tracking-card-header .card-header-right {
+    flex-wrap: wrap;
+    padding-left: 2rem;
+  }
+
+  .result-barcode-mono {
+    font-size: 1.02rem;
+  }
+
+  /* Dashboard */
+  .dash-ranking-footer {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .dash-section-card {
+    padding: 0.9rem;
+  }
+
+  /* Workspace */
+  .main-content.python-layout-main {
+    padding-top: 10px;
+  }
+
+  .card-controls-row,
+  .action-buttons-group {
+    flex-wrap: wrap;
+  }
+
+  .action-buttons-group > * {
+    flex: 1 1 auto;
+  }
+
+  /* Admin */
+  .admin-management-container {
+    padding-top: 10px;
+  }
+}

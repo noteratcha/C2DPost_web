@@ -38,7 +38,7 @@ except Exception as e:
     print(f"Error registering fonts: {e}")
     FONT_REGISTERED = False
 
-__version__ = "2026.1006.0351"
+__version__ = "2026.1006.0427"
 
 # Thailand Post API Credentials
 API_KEY = "V9JN25IFH5hdZYc1k8NNRVgnLYXyQLzc"
@@ -910,7 +910,11 @@ def process_pdf(pdf_path):
                 if l_rec and l_rec.get('RECEIVER'):
                     if not l_rec.get('RECEIVER ZIPCODE') and receiver_info and receiver_info.get('RECEIVER ZIPCODE'):
                         l_rec['RECEIVER ZIPCODE'] = receiver_info['RECEIVER ZIPCODE']
-                    if not receiver_info or (l_rec.get('RECEIVER ZIPCODE') and not receiver_info.get('RECEIVER ZIPCODE')):
+                    # Plain text can come out in content-stream order (e.g. "เรียน" separated from the name),
+                    # leaving a result with zipcode but no RECEIVER -> prefer the layout parse in that case too.
+                    if (not receiver_info
+                            or not receiver_info.get('RECEIVER')
+                            or (l_rec.get('RECEIVER ZIPCODE') and not receiver_info.get('RECEIVER ZIPCODE'))):
                         receiver_info = l_rec
                     page_shipper = parse_shipper_label(layout_text)
                     if not ref_no:
@@ -921,7 +925,8 @@ def process_pdf(pdf_path):
                         ref_no = prev_shipper.get('REF NO', '')
 
         # 3. Check envelope label (covers envelopes with "ผู้รับ" or inverted layout)
-        if not receiver_info:
+        #    Also used when steps 1-2 returned a partial result without a receiver name.
+        if not receiver_info or not receiver_info.get('RECEIVER'):
             for t_candidate in [text, layout_text]:
                 if not t_candidate: continue
                 env_info = parse_envelope_label(t_candidate)
