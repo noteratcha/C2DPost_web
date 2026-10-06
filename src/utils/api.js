@@ -346,6 +346,36 @@ export async function exportDepositReportExcel({ records, summary = {}, date = '
 }
 
 /**
+ * Export the parcels behind a dashboard reason card (ส่งคืน / นำจ่ายไม่สำเร็จ) to Excel (.xlsx)
+ *
+ * @param {Object} payload
+ * @param {Array} payload.items - reason parcels (from dashboard `reason_parcels`)
+ * @param {string} payload.title - card title
+ * @param {'return'|'delivery_failed'} payload.reasonType
+ * @param {string} [payload.reason] - single reason filter ('' = all reasons)
+ * @param {string} [payload.date]
+ * @param {string} [payload.organization]
+ */
+export async function exportReasonExcel({ items, title, reasonType, reason = '', date = '', organization = '' }) {
+  const response = await fetch(`${API_BASE}/reports/export-reason-excel`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ items, title, reason_type: reasonType, reason, date, organization })
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ detail: response.statusText }));
+    throw new Error(err.detail || 'ไม่สามารถสร้างไฟล์ Excel ได้');
+  }
+
+  const prefix = reasonType === 'return' ? 'Return_Reasons' : 'Delivery_Failed_Reasons';
+  const fallback = `${prefix}_${(date || '').replace(/\//g, '-') || Date.now()}.xlsx`;
+  const filename = getFilenameFromHeader(response.headers.get('Content-Disposition'), fallback);
+  const blob = await response.blob();
+  downloadBlob(blob, filename);
+}
+
+/**
  * Export Deposit Report to Landscape PDF (.pdf)
  *
  * @param {Object} payload

@@ -18,8 +18,11 @@ export default function Navbar({
   adminServices = null,
   onOpenDepositReport = null,
   earStatus = 'unknown',
-  onRefreshEar = null
+  onRefreshEar = null,
+  hideWorkspace = false
 }) {
+  // Mobile has no PDF workspace -> brand/logo goes to the status report page
+  const homePage = isAdmin ? 'admin' : (hideWorkspace ? 'deposit-report' : 'workspace');
   const [showAboutModal, setShowAboutModal] = useState(false);
   const [isNavMenuOpen, setIsNavMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
@@ -229,12 +232,12 @@ export default function Navbar({
         <div className="navbar-container">
           {/* Left: Modern Brand & Organization Identity */}
           <div className="navbar-left-group">
-            <div className="brand-logo-wrap" onClick={() => onNavigate && onNavigate(isAdmin ? 'admin' : 'workspace')} style={{ cursor: onNavigate ? 'pointer' : 'default' }}>
+            <div className="brand-logo-wrap" onClick={() => onNavigate && onNavigate(homePage)} style={{ cursor: onNavigate ? 'pointer' : 'default' }}>
               <img src="/logo_dark.png" alt="C2DPost" className="brand-logo-img" />
             </div>
             <div className="brand-identity-stack">
               <div className="brand-primary-row">
-                <span className="brand-title-accent" onClick={() => onNavigate && onNavigate(isAdmin ? 'admin' : 'workspace')} style={{ cursor: onNavigate ? 'pointer' : 'default' }}>
+                <span className="brand-title-accent" onClick={() => onNavigate && onNavigate(homePage)} style={{ cursor: onNavigate ? 'pointer' : 'default' }}>
                   C2DPost
                 </span>
               </div>
@@ -255,6 +258,7 @@ export default function Navbar({
             <nav className="navbar-nav-tabs" aria-label="แถบเมนูนำทาง">
               {!isAdmin && (
                 <>
+                  {!hideWorkspace && (
                   <button
                     type="button"
                     className={`nav-tab-btn ${activePage === 'workspace' ? 'active' : ''}`}
@@ -269,6 +273,7 @@ export default function Navbar({
                     </svg>
                     <span>แปลงไฟล์ PDF</span>
                   </button>
+                  )}
 
                   <button
                     type="button"

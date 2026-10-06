@@ -38,7 +38,7 @@ except Exception as e:
     print(f"Error registering fonts: {e}")
     FONT_REGISTERED = False
 
-__version__ = "2026.1006.0427"
+__version__ = "2026.1006.1201"
 
 # Thailand Post API Credentials
 API_KEY = "V9JN25IFH5hdZYc1k8NNRVgnLYXyQLzc"
@@ -1858,6 +1858,137 @@ def generate_deposit_report_excel(records, summary, meta, output_excel_path):
         ws.column_dimensions[col_letter].width = max(max_len + 4, 11)
         
     ws.column_dimensions['E'].width = 30
+
+    wb.save(output_excel_path)
+
+def generate_reason_report_excel(items, meta, output_excel_path):
+    """
+    Excel list of parcels behind a dashboard reason card
+    (สาเหตุการส่งคืน / สาเหตุการนำจ่ายไม่สำเร็จ), optionally filtered to one reason.
+    Item list followed by a per-reason summary block.
+    """
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Reason_Report"
+
+    accent = "E11D48" if meta.get("reason_type") == "return" else "D97706"
+    HEADER_FILL = PatternFill(start_color=accent, end_color=accent, fill_type="solid")
+    HEADER_FONT = Font(name="Tahoma", size=10, bold=True, color="FFFFFF")
+    TITLE_FONT = Font(name="Tahoma", size=14, bold=True, color="0F172A")
+    SUBTITLE_FONT = Font(name="Tahoma", size=9, color="475569")
+    DATA_FONT = Font(name="Tahoma", size=9)
+    BOLD_DATA_FONT = Font(name="Tahoma", size=9, bold=True)
+    TOTAL_FONT = Font(name="Tahoma", size=10, bold=True, color="0F172A")
+    THIN_BORDER = Border(
+        left=Side(style='thin', color='CBD5E1'),
+        right=Side(style='thin', color='CBD5E1'),
+        top=Side(style='thin', color='CBD5E1'),
+        bottom=Side(style='thin', color='CBD5E1')
+    )
+
+    title = meta.get("title") or "รายการพัสดุตามสาเหตุ"
+    org_name = meta.get("organization") or "สำนักงานที่ดิน"
+    report_date = meta.get("date") or datetime.now().strftime("%d/%m/%Y")
+    reason_filter = meta.get("reason") or "ทุกสาเหตุ"
+
+    headers = [
+        "ลำดับ", "หมายเลข Barcode", "เลขที่คำขอ", "ชื่อผู้รับ", "ที่อยู่ปลายทาง",
+        "จังหวัด", "รหัสไปรษณีย์", "สาเหตุ", "สถานะล่าสุด", "วัน-เวลาล่าสุด", "ปณ./สถานที่ล่าสุด"
+    ]
+    last_col = get_column_letter(len(headers))
+
+    ws.merge_cells(f"A1:{last_col}1")
+    ws["A1"] = f"{title} — {org_name}"
+    ws["A1"].font = TITLE_FONT
+    ws["A1"].alignment = Alignment(horizontal="left", vertical="center")
+    ws.row_dimensions[1].height = 28
+
+    ws.merge_cells(f"A2:{last_col}2")
+    ws["A2"] = f"ช่วงวันที่: {report_date}  |  สาเหตุ: {reason_filter}  |  จำนวน: {len(items)} รายการ"
+    ws["A2"].font = SUBTITLE_FONT
+    ws["A2"].alignment = Alignment(horizontal="left", vertical="center")
+    ws.row_dimensions[2].height = 20
+
+    header_row = 4
+    ws.row_dimensions[header_row].height = 24
+    for col_idx, h_text in enumerate(headers, start=1):
+        cell = ws.cell(row=header_row, column=col_idx, value=h_text)
+        cell.fill = HEADER_FILL
+        cell.font = HEADER_FONT
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+        cell.border = THIN_BORDER
+
+    start_data_row = header_row + 1
+    for i, r in enumerate(items):
+        cur_row = start_data_row + i
+        ws.row_dimensions[cur_row].height = 20
+        amphur = (r.get("receiver_amphur") or "").strip()
+        addr = " ".join(x for x in [
+            (r.get("receiver_address") or "").strip(),
+            f"อ.{amphur}" if amphur and not amphur.startswith("อ.") else amphur,
+        ] if x)
+        status_lbl = r.get("status_label") or ""
+        raw_desc = (r.get("status_description_raw") or "").strip()
+        status_display = f"{status_lbl} ({raw_desc})" if status_lbl and raw_desc and raw_desc not in status_lbl else (status_lbl or raw_desc)
+        row_values = [
+            i + 1,
+            r.get("barcode", ""),
+            r.get("inv_no", ""),
+            r.get("receiver_name", ""),
+            addr,
+            r.get("receiver_province", ""),
+            r.get("receiver_zipcode", ""),
+            r.get("reason", ""),
+            status_display,
+            r.get("latest_date", ""),
+            format_station_with_zipcode(r.get("latest_station") or "", r),
+        ]
+        for col_idx, val in enumerate(row_values, start=1):
+            cell = ws.cell(row=cur_row, column=col_idx, value=val)
+            cell.font = DATA_FONT
+            cell.border = THIN_BORDER
+            if col_idx in (2, 3, 7):
+                cell.number_format = "@"  # keep leading zeros / text barcodes
+            if col_idx in (1, 2, 3, 7, 10, 11):
+                cell.alignment = Alignment(horizontal="center", vertical="center")
+                if col_idx == 2:
+                    cell.font = BOLD_DATA_FONT
+            elif col_idx == 8:
+                cell.alignment = Alignment(horizontal="left", vertical="center")
+                cell.font = BOLD_DATA_FONT
+            else:
+                cell.alignment = Alignment(horizontal="left", vertical="center", wrap_text=(col_idx == 5))
+
+    # Per-reason summary block
+    counts = {}
+    for r in items:
+        key = r.get("reason") or "-"
+        counts[key] = counts.get(key, 0) + 1
+    sum_row = start_data_row + len(items) + 1
+    ws.cell(row=sum_row, column=2, value="สรุปตามสาเหตุ").font = TOTAL_FONT
+    for j, (reason, cnt) in enumerate(sorted(counts.items(), key=lambda kv: -kv[1]), start=1):
+        rr = sum_row + j
+        ws.cell(row=rr, column=2, value=reason).font = DATA_FONT
+        c = ws.cell(row=rr, column=3, value=cnt)
+        c.font = BOLD_DATA_FONT
+        c.alignment = Alignment(horizontal="center")
+        pc = ws.cell(row=rr, column=4, value=(cnt / len(items)) if items else 0)
+        pc.number_format = "0.00%"
+        pc.font = DATA_FONT
+    total_r = sum_row + len(counts) + 1
+    ws.cell(row=total_r, column=2, value="รวมทั้งสิ้น").font = TOTAL_FONT
+    t = ws.cell(row=total_r, column=3, value=len(items))
+    t.font = TOTAL_FONT
+    t.alignment = Alignment(horizontal="center")
+
+    widths = [7, 18, 18, 26, 40, 14, 12, 28, 30, 20, 22]
+    for idx, w in enumerate(widths, start=1):
+        ws.column_dimensions[get_column_letter(idx)].width = w
+    ws.freeze_panes = ws.cell(row=start_data_row, column=1)
 
     wb.save(output_excel_path)
 

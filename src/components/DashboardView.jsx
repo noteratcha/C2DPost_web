@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { fetchDashboardReport } from '../utils/api';
 import ThaiDateInput from './ThaiDateInput';
+import ReasonDetailModal from './ReasonDetailModal';
 import { THAILAND_VIEWBOX, THAILAND_PROVINCES } from '../data/thailandMapData';
 import './DashboardView.css';
 
@@ -147,6 +148,8 @@ export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
   const [lockedProvince, setLockedProvince] = useState(null);
   const [hoveredProvince, setHoveredProvince] = useState(null);
   const [provincePage, setProvincePage] = useState(1);
+  // Reason card popup: { type: 'return' | 'delivery_failed', reason: '' | '<reason>' }
+  const [reasonModal, setReasonModal] = useState(null);
   const [tooltip, setTooltip] = useState({
     visible: false,
     x: 0,
@@ -432,6 +435,33 @@ export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
       totalDeliveryFailedReasonsCount: totFail
     };
   }, [rawReturnReasons, rawDeliveryFailedReasons, reasons]);
+
+  // Parcels behind the reason cards (new API: reason_parcels; older cache: parcels with a reason)
+  const reasonParcels = useMemo(() => {
+    if (Array.isArray(data?.reason_parcels)) return data.reason_parcels;
+    return (Array.isArray(data?.parcels) ? data.parcels : []).filter((p) => p.reason);
+  }, [data]);
+
+  const reasonParcelsByType = useMemo(() => ({
+    return: reasonParcels.filter((p) => p.reason_type === 'return'),
+    delivery_failed: reasonParcels.filter((p) => p.reason_type === 'delivery_failed')
+  }), [reasonParcels]);
+
+  const reasonDateDisplay = data?.date_display || '';
+
+  const openReasonModal = (type, reason = '') => setReasonModal({ type, reason });
+  const reasonRowProps = (type, reason) => ({
+    role: 'button',
+    tabIndex: 0,
+    title: `คลิกเพื่อดูรายการ "${reason}"`,
+    onClick: () => openReasonModal(type, reason),
+    onKeyDown: (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        openReasonModal(type, reason);
+      }
+    }
+  });
 
   const totalItems = summary.total_items || 0;
   const receivedCount = summary.received_count || 0;
@@ -1038,6 +1068,16 @@ export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
                       </span>
                     </div>
                   </div>
+                  {reasonParcelsByType.return.length > 0 && (
+                    <button
+                      type="button"
+                      className="btn-reason-view-all view-return"
+                      onClick={() => openReasonModal('return')}
+                      title="ดูรายการพัสดุส่งคืนทั้งหมด และดาวน์โหลด Excel"
+                    >
+                      ดูรายการ ({reasonParcelsByType.return.length})
+                    </button>
+                  )}
                 </div>
                 {returnReasons.length === 0 ? (
                   <div className="dash-section-empty">
@@ -1050,7 +1090,7 @@ export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
                         ? (r.count * 100 / totalReturnReasonsCount)
                         : (Number(r.pct) || 0);
                       return (
-                        <div className="dash-reason-row dash-return-row" key={r.reason}>
+                        <div className="dash-reason-row dash-return-row is-clickable" key={r.reason} {...reasonRowProps('return', r.reason)}>
                           <div className="dash-reason-top">
                             <div className="dash-reason-name">
                               <span className="dash-reason-dot dot-return"></span>
@@ -1094,6 +1134,16 @@ export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
                       </span>
                     </div>
                   </div>
+                  {reasonParcelsByType.delivery_failed.length > 0 && (
+                    <button
+                      type="button"
+                      className="btn-reason-view-all view-failed"
+                      onClick={() => openReasonModal('delivery_failed')}
+                      title="ดูรายการนำจ่ายไม่สำเร็จทั้งหมด และดาวน์โหลด Excel"
+                    >
+                      ดูรายการ ({reasonParcelsByType.delivery_failed.length})
+                    </button>
+                  )}
                 </div>
                 {deliveryFailedReasons.length === 0 ? (
                   <div className="dash-section-empty">
@@ -1106,7 +1156,7 @@ export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
                         ? (r.count * 100 / totalDeliveryFailedReasonsCount)
                         : (Number(r.pct) || 0);
                       return (
-                        <div className="dash-reason-row dash-failed-row" key={r.reason}>
+                        <div className="dash-reason-row dash-failed-row is-clickable" key={r.reason} {...reasonRowProps('delivery_failed', r.reason)}>
                           <div className="dash-reason-top">
                             <div className="dash-reason-name">
                               <span className="dash-reason-dot dot-failed"></span>
@@ -1133,6 +1183,19 @@ export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
           </>
         )}
       </div>
+
+      {reasonModal && (
+        <ReasonDetailModal
+          isOpen={!!reasonModal}
+          onClose={() => setReasonModal(null)}
+          reasonType={reasonModal.type}
+          title={reasonModal.type === 'return' ? 'สาเหตุการส่งคืน' : 'สาเหตุการนำจ่ายไม่สำเร็จ'}
+          items={reasonParcelsByType[reasonModal.type] || []}
+          initialReason={reasonModal.reason}
+          dateDisplay={reasonDateDisplay}
+          currentPerson={currentPerson}
+        />
+      )}
     </main>
   );
 }

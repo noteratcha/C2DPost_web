@@ -13,6 +13,8 @@ import { parseCsv } from './utils/parseCsv';
 import { convertPdfs, exportAllFiles, exportExcel, exportPdf, reconcileRecords, logBarcodesToUseBarcode, updateEparcelStatusInSheet } from './utils/api';
 import { fetchBarcodesFromExtension, syncCredentialsToExtension, getExtensionVersion, subscribeExtensionReady, checkExtensionInstalled, checkEarCapability } from './utils/extensionBridge';
 import { SPREADSHEET_ID } from './config';
+import { isMobileDevice, isGoogleChrome } from './utils/browserEnv';
+import BrowserGate from './components/BrowserGate';
 import './App.css';
 
 const STORAGE_USER_KEY = 'c2dpost_web_user';
@@ -44,7 +46,13 @@ export default function App() {
     setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
   };
 
+  // Chrome-only policy: desktop must be Google Chrome (extension). Mobile cannot install
+  // extensions -> skip the extension gate and hide the PDF workspace page.
+  const isMobile = useMemo(() => isMobileDevice(), []);
+  const isBrowserAllowed = useMemo(() => isMobile || isGoogleChrome(), [isMobile]);
+
   const [extensionUnlocked, setExtensionUnlocked] = useState(() => isDemo || false);
+  const appUnlocked = extensionUnlocked || isMobile;
   const [extensionVersion, setExtensionVersion] = useState(() => {
     if (isDemo) return '1.1.0';
     return getExtensionVersion() || '';
@@ -67,7 +75,11 @@ export default function App() {
     const saved = typeof window !== 'undefined' ? localStorage.getItem(STORAGE_USER_KEY) || '' : '';
     return saved.toLowerCase() === 'admin' ? 'admin' : 'workspace';
   });
-  const [selectedTrackingBarcode, setSelectedTrackingBarcode] = useState('');
+
+  // Mobile: the PDF workspace is hidden -> any navigation to it lands on the status report
+  useEffect(() => {
+    if (isMobile && activePage === 'workspace') setActivePage('deposit-report');
+  }, [isMobile, activePage]);
   const [adminServices, setAdminServices] = useState(null);
   const [people, setPeople] = useState([]);
   const [loadingSheet, setLoadingSheet] = useState(true);
@@ -1065,19 +1077,6 @@ export default function App() {
     }
   };
 
-  const handleTrackingBarcodeConsumed = useCallback(() => setSelectedTrackingBarcode(''), []);
-
-  // 10. Handle View Tracking Timeline (single barcode) -> Opens status report page with live tracking
-  const handleViewTracking = (row) => {
-    const barcode = String(row.BARCODE_NO || '').trim();
-    if (!barcode) {
-      alert("รายการนี้ยังไม่มีหมายเลขบาร์โค้ด กรุณากด 'ดึงหมายเลข' ก่อนครับ");
-      return;
-    }
-    setSelectedTrackingBarcode(barcode);
-    setActivePage('deposit-report');
-  };
-
   // 11. Handle Auto-Reconcile (batch check received status vs post office)
   const handleCheckDeposit = async () => {
     const rowsWithBarcode = records.filter(r => r.BARCODE_NO && String(r.BARCODE_NO).trim() !== '');
@@ -1208,8 +1207,11 @@ export default function App() {
 
   return (
     <div className="app-layout">
-      {/* 1. Chrome Extension Gatekeeper */}
-      {!extensionUnlocked && (
+      {/* 0. Chrome-only gate (desktop browsers other than Google Chrome) */}
+      {!isBrowserAllowed && <BrowserGate />}
+
+      {/* 1. Chrome Extension Gatekeeper (desktop only) */}
+      {isBrowserAllowed && !appUnlocked && (
         <ExtensionGate 
           onUnlocked={handleExtensionUnlocked} 
           theme={theme}
@@ -1233,10 +1235,11 @@ export default function App() {
         onOpenDepositReport={() => setActivePage('deposit-report')}
         earStatus={earStatus}
         onRefreshEar={checkEarConnection}
+        hideWorkspace={isMobile}
       />
 
       {/* 3. Dedicated Login Screen (Shown when NOT logged in) */}
-      {extensionUnlocked && !user && (
+      {isBrowserAllowed && appUnlocked && !user && (
         <main className="login-page-main">
           <LoginModal 
             onLogin={handleLogin} 
@@ -1248,10 +1251,10 @@ export default function App() {
       )}
 
       {/* 4. Dedicated Page Views (Shown ONLY when logged in) */}
-      {extensionUnlocked && user && (
+      {isBrowserAllowed && appUnlocked && user && (
         <>
           {/* Page 1: แปลงไฟล์ PDF & ตารางข้อมูล (Workspace) */}
-          {activePage === 'workspace' && (
+          {activePage === 'workspace' && !isMobile && (
             <main 
               className={`main-content python-layout-main ${isWorkspaceDragOver ? 'workspace-drag-active' : ''}`}
               onDragEnter={handleWorkspaceDragEnter}
@@ -1289,7 +1292,6 @@ export default function App() {
                   onDeleteRecord={handleDeleteRecord} 
                   onClearAll={handleClearAll}
                   onViewPdf={handleViewPdf}
-                  onViewTracking={handleViewTracking}
                   onFilesSelected={handleFilesSelected}
                 />
               </div>
@@ -1326,8 +1328,6 @@ export default function App() {
               onSyncRecords={handleSyncFromDepositReport}
               onSwitchToWorkspace={() => setActivePage('workspace')}
               workspaceRecords={records}
-              initialTrackingBarcode={selectedTrackingBarcode}
-              onTrackingBarcodeConsumed={handleTrackingBarcodeConsumed}
             />
           )}
 

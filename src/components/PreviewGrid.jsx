@@ -12,7 +12,6 @@ export default function PreviewGrid({
   onDeleteRecord,
   onClearAll,
   onViewPdf,
-  onViewTracking,
   onFilesSelected
 }) {
   const [searchTerm, setSearchTerm] = useState('');
@@ -400,18 +399,6 @@ export default function PreviewGrid({
                           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                             <circle cx="11" cy="11" r="8"></circle>
                             <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                          </svg>
-                        </button>
-                        <button
-                          type="button"
-                          className="btn-tool-icon btn-tool-track"
-                          onClick={() => onViewTracking && onViewTracking(row)}
-                          title={barcode ? 'ดูประวัติสถานะรายชิ้น (Tracking)' : 'กรุณาดึงหมายเลขบาร์โค้ดก่อน'}
-                          disabled={!barcode}
-                        >
-                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                            <circle cx="12" cy="12" r="10"></circle>
-                            <polyline points="12 6 12 12 16 14"></polyline>
                           </svg>
                         </button>
                       </div>

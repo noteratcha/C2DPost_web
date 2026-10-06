@@ -24,6 +24,7 @@ from core.convert_dpost import (
     generate_custom_envelopes_pdf,
     generate_deposit_report_excel,
     generate_deposit_report_pdf,
+    generate_reason_report_excel,
     __version__
 )
 
@@ -88,6 +89,14 @@ class DashboardRequest(BaseModel):
 class DepositExportRequest(BaseModel):
     records: List[dict]
     summary: Optional[dict] = {}
+    date: Optional[str] = ""
+    organization: Optional[str] = "สำนักงานที่ดิน"
+
+class ReasonExportRequest(BaseModel):
+    items: List[dict]
+    title: Optional[str] = ""
+    reason_type: Optional[str] = ""
+    reason: Optional[str] = ""
     date: Optional[str] = ""
     organization: Optional[str] = "สำนักงานที่ดิน"
 
@@ -1243,6 +1252,7 @@ def get_dashboard_report(req: DashboardRequest):
     delivery_failed_reason_counts = {}
     province_map = {}
     parcels = []
+    reason_parcels = []
 
     for idx, rec in enumerate(records):
         key = rec.get("status_key") or "in_transit"
@@ -1331,6 +1341,26 @@ def get_dashboard_report(req: DashboardRequest):
             "latest_date": rec.get("latest_date") or "",
             "latest_station": rec.get("latest_station") or "",
         })
+
+        # Full detail list for the reason cards popup / Excel (never truncated)
+        if reason:
+            reason_parcels.append({
+                "barcode": rec.get("barcode") or "",
+                "inv_no": rec.get("inv_no") or "",
+                "receiver_name": rec.get("receiver_name") or "",
+                "receiver_address": rec.get("receiver_address") or "",
+                "receiver_amphur": rec.get("receiver_amphur") or "",
+                "receiver_province": province,
+                "receiver_zipcode": rec.get("receiver_zipcode") or "",
+                "status_key": key,
+                "status_label": rec.get("status_label") or "",
+                "status_description_raw": rec.get("status_description_raw") or rec.get("status_description") or "",
+                "reason": reason,
+                "reason_type": reason_type,
+                "latest_date": rec.get("latest_date") or rec.get("received_date") or "",
+                "latest_station": rec.get("latest_station") or rec.get("received_postoffice") or "",
+                "fee": rec.get("fee") or 0,
+            })
 
     concluded = delivered + failed
     parcels_truncated = len(parcels) > 300
@@ -1426,6 +1456,7 @@ def get_dashboard_report(req: DashboardRequest):
         "provinces": provinces,
         "parcels": parcels,
         "parcels_truncated": parcels_truncated,
+        "reason_parcels": reason_parcels,
     }
 
 
@@ -2776,6 +2807,40 @@ async def export_deposit_report_excel_endpoint(req: DepositExportRequest):
             )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to generate Deposit Report Excel: {str(e)}")
+
+@app.post("/api/reports/export-reason-excel")
+async def export_reason_excel_endpoint(req: ReasonExportRequest):
+    """
+    Exports the parcels behind a dashboard reason card (return / delivery failed) as Excel.
+    """
+    if not req.items:
+        raise HTTPException(status_code=400, detail="ไม่มีรายการสำหรับส่งออก")
+
+    try:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            tmp_excel_path = os.path.join(temp_dir, f"Reason_Report_{timestamp}.xlsx")
+            meta = {
+                "title": req.title,
+                "reason_type": req.reason_type,
+                "reason": req.reason,
+                "organization": req.organization or "สำนักงานที่ดิน",
+                "date": req.date or datetime.now().strftime("%d/%m/%Y"),
+            }
+            generate_reason_report_excel(req.items, meta, tmp_excel_path)
+            with open(tmp_excel_path, "rb") as f:
+                excel_bytes = io.BytesIO(f.read())
+
+            prefix = "Return_Reasons" if req.reason_type == "return" else "Delivery_Failed_Reasons"
+            clean_date_file = (req.date or timestamp).replace("/", "-").replace(" - ", "_to_").replace(" ", "_")
+            filename = f"{prefix}_{clean_date_file}.xlsx"
+            return StreamingResponse(
+                excel_bytes,
+                media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+            )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"ไม่สามารถสร้างไฟล์ Excel สาเหตุได้: {str(e)}")
 
 @app.post("/api/reports/export-pdf")
 async def export_deposit_report_pdf_endpoint(req: DepositExportRequest):
