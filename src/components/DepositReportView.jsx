@@ -708,9 +708,9 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
         type="button"
         className="sig-check-badge sig-error"
         onClick={() => recheckSignature(bc)}
-        title="ดึงใบตอบรับ e-AR ไม่สำเร็จ (ยังไม่มี e-AR หรือ Extension ไม่ตอบสนอง) — คลิกเพื่อลองใหม่"
+        title="ดึงใบตอบรับ e-AR จากไปรษณีย์ไม่สำเร็จ (ระบบ e-AR ของไปรษณีย์ขัดข้อง หรือรายการนี้ยังไม่มี e-AR) — คลิกเพื่อตรวจใหม่"
       >
-        ? ตรวจไม่ได้
+        ⚠ ระบบ e-AR มีปัญหา
       </button>
     );
   };

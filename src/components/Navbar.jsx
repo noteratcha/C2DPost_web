@@ -122,6 +122,7 @@ export default function Navbar({
   const getEarStatusClass = (status) => {
     switch (status) {
       case 'connected': return 'success';
+      case 'service_down': return 'danger';
       case 'outdated': return 'warning';
       case 'checking': return 'warning';
       case 'disconnected': return 'danger';
@@ -133,6 +134,7 @@ export default function Navbar({
   const getEarStatusTitle = (status) => {
     switch (status) {
       case 'connected': return 'เชื่อมต่อ e-AR สำเร็จ';
+      case 'service_down': return 'Extension ปกติ แต่ระบบ e-AR ของไปรษณีย์ขัดข้อง (เช่น HTTP 502) — กดรีเฟรชเพื่อตรวจอีกครั้ง';
       case 'outdated': return 'Extension เวอร์ชันเก่า กรุณาอัปเดต';
       case 'checking': return 'กำลังตรวจสอบ...';
       case 'disconnected': return 'ไม่ได้เชื่อมต่อ Extension';
@@ -148,6 +150,13 @@ export default function Navbar({
           <>
             <span className="chip-dot"></span>
             <span>เชื่อมต่อแล้ว</span>
+          </>
+        );
+      case 'service_down':
+        return (
+          <>
+            <span className="chip-dot"></span>
+            <span>ระบบ e-AR มีปัญหา</span>
           </>
         );
       case 'outdated':

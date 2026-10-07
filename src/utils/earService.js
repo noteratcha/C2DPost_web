@@ -11,6 +11,52 @@ import { fetchEarPdfFromExtension, checkEarCapability } from './extensionBridge'
 
 const earCache = new Map();
 
+// ---- Thailand Post e-AR service health (from real fetch outcomes) ----
+// 'unknown' | 'ok' | 'down'. The extension reports "HTTP 5xx" when e-ar.thailandpost.com fails.
+const LAST_GOOD_BARCODE_KEY = 'c2dpost_ear_last_good_barcode';
+let earServiceHealth = { status: 'unknown', detail: '', at: 0 };
+const earHealthListeners = new Set();
+
+function setEarServiceHealth(status, detail = '') {
+  earServiceHealth = { status, detail, at: Date.now() };
+  earHealthListeners.forEach((fn) => {
+    try { fn(earServiceHealth); } catch { /* ignore listener errors */ }
+  });
+}
+
+export function getEarServiceHealth() {
+  return earServiceHealth;
+}
+
+export function subscribeEarServiceHealth(fn) {
+  earHealthListeners.add(fn);
+  return () => earHealthListeners.delete(fn);
+}
+
+function isServerError(msg) {
+  return /HTTP\s*5\d\d/i.test(String(msg || ''));
+}
+
+/**
+ * Actively probe the e-AR service by re-fetching the last barcode that succeeded
+ * (no probe possible until one e-AR has been fetched successfully on this browser).
+ * @returns {Promise<'ok'|'down'|'unknown'>}
+ */
+export async function probeEarService() {
+  let bc = '';
+  try { bc = localStorage.getItem(LAST_GOOD_BARCODE_KEY) || ''; } catch { /* storage blocked */ }
+  if (!bc) return earServiceHealth.status;
+  try {
+    const res = await fetchEarPdfFromExtension(bc);
+    if (res && res.success && res.pdfBase64) {
+      setEarServiceHealth('ok');
+    } else if (isServerError(res?.error)) {
+      setEarServiceHealth('down', res.error);
+    }
+  } catch { /* extension unavailable: leave health unchanged */ }
+  return earServiceHealth.status;
+}
+
 /**
  * Fetch official e-AR PDF directly from Thailand Post, then parse signature & metadata.
  * 
@@ -35,7 +81,12 @@ export async function fetchEarDetailsClient(barcode, force = false) {
     // 1. Primary Strategy: Request PDF via C2DPost Helper Extension (Domestic Thai IP + No CORS restrictions)
     try {
       const extRes = await fetchEarPdfFromExtension(cleanBarcode);
+      if (extRes && !extRes.success && isServerError(extRes.error)) {
+        setEarServiceHealth('down', extRes.error);
+      }
       if (extRes && extRes.success && extRes.pdfBase64) {
+        setEarServiceHealth('ok');
+        try { localStorage.setItem(LAST_GOOD_BARCODE_KEY, cleanBarcode); } catch { /* storage blocked */ }
         pdfBase64 = extRes.pdfBase64;
         const binaryString = atob(extRes.pdfBase64);
         const len = binaryString.length;
@@ -240,7 +291,12 @@ export async function openEarWithTrackingPdf({
   if (!clientPdfBase64) {
     try {
       const extRes = await fetchEarPdfFromExtension(cleanBarcode);
+      if (extRes && !extRes.success && isServerError(extRes.error)) {
+        setEarServiceHealth('down', extRes.error);
+      }
       if (extRes && extRes.success && extRes.pdfBase64) {
+        setEarServiceHealth('ok');
+        try { localStorage.setItem(LAST_GOOD_BARCODE_KEY, cleanBarcode); } catch { /* storage blocked */ }
         clientPdfBase64 = extRes.pdfBase64;
       }
     } catch (extErr) {

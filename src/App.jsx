@@ -12,6 +12,7 @@ import TrackingTimelineModal from './components/TrackingTimelineModal';
 import { parseCsv } from './utils/parseCsv';
 import { convertPdfs, exportAllFiles, exportExcel, exportPdf, reconcileRecords, logBarcodesToUseBarcode, updateEparcelStatusInSheet } from './utils/api';
 import { fetchBarcodesFromExtension, syncCredentialsToExtension, getExtensionVersion, subscribeExtensionReady, checkExtensionInstalled, checkEarCapability } from './utils/extensionBridge';
+import { getEarServiceHealth, subscribeEarServiceHealth, probeEarService } from './utils/earService';
 import { SPREADSHEET_ID } from './config';
 import { isMobileDevice, isGoogleChrome } from './utils/browserEnv';
 import BrowserGate from './components/BrowserGate';
@@ -150,12 +151,20 @@ export default function App() {
 
   // e-AR connection status check
   const earCheckIntervalRef = useRef(null);
-  const checkEarConnection = useCallback(async () => {
+  // probe=true: also re-check Thailand Post's e-AR service (manual refresh / every 5 minutes)
+  const lastEarProbeRef = useRef(0);
+  const checkEarConnection = useCallback(async (probe = false) => {
     try {
       const cap = await checkEarCapability(1000);
       console.log('[e-AR Status Check] Result:', cap);
       if (cap.installed && cap.supported) {
-        setEarStatus('connected');
+        const now = Date.now();
+        if (probe === true || now - lastEarProbeRef.current > 5 * 60 * 1000) {
+          lastEarProbeRef.current = now;
+          await probeEarService();
+        }
+        // Extension OK but the e-AR service itself may be failing (HTTP 5xx)
+        setEarStatus(getEarServiceHealth().status === 'down' ? 'service_down' : 'connected');
       } else if (cap.installed && !cap.supported) {
         setEarStatus('outdated');
       } else {
@@ -166,6 +175,14 @@ export default function App() {
       setEarStatus('error');
     }
   }, []);
+
+  // Reflect e-AR fetch outcomes immediately (e.g. signature checks hitting HTTP 502)
+  useEffect(() => subscribeEarServiceHealth((health) => {
+    setEarStatus((prev) => {
+      if (prev !== 'connected' && prev !== 'service_down') return prev;
+      return health.status === 'down' ? 'service_down' : 'connected';
+    });
+  }), []);
 
   useEffect(() => {
     // Initial check
@@ -1244,7 +1261,7 @@ export default function App() {
         adminServices={adminServices}
         onOpenDepositReport={() => setActivePage('deposit-report')}
         earStatus={earStatus}
-        onRefreshEar={checkEarConnection}
+        onRefreshEar={() => checkEarConnection(true)}
         hideWorkspace={hideWorkspace}
       />
 
