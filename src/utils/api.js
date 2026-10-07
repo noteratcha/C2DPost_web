@@ -212,6 +212,39 @@ export async function fetchReceivedReport({ date, endDate, username = '', passwo
 }
 
 /**
+ * Post office (ปณ.) viewer account login: username = <zipcode>a1, password = d<zipcode>.
+ * Returns the person object used by the app (Status: 'POSTOFFICE').
+ */
+export async function postofficeLogin(username, password) {
+  const response = await fetch(`${API_BASE}/postoffice/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, password })
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || !data.success) {
+    throw new Error(data.message || 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
+  }
+  return { ...data.user_data, Password: password };
+}
+
+/**
+ * Audit log for post office accounts (downloads etc.). No-op for other users.
+ *
+ * @param {Object} person - currentPerson
+ * @param {string} action - e.g. 'export_excel', 'export_pdf', 'download_ear'
+ * @param {string} [detail]
+ */
+export function logPostofficeAction(person, action, detail = '') {
+  if ((person?.Status || '').toUpperCase() !== 'POSTOFFICE') return;
+  fetch(`${API_BASE}/postoffice/log`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: person.UserName, password: person.Password || '', action, detail })
+  }).catch(() => {});
+}
+
+/**
  * Fetch aggregated delivery statistics dashboard.
  *
  * @param {Object} params

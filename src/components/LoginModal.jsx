@@ -1,6 +1,10 @@
 import { useState } from 'react';
 import { APP_VERSION } from '../config';
 import RegistrationModal from './RegistrationModal';
+import { postofficeLogin } from '../utils/api';
+
+// Post office viewer accounts: <zipcode>a1 / d<zipcode>
+const POSTOFFICE_USER_PATTERN = /^\d{5}a1$/i;
 import './LoginModal.css';
 
 export default function LoginModal({ onLogin, people = [], loading = false, error = false }) {
@@ -11,7 +15,7 @@ export default function LoginModal({ onLogin, people = [], loading = false, erro
   const [submitting, setSubmitting] = useState(false);
   const [showRegister, setShowRegister] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setAuthError('');
 
@@ -24,6 +28,18 @@ export default function LoginModal({ onLogin, people = [], loading = false, erro
     }
 
     setSubmitting(true);
+
+    // Post office account (verified by the backend, not stored in the user sheet)
+    if (POSTOFFICE_USER_PATTERN.test(u)) {
+      try {
+        const person = await postofficeLogin(u, p.trim());
+        onLogin(person.UserName, person);
+      } catch (err) {
+        setAuthError(err.message || 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
+      }
+      setSubmitting(false);
+      return;
+    }
 
     // Look up in people list from Google Sheets
     const matched = people.find(

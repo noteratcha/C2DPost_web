@@ -76,10 +76,6 @@ export default function App() {
     return saved.toLowerCase() === 'admin' ? 'admin' : 'workspace';
   });
 
-  // Mobile: the PDF workspace is hidden -> any navigation to it lands on the status report
-  useEffect(() => {
-    if (isMobile && activePage === 'workspace') setActivePage('deposit-report');
-  }, [isMobile, activePage]);
   const [adminServices, setAdminServices] = useState(null);
   const [people, setPeople] = useState([]);
   const [loadingSheet, setLoadingSheet] = useState(true);
@@ -410,6 +406,15 @@ export default function App() {
     return null;
   }, [people, user, isDemo, isDemoAdmin]);
 
+  // Post office viewer account (<zipcode>a1): report & dashboard of its agencies only
+  const isPostOffice = (currentPerson?.Status || '').trim().toUpperCase() === 'POSTOFFICE';
+  const hideWorkspace = isMobile || isPostOffice;
+
+  // Mobile / post office accounts: the PDF workspace is hidden -> land on the status report
+  useEffect(() => {
+    if (hideWorkspace && activePage === 'workspace') setActivePage('deposit-report');
+  }, [hideWorkspace, activePage]);
+
   const isAdmin = useMemo(() => {
     if ((user || '').toLowerCase() === 'admin') return true;
     const status = (currentPerson?.Status || '').trim().toUpperCase();
@@ -424,15 +429,16 @@ export default function App() {
   }, [isAdmin, activePage]);
 
   // Synchronize credentials to Chrome extension whenever currentPerson is resolved
+  // (not for post office accounts: they are not e-Parcel credentials)
   useEffect(() => {
-    if (user && currentPerson?.UserName) {
+    if (user && currentPerson?.UserName && !isPostOffice) {
       syncCredentialsToExtension(
         currentPerson.UserName,
         currentPerson.Password || '',
         currentPerson.Organization || ''
       );
     }
-  }, [user, currentPerson]);
+  }, [user, currentPerson, isPostOffice]);
 
   const handleLogin = (username, personData) => {
     localStorage.setItem(STORAGE_USER_KEY, username);
@@ -442,14 +448,18 @@ export default function App() {
       } catch (e) {}
     }
     setUser(username);
-    syncCredentialsToExtension(
-      username,
-      personData?.Password || '',
-      personData?.Organization || ''
-    );
     const status = (personData?.Status || '').trim().toUpperCase();
+    if (status !== 'POSTOFFICE') {
+      syncCredentialsToExtension(
+        username,
+        personData?.Password || '',
+        personData?.Organization || ''
+      );
+    }
     if (username.toLowerCase() === 'admin' || status === 'ADMIN' || status === 'ADMINISTRATOR') {
       setActivePage('admin');
+    } else if (status === 'POSTOFFICE') {
+      setActivePage('deposit-report');
     } else {
       setActivePage('workspace');
     }
@@ -1235,7 +1245,7 @@ export default function App() {
         onOpenDepositReport={() => setActivePage('deposit-report')}
         earStatus={earStatus}
         onRefreshEar={checkEarConnection}
-        hideWorkspace={isMobile}
+        hideWorkspace={hideWorkspace}
       />
 
       {/* 3. Dedicated Login Screen (Shown when NOT logged in) */}
@@ -1254,7 +1264,7 @@ export default function App() {
       {isBrowserAllowed && appUnlocked && user && (
         <>
           {/* Page 1: แปลงไฟล์ PDF & ตารางข้อมูล (Workspace) */}
-          {activePage === 'workspace' && !isMobile && (
+          {activePage === 'workspace' && !hideWorkspace && (
             <main 
               className={`main-content python-layout-main ${isWorkspaceDragOver ? 'workspace-drag-active' : ''}`}
               onDragEnter={handleWorkspaceDragEnter}

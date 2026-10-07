@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { exportReasonExcel } from '../utils/api';
+import { exportReasonExcel, logPostofficeAction } from '../utils/api';
 import { formatStationWithZipcode } from '../utils/postalUtils';
 import TrackingTimelineModal from './TrackingTimelineModal';
 import './ReasonDetailModal.css';
@@ -85,6 +85,7 @@ export default function ReasonDetailModal({
         date: dateDisplay,
         organization: currentPerson?.Organization || ''
       });
+      logPostofficeAction(currentPerson, 'export_reason_excel', `${title}${activeReason ? ` - ${activeReason}` : ''} (${filteredItems.length} รายการ)`);
     } catch (err) {
       setExportError(err.message || 'ไม่สามารถดาวน์โหลดไฟล์ Excel ได้');
     } finally {

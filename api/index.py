@@ -596,6 +596,271 @@ def get_received_report(req: ReceivedReportRequest):
     return _fetch_received_report_payload(req.date, req.end_date, req.username, req.password)
 
 
+# =====================================================================================
+# Post Office (ปณ.) viewer accounts
+#   username = <zipcode> + "a1"   (e.g. 48170a1)
+#   password = "d" + <zipcode>     (e.g. d48170)
+# A post office sees parcels whose barcodes were issued through C2DPost (UseBarcode sheet)
+# by agencies registered with that post office (LoginC2DPost.ResponsibleZipcode).
+# Statuses are fetched with each owning agency's own e-Parcel credentials.
+# Every login / report view / download is written to the PostOfficeLog sheet (audit log).
+# =====================================================================================
+PO_USERS_SHEET_CSV = "https://docs.google.com/spreadsheets/d/1hiWww6BI7NCTAw3Ai3CjbzS8TWdIX2AAOj7P_2BxMcQ/export?format=csv&gid=0"
+PO_USEBARCODE_CSV = "https://docs.google.com/spreadsheets/d/1vl-vPd5LUuJB8wnU2YwDYmXxWpp_vVfAXKicKFJlOv0/export?format=csv"
+PO_POSTOFFICE_CSV = "https://docs.google.com/spreadsheets/d/12tt2MBVqBRMzoqfCjskt_Aft-SUGVMs7uH1Endp2cQI/export?format=csv"
+PO_AUDIT_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzWaXpG3YY35__xFc1dTIbMSwu4TmijO5zWRQgAvt_bYmvU2HdXl76qoZkmKlnbaVg/exec"  # deployment with log_postoffice_access (7 ต.ค. 2569)
+
+
+def _postoffice_zip(username, password):
+    """Return the zipcode when username/password form a valid post office account, else None."""
+    m = re.match(r'^(\d{5})a1$', (username or "").strip(), re.IGNORECASE)
+    if not m:
+        return None
+    zipcode = m.group(1)
+    if (password or "").strip() != f"d{zipcode}":
+        return None
+    return zipcode
+
+
+def _po_read_csv(url, timeout=20):
+    import csv
+    import requests
+    resp = requests.get(url, timeout=timeout, headers={"Cache-Control": "no-cache"})
+    resp.raise_for_status()
+    resp.encoding = "utf-8"
+    return list(csv.DictReader(io.StringIO(resp.text)))
+
+
+def _postoffice_name(zipcode):
+    """Official post office name for a zipcode ('' when unknown)."""
+    import csv
+    import requests
+    try:
+        resp = requests.get(PO_POSTOFFICE_CSV, timeout=15)
+        resp.encoding = "utf-8"
+        for row in csv.reader(io.StringIO(resp.text)):
+            if row and row[0].strip() == zipcode:
+                return (row[2] if len(row) > 2 and row[2].strip() else row[1]).strip()
+    except Exception as e:
+        print(f"[postoffice] name lookup warning: {e}")
+    try:
+        custom = _load_custom_postoffices()
+        if custom.get(zipcode):
+            return str(custom[zipcode]).strip()
+    except Exception:
+        pass
+    try:
+        for row in _po_read_csv(PO_USERS_SHEET_CSV):
+            if (row.get("ResponsibleZipcode") or "").strip() == zipcode and (row.get("ResponsiblePostoffice") or "").strip():
+                return row["ResponsiblePostoffice"].strip()
+    except Exception:
+        pass
+    return ""
+
+
+def _postoffice_agencies(zipcode):
+    """Agencies registered with this post office: {username_lower: {username, password, organization}}."""
+    agencies = {}
+    for row in _po_read_csv(PO_USERS_SHEET_CSV):
+        if (row.get("ResponsibleZipcode") or "").strip() != zipcode:
+            continue
+        status = (row.get("Status") or "").strip().upper()
+        if status in ("ADMIN", "ADMINISTRATOR"):
+            continue
+        uname = (row.get("UserName") or "").strip()
+        if not uname:
+            continue
+        agencies[uname.lower()] = {
+            "username": uname,
+            "password": (row.get("Password") or "").strip(),
+            "organization": (row.get("Organization") or uname).strip(),
+        }
+    return agencies
+
+
+def _postoffice_barcodes(zipcode, target_dates=None):
+    """
+    Barcodes issued via C2DPost by agencies of this post office.
+    target_dates: set of 'DD/MM/YYYY' to filter by issue date (UseBarcode Timestamp), None = all.
+    Returns (agencies, {barcode: {"agency": agency_dict, "issued": "DD/MM/YYYY HH:MM:SS", "details": str}}).
+    """
+    agencies = _postoffice_agencies(zipcode)
+    owned = {}
+    if not agencies:
+        return agencies, owned
+    for row in _po_read_csv(PO_USEBARCODE_CSV):
+        owner = (row.get("UserName") or "").strip().lower()
+        if owner not in agencies:
+            continue
+        bc = (row.get("Barcode") or "").strip().upper()
+        if not bc:
+            continue
+        ts = (row.get("Timestamp") or "").strip()  # YYYY-MM-DD HH:MM:SS
+        issued = ts
+        m = re.match(r'^(\d{4})-(\d{2})-(\d{2})(.*)$', ts)
+        if m:
+            issued = f"{m.group(3)}/{m.group(2)}/{m.group(1)}{m.group(4)}"
+        if target_dates is not None and issued[:10] not in target_dates:
+            continue
+        owned[bc] = {"agency": agencies[owner], "issued": issued, "details": (row.get("Details") or "").strip()}
+    return agencies, owned
+
+
+def _postoffice_credentials_for(zipcode, barcodes):
+    """Map each barcode owned by this post office to its agency (username, password). Others are omitted."""
+    _, owned = _postoffice_barcodes(zipcode)
+    result = {}
+    for b in barcodes:
+        info = owned.get(str(b).strip().upper())
+        if info:
+            result[str(b).strip()] = (info["agency"]["username"], info["agency"]["password"])
+    return result
+
+
+def _log_postoffice_access(username, action, detail=""):
+    """Audit log -> PostOfficeLog sheet (fire-and-forget, never blocks the request)."""
+    import threading
+    import requests
+    from datetime import timezone, timedelta
+
+    def _send():
+        try:
+            ts = datetime.now(timezone(timedelta(hours=7))).strftime("%Y-%m-%d %H:%M:%S")
+            requests.post(PO_AUDIT_SCRIPT_URL, json={
+                "action": "log_postoffice_access",
+                # NOT "UserName": the admin script appends unknown UserNames as new users
+                "po_account": username,
+                "timestamp": ts,
+                "event": action,
+                "detail": str(detail)[:500],
+            }, timeout=15)
+        except Exception as e:
+            print(f"[postoffice] audit log warning: {e}")
+
+    threading.Thread(target=_send, daemon=True).start()
+
+
+def _collect_postoffice_items(zipcode, target_dates):
+    """
+    Raw e-Parcel items (getOrderByBarcodes) for the post office, in the same shape as
+    getAllOrderReceived items, tagged with "_agency". Returns (items, notice).
+    Barcodes not yet deposited (no data at Thailand Post) are not included.
+    """
+    import requests
+    from requests.auth import HTTPBasicAuth
+    from concurrent.futures import ThreadPoolExecutor
+
+    agencies, owned = _postoffice_barcodes(zipcode, set(target_dates))
+    if not agencies:
+        return [], f"ยังไม่มีหน่วยงานที่ลงทะเบียนใช้งาน C2DPost กับรหัสไปรษณีย์ {zipcode}"
+    if not owned:
+        return [], None
+
+    by_agency = {}
+    for bc, info in owned.items():
+        by_agency.setdefault(info["agency"]["username"].lower(), []).append(bc)
+
+    failed_agencies = []
+
+    def fetch_agency(key):
+        agency = agencies[key]
+        codes = by_agency[key]
+        found = []
+        for i in range(0, len(codes), 50):
+            chunk = codes[i:i + 50]
+            try:
+                r = requests.post(
+                    "https://r_dservice.thailandpost.com/webservice/getOrderByBarcodes",
+                    # API expects one comma-separated string (a JSON list returns HTTP 400)
+                    json={"barcodes": ",".join(chunk)},
+                    headers={"Content-Type": "application/json"},
+                    auth=HTTPBasicAuth(agency["username"], agency["password"]),
+                    timeout=45,
+                    verify=False,
+                )
+                if r.status_code != 200:
+                    failed_agencies.append(agency["organization"])
+                    break
+                try:
+                    raw = r.json()
+                except Exception:
+                    raw = []
+                for item in _normalize_payload_list(raw):
+                    if not isinstance(item, dict) or item.get("errorCode"):
+                        continue
+                    bc = str(item.get("barcode") or "").strip().upper()
+                    if bc not in owned:
+                        continue
+                    item = dict(item)
+                    item["_agency"] = agency["organization"]
+                    if not item.get("customerName") and owned[bc]["details"]:
+                        item["customerName"] = owned[bc]["details"]
+                    found.append(item)
+            except Exception as e:
+                print(f"[postoffice] {agency['username']} getOrderByBarcodes error: {e}")
+                failed_agencies.append(agency["organization"])
+                break
+        return found
+
+    items = []
+    with ThreadPoolExecutor(max_workers=min(5, len(by_agency))) as ex:
+        for found in ex.map(fetch_agency, list(by_agency.keys())):
+            items.extend(found)
+
+    notice = None
+    if failed_agencies:
+        notice = ("ดึงข้อมูลของบางหน่วยงานผิดพลาด: " + ", ".join(sorted(set(failed_agencies)))
+                  + " (ตรวจสอบบัญชี e-Parcel ของหน่วยงานนั้น)")
+    return items, notice
+
+
+@app.post("/api/postoffice/login")
+def postoffice_login(req: VerifyUserRequest):
+    """Validate a post office viewer account and return its profile."""
+    zipcode = _postoffice_zip(req.username, req.password)
+    if not zipcode:
+        return JSONResponse(status_code=401, content={"success": False, "message": "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง"})
+    name = _postoffice_name(zipcode)
+    if not name:
+        return JSONResponse(status_code=404, content={"success": False, "message": f"ไม่พบรหัสไปรษณีย์ {zipcode} ในฐานข้อมูลที่ทำการไปรษณีย์"})
+    try:
+        agencies = _postoffice_agencies(zipcode)
+    except Exception:
+        agencies = {}
+    username = f"{zipcode}a1"
+    _log_postoffice_access(username, "login", f"{name} ({len(agencies)} หน่วยงาน)")
+    return {
+        "success": True,
+        "user_data": {
+            "UserName": username,
+            "Status": "POSTOFFICE",
+            "Organization": name if name.startswith(("ปณ", "ปจ", "ศป")) else f"ที่ทำการไปรษณีย์ {name}",
+            "ResponsiblePostoffice": name,
+            "ResponsibleZipcode": zipcode,
+            "VendorID": "",
+            "AgencyCount": len(agencies),
+            "Agencies": sorted(a["organization"] for a in agencies.values()),
+        },
+    }
+
+
+class PostofficeLogRequest(BaseModel):
+    username: str
+    password: str
+    action: str
+    detail: Optional[str] = ""
+
+
+@app.post("/api/postoffice/log")
+def postoffice_log(req: PostofficeLogRequest):
+    """Audit log for client-side actions (Excel / PDF / e-AR downloads) of post office accounts."""
+    zipcode = _postoffice_zip(req.username, req.password)
+    if not zipcode:
+        return {"success": False}
+    _log_postoffice_access(f"{zipcode}a1", req.action, req.detail or "")
+    return {"success": True}
+
+
 def _fetch_received_report_payload(req_date, req_end_date, req_username, req_password):
     """
     Fetches daily or date-range deposit report from Thailand Post e-Parcel API (getAllOrderReceived).
@@ -649,6 +914,9 @@ def _fetch_received_report_payload(req_date, req_end_date, req_username, req_pas
 
     # Check for demo mode / mock fallback (only if credentials are missing or explicitly demo)
     is_demo_user = not username or not password or username.lower() == "demo"
+
+    # Post office viewer account -> data of agencies registered with this post office
+    po_zip = _postoffice_zip(username, password)
     
     raw_data = None
     api_error = None
@@ -661,7 +929,14 @@ def _fetch_received_report_payload(req_date, req_end_date, req_username, req_pas
         'เพราะเนื่องจากข้อจำกัดของโครงสร้าง API ฝั่ง ปณท. ไม่รองรับการ Dump ข้อมูลระดับทั้งประเทศผ่าน Web Service แบบเรียลไทม์'
     )
     
-    if username and password and not is_demo_user:
+    if po_zip:
+        po_items, po_notice = _collect_postoffice_items(po_zip, target_dates)
+        raw_data = po_items
+        api_error = po_notice
+        api_suggestion = None
+        _log_postoffice_access(f"{po_zip}a1", "view_report",
+                               f"{target_dates[0]} - {target_dates[-1]} ({len(po_items)} รายการ)")
+    elif username and password and not is_demo_user:
         # ---- Time budget (Vercel maxDuration = 300s) ----
         # 1) getAllOrderReceived once (whole day), waiting up to ~4 minutes: national accounts
         #    (e.g. Royalthai.pol) deposit at the counter without e-Parcel preload, so this is the
@@ -1007,13 +1282,14 @@ def _fetch_received_report_payload(req_date, req_end_date, req_username, req_pas
             "latest_station": latest_station,
             "weight": round(weight, 2),
             "fee": round(fee, 2),
-            "signature": (item.get("signature") or "").strip()
+            "signature": (item.get("signature") or "").strip(),
+            "agency": (item.get("_agency") or "").strip()
         }
         normalized_records.append(norm_item)
 
     # Auto-enrich with real-time checkpoints from getHistoryStatus
     # when live credentials exist and count is between 1 and 35
-    if not is_demo_user and username and password and 0 < len(normalized_records) <= 35:
+    if not is_demo_user and not po_zip and username and password and 0 < len(normalized_records) <= 35:
         def _fetch_realtime_tracking(rec):
             bcode = rec.get("barcode", "").strip()
             if not bcode:
@@ -1077,7 +1353,7 @@ def _fetch_received_report_payload(req_date, req_end_date, req_username, req_pas
         "date_display": date_display,
         "fetch_debug": duration_debug_out,
         "fetch_seconds": fetch_seconds,
-        "fetch_mode": "duration" if used_duration_mode else "full_day",
+        "fetch_mode": "postoffice" if po_zip else ("duration" if used_duration_mode else "full_day"),
         "is_mock": bool(is_demo_user),
         "api_notice": (api_error if not is_demo_user else None) if (api_error and not re.search(r"no\s*receive\s*product|no\s*data", str(api_error), re.IGNORECASE)) else None,
         "api_suggestion": (api_suggestion if not is_demo_user else None),
@@ -1250,7 +1526,7 @@ def get_dashboard_report(req: DashboardRequest):
     password = (req.password or "").strip()
     is_live = bool(username and password and username.lower() != "demo")
     # The duration-window fallback already used most of the 120s budget -> skip extra enrichment
-    if payload.get("fetch_mode") == "duration" or (payload.get("fetch_seconds") or 0) > 90:
+    if payload.get("fetch_mode") in ("duration", "postoffice") or (payload.get("fetch_seconds") or 0) > 90:
         is_live = False
 
     # For large live datasets (more than 35) the received endpoint only enriches up to 35 records.
@@ -1266,7 +1542,8 @@ def get_dashboard_report(req: DashboardRequest):
             try:
                 url = "https://r_dservice.thailandpost.com/webservice/getOrderByBarcodes"
                 headers = {"Content-Type": "application/json"}
-                r = requests.post(url, json={"barcodes": _t}, headers=headers,
+                # API expects one comma-separated string (a JSON list returns HTTP 400)
+                r = requests.post(url, json={"barcodes": ",".join(_t) if isinstance(_t, (list, tuple)) else _t}, headers=headers,
                                   auth=HTTPBasicAuth(username, password), timeout=30, verify=False)
                 if r.status_code == 200:
                     try:
@@ -2616,6 +2893,18 @@ def get_tracking(req: TrackingRequest):
 
     username = (req.username or "").strip()
     password = (req.password or "").strip()
+
+    # Post office account: only barcodes of its agencies, queried with that agency's credentials
+    po_zip = _postoffice_zip(username, password)
+    if po_zip:
+        creds = _postoffice_credentials_for(po_zip, [barcode])
+        if not creds:
+            return JSONResponse(status_code=403, content={
+                "success": False, "error": "forbidden",
+                "message": "หมายเลขนี้ไม่อยู่ในความรับผิดชอบของที่ทำการไปรษณีย์นี้ (ไม่ได้ออกผ่าน C2DPost โดยหน่วยงานที่ลงทะเบียนกับ ปณ.)"
+            })
+        username, password = creds[barcode]
+
     is_demo_user = not username or not password or username.lower() == "demo"
 
     events = None
@@ -2740,16 +3029,24 @@ def batch_tracking(req: BatchTrackingRequest):
     password = (req.password or "").strip()
     is_demo_user = not username or not password or username.lower() == "demo"
 
+    # Post office account: keep only its agencies' barcodes, each with the owner's credentials
+    cred_map = {}
+    po_zip = _postoffice_zip(username, password)
+    if po_zip:
+        cred_map = _postoffice_credentials_for(po_zip, barcodes)
+        barcodes = [b for b in barcodes if b in cred_map]
+
     results = {}
 
     if not is_demo_user and username and password:
         def _fetch_single(bcode):
             try:
+                b_user, b_pass = cred_map.get(bcode, (username, password))
                 hurl = f"https://r_dservice.thailandpost.com/webservice/getHistoryStatus?barcode={bcode}"
                 hresp = requests.get(
                     hurl,
                     headers={"Content-Type": "application/json"},
-                    auth=HTTPBasicAuth(username, password),
+                    auth=HTTPBasicAuth(b_user, b_pass),
                     timeout=5,
                     verify=False
                 )
@@ -2831,7 +3128,8 @@ def reconcile_received(req: ReconcileRequest):
         try:
             url = "https://r_dservice.thailandpost.com/webservice/getOrderByBarcodes"
             headers = {"Content-Type": "application/json"}
-            payload = {"barcodes": barcodes}
+            # API expects one comma-separated string (a JSON list returns HTTP 400)
+            payload = {"barcodes": ",".join(barcodes)}
             response = requests.post(url, json=payload, headers=headers,
                                      auth=HTTPBasicAuth(username, password), timeout=30, verify=False)
 

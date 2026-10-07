@@ -2190,3 +2190,73 @@ button.sig-check-badge:hover {
   color: #34d399;
 }
 
+/* Post office accounts: agency filter + agency name under receiver */
+.po-agency-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  padding: 0.85rem 1.25rem;
+  border-bottom: 1px solid var(--border-color, rgba(0, 0, 0, 0.08));
+  background: rgba(16, 185, 129, 0.06);
+}
+
+[data-theme='dark'] .po-agency-bar {
+  background: rgba(16, 185, 129, 0.1);
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+
+.po-agency-label {
+  font-family: 'Prompt', sans-serif;
+  font-size: 0.85rem;
+  font-weight: 600;
+  white-space: nowrap !important;
+}
+
+.po-agency-select {
+  min-width: 260px;
+  max-width: 100%;
+  padding: 0.45rem 0.7rem;
+  border-radius: 8px;
+  border: 1.5px solid var(--border-color, #cbd5e1);
+  background: var(--bg-input, #ffffff);
+  color: var(--text-main, #0f172a);
+  font-family: inherit;
+  font-size: 0.84rem;
+}
+
+.po-agency-select:focus {
+  outline: none;
+  border-color: #059669;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
+}
+
+[data-theme='dark'] .po-agency-select {
+  background: #0f172a;
+  border-color: #334155;
+  color: #f8fafc;
+}
+
+.po-agency-note {
+  font-size: 0.76rem;
+  color: var(--text-muted, #64748b);
+}
+
+.cell-agency-name {
+  margin-top: 2px;
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: #047857;
+}
+
+[data-theme='dark'] .cell-agency-name {
+  color: #34d399;
+}
+
+@media (max-width: 640px) {
+  .po-agency-select {
+    min-width: 0;
+    width: 100%;
+  }
+}
+

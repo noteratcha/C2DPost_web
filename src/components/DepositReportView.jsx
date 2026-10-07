@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { fetchReceivedReport, exportDepositReportExcel, exportDepositReportPdf, batchFetchTracking } from '../utils/api';
+import { fetchReceivedReport, exportDepositReportExcel, exportDepositReportPdf, batchFetchTracking, logPostofficeAction } from '../utils/api';
 import { formatStationWithZipcode } from '../utils/postalUtils';
 import { downloadBatchEar } from '../utils/earService';
 import TrackingTimelineModal from './TrackingTimelineModal';
@@ -252,6 +252,9 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
   const [reportData, setReportData] = useState(() => cachedState?.reportData || null);
   const [searchQuery, setSearchQuery] = useState(() => cachedState?.searchQuery || '');
   const [filterTab, setFilterTab] = useState(() => cachedState?.filterTab || 'all');
+  // Post office accounts: filter by agency ('' = all agencies)
+  const [agencyFilter, setAgencyFilter] = useState('');
+  const isPostOffice = (currentPerson?.Status || '').toUpperCase() === 'POSTOFFICE';
   const [selectedTrackingItem, setSelectedTrackingItem] = useState(null);
   // Live tracking request for the embedded TrackingInquiryView ({ barcodes, nonce })
   const [trackingRequest, setTrackingRequest] = useState(null);
@@ -563,9 +566,21 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
     }
   };
 
+  const agencyOptions = useMemo(() => {
+    const counts = {};
+    (reportData?.records || []).forEach((r) => {
+      if (r.agency) counts[r.agency] = (counts[r.agency] || 0) + 1;
+    });
+    return Object.entries(counts).sort((a, b) => a[0].localeCompare(b[0], 'th'));
+  }, [reportData]);
+
   const filteredRecords = useMemo(() => {
     if (!reportData || !reportData.records) return [];
     let list = reportData.records;
+
+    if (agencyFilter) {
+      list = list.filter((r) => r.agency === agencyFilter);
+    }
 
     if (filterTab === 'delivered') {
       list = list.filter((r) => getDeliveryStatusInfo(r).key === 'delivered');
@@ -599,7 +614,7 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
     }
 
     return list;
-  }, [reportData, filterTab, searchQuery, queryBarcodes]);
+  }, [reportData, filterTab, searchQuery, queryBarcodes, agencyFilter]);
 
   // Total pages and clamping
   const totalPages = Math.max(1, Math.ceil(filteredRecords.length / PAGE_SIZE));
@@ -736,8 +751,9 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
         records: filteredRecords,
         summary: reportData?.summary || {},
         date: dateDisplay,
-        organization: currentPerson?.Organization || 'สำนักงานที่ดิน'
+        organization: [currentPerson?.Organization || 'สำนักงานที่ดิน', agencyFilter].filter(Boolean).join(' • ')
       });
+      logPostofficeAction(currentPerson, 'export_excel', `${dateDisplay} (${filteredRecords.length} รายการ)${agencyFilter ? ` ${agencyFilter}` : ''}`);
     } catch (err) {
       setError(err.message || 'เกิดข้อผิดพลาดในการส่งออกไฟล์ Excel');
     } finally {
@@ -754,8 +770,9 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
         records: filteredRecords,
         summary: reportData?.summary || {},
         date: dateDisplay,
-        organization: currentPerson?.Organization || 'สำนักงานที่ดิน'
+        organization: [currentPerson?.Organization || 'สำนักงานที่ดิน', agencyFilter].filter(Boolean).join(' • ')
       });
+      logPostofficeAction(currentPerson, 'export_pdf', `${dateDisplay} (${filteredRecords.length} รายการ)${agencyFilter ? ` ${agencyFilter}` : ''}`);
     } catch (err) {
       setError(err.message || 'เกิดข้อผิดพลาดในการส่งออกไฟล์ PDF');
     } finally {
@@ -863,6 +880,7 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
     setEarProgressText(`กำลังเตรียมการดาวน์โหลด e-AR (0/${limitedRecords.length})...`);
 
     try {
+      logPostofficeAction(currentPerson, 'download_ear', `${limitedRecords.length} รายการ: ${limitedRecords.map((r) => r.barcode).slice(0, 20).join(',')}`);
       const result = await downloadBatchEar({
         records: limitedRecords,
         format: format,
@@ -1202,6 +1220,22 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
 
         {/* Data Table Section Card */}
         <div className="deposit-table-card">
+          {isPostOffice && (
+            <div className="po-agency-bar">
+              <span className="po-agency-label">หน่วยงานที่ลงทะเบียนกับ {currentPerson?.ResponsiblePostoffice || 'ปณ.'}</span>
+              <select
+                className="po-agency-select"
+                value={agencyFilter}
+                onChange={(e) => setAgencyFilter(e.target.value)}
+              >
+                <option value="">ทุกหน่วยงาน ({(reportData?.records || []).length})</option>
+                {agencyOptions.map(([name, count]) => (
+                  <option key={name} value={name}>{name} ({count})</option>
+                ))}
+              </select>
+              <span className="po-agency-note">แสดงเฉพาะพัสดุที่ออกบาร์โค้ดผ่าน C2DPost (ตามวันที่ออกบาร์โค้ด)</span>
+            </div>
+          )}
           <div className="deposit-table-toolbar">
             <div className="deposit-filter-tabs">
               <button
@@ -1438,7 +1472,10 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
                           )}
                         </td>
                         <td className="cell-invno" data-label="เลขที่คำขอ">{item.inv_no || '-'}</td>
-                        <td className="cell-receiver-name">{item.receiver_name || '-'}</td>
+                        <td className="cell-receiver-name">
+                          {item.receiver_name || '-'}
+                          {item.agency && <div className="cell-agency-name">{item.agency}</div>}
+                        </td>
                         <td className="cell-address">
                           {item.receiver_address}{' '}
                           {item.receiver_amphur ? `อ.${item.receiver_amphur}` : ''}{' '}
