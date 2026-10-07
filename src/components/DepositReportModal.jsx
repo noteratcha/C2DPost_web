@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { fetchReceivedReport, exportDepositReportExcel, exportDepositReportPdf } from '../utils/api';
 import { getDeliveryStatusInfo } from './DepositReportView';
 import { formatStationWithZipcode } from '../utils/postalUtils';
-import { downloadBatchEar } from '../utils/earService';
+import { downloadBatchEar, useEarServiceDown, EAR_DOWN_MESSAGE } from '../utils/earService';
 import TrackingTimelineModal from './TrackingTimelineModal';
 import ThaiDateInput from './ThaiDateInput';
 import './DepositReportModal.css';
@@ -48,6 +48,9 @@ export default function DepositReportModal({ isOpen, onClose, currentPerson, onS
     const d = new Date();
     return toInputDateFormat(new Date(d.getFullYear(), d.getMonth(), 0));
   }, []);
+
+  // Thailand Post e-AR service failing (HTTP 5xx) -> batch e-AR download disabled
+  const earServiceDown = useEarServiceDown();
 
   // Date Range state
   const [startDate, setStartDate] = useState(todayIso);
@@ -980,9 +983,11 @@ export default function DepositReportModal({ isOpen, onClose, currentPerson, onS
               type="button"
               className="btn-footer-ear"
               onClick={() => handleBatchDownloadEar('pdf')}
-              disabled={loading || isDownloadingEar || deliveredCount === 0}
+              disabled={loading || isDownloadingEar || deliveredCount === 0 || earServiceDown}
               title={
-                deliveredCount === 0
+                earServiceDown
+                  ? EAR_DOWN_MESSAGE
+                  : deliveredCount === 0
                   ? 'ไม่มีรายการที่นำจ่ายสำเร็จสำหรับดาวน์โหลด e-AR'
                   : `คลิกดาวน์โหลด PDF รวม e-AR (${deliveredCount} รายการ)`
               }

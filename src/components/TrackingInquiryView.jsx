@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { fetchTrackingHistory } from '../utils/api';
 import { formatStationWithZipcode } from '../utils/postalUtils';
 import { openEarWithBarcode } from '../utils/extensionBridge';
-import { fetchEarDetailsClient, downloadBatchEar, openEarWithTrackingPdf } from '../utils/earService';
+import { fetchEarDetailsClient, downloadBatchEar, openEarWithTrackingPdf, useEarServiceDown, EAR_DOWN_MESSAGE } from '../utils/earService';
 import './TrackingInquiryView.css';
 
 /**
@@ -270,6 +270,7 @@ export default function TrackingInquiryView({ currentPerson, records = [], initi
   const [isDownloadingEar, setIsDownloadingEar] = useState(false);
   const [earProgressText, setEarProgressText] = useState('');
   const [openingEarBarcode, setOpeningEarBarcode] = useState(null);
+  const earServiceDown = useEarServiceDown();
   // Sequence id of the latest search; older responses are ignored
   const searchSeqRef = useRef(0);
 
@@ -740,8 +741,8 @@ export default function TrackingInquiryView({ currentPerson, records = [], initi
                   type="button"
                   className="btn-footer-ear"
                   onClick={() => handleBatchDownloadEar('pdf')}
-                  disabled={isDownloadingEar}
-                  title={`คลิกดาวน์โหลด PDF รวม e-AR (${summary.delivered} รายการ)`}
+                  disabled={isDownloadingEar || earServiceDown}
+                  title={earServiceDown ? EAR_DOWN_MESSAGE : `คลิกดาวน์โหลด PDF รวม e-AR (${summary.delivered} รายการ)`}
                 >
                   {isDownloadingEar ? (
                     <>

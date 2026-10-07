@@ -6,6 +6,7 @@
  * Then passes the received PDF bytes to our API backend to extract signature thumbnail and metadata.
  */
 
+import { useState, useEffect } from 'react';
 import { API_BASE } from './api';
 import { fetchEarPdfFromExtension, checkEarCapability } from './extensionBridge';
 
@@ -32,6 +33,15 @@ export function subscribeEarServiceHealth(fn) {
   earHealthListeners.add(fn);
   return () => earHealthListeners.delete(fn);
 }
+
+/** React hook: true while Thailand Post's e-AR service is failing (HTTP 5xx). */
+export function useEarServiceDown() {
+  const [down, setDown] = useState(earServiceHealth.status === 'down');
+  useEffect(() => subscribeEarServiceHealth((h) => setDown(h.status === 'down')), []);
+  return down;
+}
+
+export const EAR_DOWN_MESSAGE = 'ระบบ e-AR ของไปรษณีย์มีปัญหาชั่วคราว ยังไม่สามารถโหลด e-AR ได้ กรุณาลองใหม่ภายหลัง';
 
 function isServerError(msg) {
   return /HTTP\s*5\d\d/i.test(String(msg || ''));

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { fetchReceivedReport, exportDepositReportExcel, exportDepositReportPdf, batchFetchTracking, logPostofficeAction } from '../utils/api';
 import { formatStationWithZipcode } from '../utils/postalUtils';
-import { downloadBatchEar } from '../utils/earService';
+import { downloadBatchEar, useEarServiceDown, EAR_DOWN_MESSAGE } from '../utils/earService';
 import TrackingTimelineModal from './TrackingTimelineModal';
 import TrackingInquiryView from './TrackingInquiryView';
 import ThaiDateInput from './ThaiDateInput';
@@ -255,6 +255,7 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
   // Post office accounts: filter by agency ('' = all agencies)
   const [agencyFilter, setAgencyFilter] = useState('');
   const isPostOffice = (currentPerson?.Status || '').toUpperCase() === 'POSTOFFICE';
+  const earServiceDown = useEarServiceDown();
   const [selectedTrackingItem, setSelectedTrackingItem] = useState(null);
   // Live tracking request for the embedded TrackingInquiryView ({ barcodes, nonce })
   const [trackingRequest, setTrackingRequest] = useState(null);
@@ -1590,9 +1591,11 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
                 type="button"
                 className={`btn-footer-ear ${selectedBarcodes.size > 0 ? 'has-selection' : ''}`}
                 onClick={() => handleBatchDownloadEar('pdf')}
-                disabled={isDownloadingEar || deliveredCount === 0}
+                disabled={isDownloadingEar || deliveredCount === 0 || earServiceDown}
                 title={
-                  deliveredCount === 0
+                  earServiceDown
+                    ? EAR_DOWN_MESSAGE
+                    : deliveredCount === 0
                     ? 'ไม่มีรายการที่นำจ่ายสำเร็จสำหรับดาวน์โหลด e-AR'
                     : selectedBarcodes.size > 0
                     ? `คลิกดาวน์โหลด PDF รวม e-AR ที่เลือก (${selectedDeliveredRecords.length} รายการ)`
