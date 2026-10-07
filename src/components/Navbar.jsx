@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import AboutModal from './AboutModal';
 import { syncCredentialsToExtension } from '../utils/extensionBridge';
+import { getManualUrl } from '../utils/manualLink';
 import { APP_VERSION } from '../config';
 import './Navbar.css';
 
@@ -689,12 +690,12 @@ export default function Navbar({
 
                   <div className="menu-nav-links">
                     <a
-                      href="https://canva.link/dyl3brb47lyph8r"
+                      href={getManualUrl(currentPerson, isAdmin)}
                       target="_blank"
                       rel="noreferrer"
                       className="menu-link-card"
                       onClick={() => setIsNavMenuOpen(false)}
-                      title="เปิดดูคู่มือการใช้งานบน Canva"
+                      title="เปิดคู่มือการใช้งานสำหรับบัญชีของคุณ"
                     >
                       <div className="link-card-left">
                         <div className="link-avatar-icon icon-manual">

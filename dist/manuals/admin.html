@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>คู่มือผู้ดูแล C2DPost</title>
+<link rel="stylesheet" href="manual.css">
+</head>
+<body>
+<header class="hero">
+  <div class="wrap">
+    <span class="tag">คู่มือสำหรับผู้ดูแลระบบ</span>
+    <h1>คู่มือผู้ดูแลระบบ C2DPost</h1>
+    <p>จัดการผู้ใช้ ตรวจสถานะ และดูแลบัญชีที่ทำการไปรษณีย์</p>
+    <div class="actions">
+      <a class="btn" href="/manuals/index.html">คู่มือทั้งหมด</a>
+      <button class="btn ghost" onclick="window.print()">พิมพ์ / บันทึก PDF</button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="chapter" id="users">
+    <h2>1. จัดการผู้ใช้</h2>
+    <figure><img src="img/30_admin_users.png" alt="จัดการผู้ใช้"><figcaption>ภาพที่ 1 หน้าระบบจัดการผู้ใช้งาน</figcaption></figure>
+    <ul>
+      <li><b>อนุมัติ/เพิ่มผู้ใช้</b>: กด <b>เพิ่มผู้ใช้</b> หรือแก้ไขแถวคำขอที่ลงทะเบียนเข้ามา ตรวจชื่อผู้ใช้ e-Parcel, Vendor ID, หน่วยงาน และรหัส ปณ. รับผิดชอบให้ถูกต้อง</li>
+      <li><b>แก้ไข/ลบ</b>: ใช้ปุ่มท้ายแถว การลบมีผลทันทีและย้อนกลับไม่ได้</li>
+      <li><b>ค้นหา/กรอง</b> ตามสถานะ และ <b>ส่งออก Excel</b> รายชื่อผู้ใช้</li>
+    </ul>
+    <div class="note">รหัส ปณ. รับผิดชอบ (ResponsibleZipcode) กำหนดว่าบัญชีที่ทำการไปรษณีย์ใดจะเห็นพัสดุของหน่วยงานนี้</div>
+  </section>
+
+  <section class="chapter" id="status">
+    <h2>2. ตรวจสถานะระบบ</h2>
+    <figure><img src="img/31_admin_menu.png" alt="เมนูสถานะ"><figcaption>ภาพที่ 2 เมนูสถานะการเชื่อมต่อ</figcaption></figure>
+    <ul>
+      <li>เมนู ☰ แสดงสถานะ API, Extension, e-Parcel และ e-AR</li>
+      <li><b>ระบบ e-AR มีปัญหา</b> = Extension ปกติ แต่เซิร์ฟเวอร์ e-AR ของไปรษณีย์ตอบ HTTP 5xx ไม่ต้องแก้ฝั่งเรา</li>
+      <li>ตรวจ API ได้ที่ <code>/api/health</code></li>
+    </ul>
+  </section>
+
+  <section class="chapter" id="po">
+    <h2>3. บัญชีที่ทำการไปรษณีย์และบันทึกการใช้งาน</h2>
+    <ul>
+      <li>บัญชีถูกสร้างอัตโนมัติทุก ปณ.: ชื่อผู้ใช้ <code>รหัสไปรษณีย์a1</code> รหัสผ่าน <code>dรหัสไปรษณีย์</code> ไม่ต้องเพิ่มในหน้าจัดการผู้ใช้</li>
+      <li>ระบบใช้บัญชี e-Parcel ของแต่ละหน่วยงานแทนในการดึงข้อมูล จึงต้องรักษาข้อมูลบัญชีหน่วยงานให้ถูกต้อง</li>
+      <li>การใช้งานทุกครั้งถูกบันทึกในแผ่นงาน <b>PostOfficeLog</b> (วันเวลา, บัญชี ปณ., การใช้งาน, รายละเอียด) ควรตรวจเป็นระยะว่ามีการใช้ผิดปกติหรือไม่ เช่น ดาวน์โหลดจำนวนมากนอกเวลาทำการ</li>
+    </ul>
+  </section>
+
+  <section class="chapter" id="maint">
+    <h2>4. การดูแลรักษา</h2>
+    <ul>
+      <li>ข้อมูลผู้ใช้ รายการบาร์โค้ด (UseBarcode) และรายชื่อ ปณ. อยู่ใน Google Sheets ห้ามเปลี่ยนชื่อคอลัมน์หรือลำดับแผ่นงาน</li>
+      <li>เมื่อแก้ Apps Script ต้อง <b>Deploy เวอร์ชันใหม่</b> และถ้า URL เปลี่ยน ต้องแจ้งผู้พัฒนาให้อัปเดตในระบบ</li>
+      <li>เมื่อปรับ Extension ต้องส่งเวอร์ชันใหม่ขึ้น Chrome Web Store และแจ้งผู้ใช้ให้อัปเดต</li>
+    </ul>
+  </section>
+
+  <section class="chapter" id="security">
+    <h2>5. ข้อควรระวังด้านความปลอดภัย</h2>
+    <div class="warn">
+      <ul>
+        <li>ห้ามแชร์ลิงก์ Google Sheets, URL ของ Apps Script หรือคู่มือนี้ให้บุคคลภายนอก</li>
+        <li>รหัสผ่านบัญชี ปณ. เดาได้จากรูปแบบ จึงต้องอาศัยการตรวจบันทึกการใช้งานแทน</li>
+        <li>ไม่ใช้บัญชีจริงของหน่วยงานในการทดสอบ และไม่ถ่ายภาพหน้าจอที่มีข้อมูลประชาชนไปเผยแพร่</li>
+        <li>ถ้าพบการรั่วไหลของข้อมูล ให้ระงับบัญชีที่เกี่ยวข้องและรายงานผู้บังคับบัญชาทันที</li>
+      </ul>
+    </div>
+  </section>
+
+  <footer class="foot">C2DPost · ส่วน ทข.ปข.10 · เอกสารภายใน · ภาพประกอบใช้ข้อมูลสมมติ</footer>
+</main>
+</body>
+</html>

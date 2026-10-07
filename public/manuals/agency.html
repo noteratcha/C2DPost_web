@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>คู่มือหน่วยงาน C2DPost</title>
+<link rel="stylesheet" href="manual.css">
+</head>
+<body>
+<header class="hero">
+  <div class="wrap">
+    <span class="tag">คู่มือสำหรับหน่วยงาน (สำนักงานที่ดิน)</span>
+    <h1>คู่มือการใช้งานระบบ C2DPost</h1>
+    <p>แปลงไฟล์ PDF หนังสือแจ้งเป็นข้อมูล DPost ขอบาร์โค้ด และติดตามสถานะพัสดุ</p>
+    <div class="actions">
+      <a class="btn" href="/">กลับเข้าสู่ระบบ</a>
+      <button class="btn ghost" onclick="window.print()">พิมพ์ / บันทึก PDF</button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <nav class="toc">
+    <h2>สารบัญ</h2>
+    <ol>
+      <li><a href="#start">เริ่มต้นใช้งาน (Chrome และ Extension)</a></li>
+      <li><a href="#login">ลงทะเบียนและเข้าสู่ระบบ</a></li>
+      <li><a href="#convert">แปลงไฟล์ PDF</a></li>
+      <li><a href="#barcode">ขอบาร์โค้ดและดาวน์โหลดเอกสาร</a></li>
+      <li><a href="#report">รายงานสถานะพัสดุ</a></li>
+      <li><a href="#dashboard">สถิติ (Dashboard)</a></li>
+      <li><a href="#mobile">ใช้งานผ่านโทรศัพท์</a></li>
+      <li><a href="#faq">คำถามที่พบบ่อย</a></li>
+    </ol>
+  </nav>
+
+  <section class="chapter" id="start">
+    <h2>1. เริ่มต้นใช้งาน</h2>
+    <h3>1.1 ใช้งานผ่าน Google Chrome เท่านั้น</h3>
+    <p>ระบบเปิดใช้งานได้บน Google Chrome บนคอมพิวเตอร์เท่านั้น ถ้าเปิดด้วยเบราว์เซอร์อื่น เช่น Microsoft Edge ระบบจะแสดงหน้าแนะนำให้เปิดด้วย Chrome</p>
+    <figure><img src="img/01_browser_gate.png" alt="หน้าแนะนำให้เปิดด้วย Chrome"><figcaption>ภาพที่ 1 หน้าแนะนำเมื่อเปิดด้วยเบราว์เซอร์อื่น (ซ้าย) และวิธีตั้ง Chrome เป็นเบราว์เซอร์เริ่มต้น (ขวา)</figcaption></figure>
+    <ol class="steps">
+      <li>กดปุ่ม <b>เปิดด้วย Google Chrome</b> หรือคัดลอกลิงก์ไปวางใน Chrome</li>
+      <li>ถ้าต้องการให้ลิงก์เปิดใน Chrome ทุกครั้ง ทำตามขั้นตอนในการ์ดด้านขวาเพื่อตั้ง Chrome เป็นเบราว์เซอร์เริ่มต้น</li>
+    </ol>
+    <h3>1.2 ติดตั้ง C2DPost Helper (Extension)</h3>
+    <p>Extension ใช้เชื่อมต่อกับระบบ e-Parcel ของไปรษณีย์เพื่อขอบาร์โค้ดและโหลดใบตอบรับ e-AR ต้องติดตั้งก่อนเข้าใช้งานบนคอมพิวเตอร์</p>
+    <figure><img src="img/02_extension_gate.png" alt="หน้าติดตั้ง Extension"><figcaption>ภาพที่ 2 หน้าติดตั้ง C2DPost Helper</figcaption></figure>
+    <ol class="steps">
+      <li>กด <b>ติดตั้งจาก Chrome Web Store</b> แล้วกด <b>เพิ่มใน Chrome</b></li>
+      <li>กลับมาที่หน้าเว็บ C2DPost ระบบจะตรวจพบ Extension และเข้าสู่หน้าเข้าสู่ระบบให้อัตโนมัติ (ถ้าไม่เปลี่ยน ให้กดรีเฟรช)</li>
+    </ol>
+  </section>
+
+  <section class="chapter" id="login">
+    <h2>2. ลงทะเบียนและเข้าสู่ระบบ</h2>
+    <figure class="narrow"><img src="img/03_login.png" alt="หน้าเข้าสู่ระบบ"><figcaption>ภาพที่ 3 หน้าเข้าสู่ระบบ</figcaption></figure>
+    <h3>2.1 ลงทะเบียนขอสิทธิ์</h3>
+    <ol class="steps">
+      <li>กด <b>ลงทะเบียนขอสิทธิ์การใช้งาน</b> ใต้ปุ่มเข้าสู่ระบบ</li>
+      <li>กรอกชื่อผู้ใช้และรหัสผ่านของระบบ e-Parcel (ใช้ชุดเดียวกัน) เลือกหน่วยงาน และที่ทำการไปรษณีย์ที่รับผิดชอบ</li>
+      <li>กดส่งคำขอ แล้วรอผู้ดูแลระบบอนุมัติ</li>
+    </ol>
+    <figure><img src="img/04_register.png" alt="แบบฟอร์มลงทะเบียน"><figcaption>ภาพที่ 4 แบบฟอร์มลงทะเบียน</figcaption></figure>
+    <h3>2.2 เข้าสู่ระบบ</h3>
+    <p>กรอกชื่อผู้ใช้และรหัสผ่าน แล้วกด <b>เข้าสู่ระบบ</b> ระบบจะส่งข้อมูลบัญชีไปให้ Extension ใช้กับ e-Parcel ให้เอง</p>
+  </section>
+
+  <section class="chapter" id="convert">
+    <h2>3. แปลงไฟล์ PDF</h2>
+    <ol class="steps">
+      <li>ไปที่เมนู <b>แปลงไฟล์ PDF</b> แล้วกด <b>เลือกไฟล์ PDF</b> หรือลากไฟล์มาวาง (เลือกได้หลายไฟล์)</li>
+      <li>ระบบอ่านชื่อ ที่อยู่ และรหัสไปรษณีย์ของผู้รับจากหนังสือแจ้งและจ่าหน้าซอง แล้วแสดงในตาราง</li>
+      <li>ตรวจข้อมูลทุกแถว แก้ไขได้โดยคลิกที่ช่อง</li>
+    </ol>
+    <figure><img src="img/05_workspace_empty.png" alt="หน้าแปลงไฟล์"><figcaption>ภาพที่ 5 หน้าแปลงไฟล์ก่อนเลือกไฟล์</figcaption></figure>
+    <figure><img src="img/06_workspace_records.png" alt="ผลการแปลงไฟล์"><figcaption>ภาพที่ 6 ตารางข้อมูลหลังแปลงไฟล์</figcaption></figure>
+    <div class="note">ตรวจรหัสไปรษณีย์และที่อยู่ทุกครั้งก่อนขอบาร์โค้ด เพราะไฟล์ที่สแกนไม่ชัดอาจทำให้อ่านผิด</div>
+  </section>
+
+  <section class="chapter" id="barcode">
+    <h2>4. ขอบาร์โค้ดและดาวน์โหลดเอกสาร</h2>
+    <ol class="steps">
+      <li>กด <b>ขอบาร์โค้ด</b> ระบบจะสร้างรายการใน e-Parcel ผ่าน Extension และใส่เลขบาร์โค้ดในตาราง</li>
+      <li>กด <b>ดาวน์โหลด</b> แล้วเลือกเอกสารที่ต้องการ เช่น ไฟล์ Excel DPost หรือใบจ่าหน้า</li>
+    </ol>
+    <figure><img src="img/07_download_menu.png" alt="เมนูดาวน์โหลด"><figcaption>ภาพที่ 7 เมนูดาวน์โหลดเอกสาร</figcaption></figure>
+  </section>
+
+  <section class="chapter" id="report">
+    <h2>5. รายงานสถานะพัสดุ</h2>
+    <p>ดูสถานะพัสดุทั้งหมดที่หน่วยงานฝากส่งในช่วงวันที่เลือก</p>
+    <figure><img src="img/08_report_top.png" alt="ส่วนบนของรายงาน"><figcaption>ภาพที่ 8 ตัวเลือกช่วงวันที่และการ์ดสรุป</figcaption></figure>
+    <ol class="steps">
+      <li>เลือก <b>วันเริ่ม</b> และ <b>วันสิ้นสุด</b> หรือกดปุ่มลัด เช่น วันนี้ เมื่อวาน เดือนนี้ แล้วกด <b>ดึงข้อมูล</b></li>
+      <li>การ์ดสรุปแสดงจำนวนนำจ่ายสำเร็จ อยู่ระหว่างนำจ่าย ส่งคืน และอื่น ๆ กดที่การ์ดเพื่อกรองตารางตามสถานะนั้น</li>
+    </ol>
+    <figure><img src="img/09_report_table.png" alt="ตารางรายงาน"><figcaption>ภาพที่ 9 ตารางรายการพัสดุ</figcaption></figure>
+    <h3>5.1 ค้นหาเลขบาร์โค้ด</h3>
+    <p>พิมพ์หรือวางเลขบาร์โค้ด (หลายเลขได้) ในช่องค้นหาด้านบนตาราง ระบบจะค้นในรายการที่ดึงมา ถ้าไม่พบจะค้นจากระบบไปรษณีย์ให้</p>
+    <figure><img src="img/10_report_search.png" alt="ค้นหาบาร์โค้ด"><figcaption>ภาพที่ 10 ผลการค้นหาเลขบาร์โค้ด</figcaption></figure>
+    <h3>5.2 ดูประวัติการนำจ่าย</h3>
+    <p>คลิกเลขบาร์โค้ดเพื่อดูไทม์ไลน์สถานะทุกขั้นตอน</p>
+    <figure><img src="img/11_timeline_modal.png" alt="ไทม์ไลน์"><figcaption>ภาพที่ 11 ประวัติสถานะพัสดุ</figcaption></figure>
+    <h3>5.3 ลายเซ็นผู้รับและใบตอบรับ e-AR</h3>
+    <div class="tblwrap"><table class="t">
+      <tr><th>ป้าย</th><th>ความหมาย</th></tr>
+      <tr><td>✍️ มีลายเซ็น</td><td>ใบตอบรับมีลายเซ็นผู้รับ คลิกเพื่อดูรูปลายเซ็น ความสัมพันธ์กับผู้รับ และผู้นำจ่าย</td></tr>
+      <tr><td>✕ ไม่พบลายเซ็น</td><td>ใบตอบรับไม่มีรูปลายเซ็น ควรตรวจสอบกับที่ทำการไปรษณีย์ปลายทาง</td></tr>
+      <tr><td>⚠ ระบบ e-AR มีปัญหา</td><td>ระบบ e-AR ของไปรษณีย์ขัดข้องชั่วคราว ตรวจลายเซ็นไม่ได้ ให้ลองใหม่ภายหลัง</td></tr>
+    </table></div>
+    <h3>5.4 ส่งออกข้อมูล</h3>
+    <p>ปุ่มด้านล่างตารางใช้ <b>โหลด e-AR</b> (PDF รวมใบตอบรับของรายการที่นำจ่ายสำเร็จ), <b>ดาวน์โหลด Excel</b> และ <b>ดาวน์โหลด PDF</b> ปุ่มโหลด e-AR จะกดไม่ได้ขณะที่ระบบ e-AR มีปัญหา</p>
+  </section>
+
+  <section class="chapter" id="dashboard">
+    <h2>6. สถิติ (Dashboard)</h2>
+    <figure><img src="img/12_dashboard_top.png" alt="Dashboard"><figcaption>ภาพที่ 12 แผนที่และตารางอันดับรายพื้นที่</figcaption></figure>
+    <p>แผนที่แสดงปริมาณพัสดุรายจังหวัด/อำเภอ ตารางอันดับแสดงหน้าละ 15 รายการ</p>
+    <figure><img src="img/13_dashboard_reasons.png" alt="สาเหตุ"><figcaption>ภาพที่ 13 การ์ดสาเหตุการส่งคืนและสาเหตุการนำจ่ายไม่สำเร็จ</figcaption></figure>
+    <p>คลิกสาเหตุในการ์ดเพื่อดูรายการพัสดุของสาเหตุนั้น และกด <b>ดาวน์โหลด Excel</b> ได้</p>
+    <figure><img src="img/14_reason_modal.png" alt="รายการตามสาเหตุ"><figcaption>ภาพที่ 14 รายการพัสดุตามสาเหตุ</figcaption></figure>
+  </section>
+
+  <section class="chapter" id="mobile">
+    <h2>7. ใช้งานผ่านโทรศัพท์</h2>
+    <p>บนโทรศัพท์ไม่ต้องติดตั้ง Extension ใช้ได้เฉพาะหน้ารายงานสถานะและสถิติ (หน้าแปลงไฟล์ใช้ได้บนคอมพิวเตอร์เท่านั้น) ตารางจะแสดงเป็นการ์ดเพื่อให้อ่านง่าย</p>
+    <figure class="narrow"><img src="img/16_phone_report.png" alt="หน้าจอโทรศัพท์"><figcaption>ภาพที่ 15 รายงานสถานะบนโทรศัพท์</figcaption></figure>
+    <p>เมนูมุมขวาบน (☰) แสดงสถานะการเชื่อมต่อ ลิงก์คู่มือ และปุ่มออกจากระบบ</p>
+    <figure><img src="img/15_status_menu.png" alt="เมนู"><figcaption>ภาพที่ 16 เมนูและสถานะการเชื่อมต่อ</figcaption></figure>
+  </section>
+
+  <section class="chapter" id="faq">
+    <h2>8. คำถามที่พบบ่อย</h2>
+    <details class="faq" open><summary>ติดตั้ง Extension แล้ว แต่ระบบยังขึ้นให้ติดตั้ง</summary><p>กดรีเฟรชหน้าเว็บ ถ้ายังไม่ได้ ให้ไปที่ <code>chrome://extensions</code> ตรวจว่าเปิดใช้งาน C2DPost Helper อยู่ แล้วรีเฟรชอีกครั้ง</p></details>
+    <details class="faq" open><summary>ขึ้นสถานะ "ระบบ e-AR มีปัญหา"</summary><p>ระบบ e-AR ของไปรษณีย์ขัดข้อง (ไม่ใช่ปัญหาที่เครื่องของท่าน) ระหว่างนี้โหลด e-AR และตรวจลายเซ็นไม่ได้ รอสักครู่แล้วกดรีเฟรชสถานะในเมนู</p></details>
+    <details class="faq" open><summary>ดึงรายงานนานมาก</summary><p>บัญชีที่มีพัสดุจำนวนมากอาจใช้เวลาหลายนาที ลองเลือกช่วงวันที่สั้นลง หรือค้นด้วยเลขบาร์โค้ดโดยตรง</p></details>
+    <details class="faq" open><summary>แปลงไฟล์ PDF แล้วข้อมูลไม่ครบหรือผิด</summary><p>ไฟล์ที่เป็นภาพสแกนหรือรูปแบบต่างจากปกติอาจอ่านไม่ครบ ให้แก้ไขในตารางก่อนขอบาร์โค้ด ถ้าพบบ่อยแจ้งผู้ดูแลระบบพร้อมแนบไฟล์ตัวอย่าง</p></details>
+    <details class="faq" open><summary>ขอบาร์โค้ดแล้วขึ้น Error 018</summary><p>เป็นข้อผิดพลาดจากระบบ e-Parcel มักเกิดจากข้อมูลบัญชีไม่ถูกต้องหรือหมดอายุ ให้ออกจากระบบแล้วเข้าใหม่ ถ้ายังพบติดต่อผู้ดูแลระบบ</p></details>
+    <details class="faq" open><summary>ติดต่อผู้ดูแลระบบ</summary><p>ผ่าน LINE ที่ลิงก์ในหน้าเข้าสู่ระบบ</p></details>
+  </section>
+
+  <footer class="foot">C2DPost · ส่วน ทข.ปข.10 · ภาพประกอบใช้ข้อมูลสมมติ</footer>
+</main>
+</body>
+</html>

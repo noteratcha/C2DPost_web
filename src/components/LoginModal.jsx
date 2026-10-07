@@ -155,7 +155,7 @@ export default function LoginModal({ onLogin, people = [], loading = false, erro
             </button>
             <span className="login-link-sep">|</span>
             <a
-              href="https://canva.link/dyl3brb47lyph8r"
+              href="/manuals/agency.html"
               target="_blank"
               rel="noopener noreferrer"
               className="login-link-btn"
