@@ -3954,18 +3954,28 @@ async def admin_update_user(request: Request):
         if "action" not in data:
             data["action"] = "update_user"
 
-        r = requests.post(SCRIPT_URL, json=data, timeout=20, allow_redirects=False)
-        if r.status_code in (301, 302, 303, 307):
-            loc = r.headers.get("Location")
-            if loc:
-                r = requests.get(loc, timeout=20)
+        r = requests.post(SCRIPT_URL, json=data, timeout=60, allow_redirects=False)
+        loc = r.headers.get("Location") if r.status_code in (301, 302, 303, 307) else None
+        if loc:
+            r = requests.get(loc, timeout=60)
         try:
             return r.json()
-        except:
-            text = r.text.strip()
-            if "success" in text.lower():
-                return {"status": "success", "message": "บันทึกข้อมูลเรียบร้อยแล้ว"}
-            return {"status": "error", "message": text or f"Response code: {r.status_code}"}
+        except Exception:
+            pass
+        # Google sometimes answers the result URL with its HTML error page although the
+        # script already ran -> re-read the result once, then give a readable message
+        if loc:
+            try:
+                r2 = requests.get(loc, timeout=30)
+                return r2.json()
+            except Exception:
+                pass
+        text = (r.text or "").strip()
+        if text.startswith("<"):
+            return {"status": "error", "message": "Google Apps Script ตอบกลับผิดปกติ (อาจบันทึกสำเร็จแล้ว) กรุณากด 'รีเฟรชข้อมูล' เพื่อตรวจสอบก่อนบันทึกซ้ำ"}
+        if "success" in text.lower():
+            return {"status": "success", "message": "บันทึกข้อมูลเรียบร้อยแล้ว"}
+        return {"status": "error", "message": text[:300] or f"Response code: {r.status_code}"}
     except Exception as e:
         return {"status": "error", "message": f"การเชื่อมต่อล้มเหลว: {str(e)}"}
 

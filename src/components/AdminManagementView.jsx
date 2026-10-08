@@ -211,13 +211,12 @@ export default function AdminManagementView({
         }, 1200);
       } else {
         setEditModalError(data.message || 'เกิดข้อผิดพลาด');
+        // ข้อมูลอาจถูกบันทึกแล้วแม้ตอบกลับผิดปกติ -> โหลดรายชื่อใหม่ให้ตารางตรงกับชีต
+        if (onRefreshPeople) onRefreshPeople();
       }
-    } catch {
-      setEditModalSuccess(`บันทึก "${editModalData.UserName}" สำเร็จ (โหมดการแสดงผล)`);
+    } catch (err) {
+      setEditModalError(`เชื่อมต่อไม่สำเร็จ: ${err.message} — กรุณากด 'รีเฟรชข้อมูล' เพื่อตรวจสอบก่อนบันทึกซ้ำ`);
       if (onRefreshPeople) onRefreshPeople();
-      setTimeout(() => {
-        handleCloseEditModal();
-      }, 1200);
     } finally {
       setIsModalSaving(false);
     }
