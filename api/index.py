@@ -124,6 +124,18 @@ class CancelEparcelRequest(BaseModel):
     password: str
     barcodes: List[str]
 
+class AdminEparcelPendingRequest(BaseModel):
+    admin_username: str
+    admin_password: str
+    start_date: str  # YYYY-MM-DD (UseBarcode issue date)
+    end_date: str
+    agency: Optional[str] = ""  # UserName, '' = all agencies
+
+class AdminCancelEparcelRequest(BaseModel):
+    admin_username: str
+    admin_password: str
+    barcodes: List[str]
+
 class UpdateEparcelStatusRequest(BaseModel):
     barcodes: List[str]
     status: Optional[str] = "yes"
@@ -471,14 +483,40 @@ def send_eparcel(req: SendEparcelRequest):
             content={"status_code": 500, "error": str(e)}
         )
 
+def _cancel_eparcel_order(barcode, username, password):
+    """Thailand Post cancelOrder for one barcode -> {barcode, success, errorCode, errorDetail}."""
+    import requests
+    from requests.auth import HTTPBasicAuth
+    import urllib3
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+    try:
+        r = requests.post(
+            "https://r_dservice.thailandpost.com/webservice/cancelOrder",
+            json={"barcode": barcode},
+            headers={"Content-Type": "application/json"},
+            auth=HTTPBasicAuth(username, password), timeout=30, verify=False,
+        )
+        if r.status_code == 401:
+            return {"barcode": barcode, "success": False, "errorCode": "401", "errorDetail": "Unauthorized"}
+        try:
+            data = r.json()
+        except Exception:
+            data = r.text
+        item = data[0] if isinstance(data, list) and data else data
+        if isinstance(item, dict):
+            code = str(item.get("errorCode", "")).strip()
+            ok = r.status_code == 200 and (code in ("000", "0") or str(item.get("status", "")).lower() == "true")
+            return {"barcode": barcode, "success": ok, "errorCode": code or str(r.status_code),
+                    "errorDetail": str(item.get("errorDetail", "") or "")}
+        return {"barcode": barcode, "success": False, "errorCode": str(r.status_code), "errorDetail": str(data)[:200]}
+    except Exception as e:
+        return {"barcode": barcode, "success": False, "errorCode": "ERR", "errorDetail": str(e)[:200]}
+
+
 @app.post("/api/cancel_eparcel")
 def cancel_eparcel(req: CancelEparcelRequest):
     """Cancel e-Parcel orders (Thailand Post cancelOrder, one barcode per call)."""
-    import requests
-    from requests.auth import HTTPBasicAuth
     from concurrent.futures import ThreadPoolExecutor
-    import urllib3
-    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
     barcodes = []
     for b in req.barcodes or []:
@@ -490,34 +528,9 @@ def cancel_eparcel(req: CancelEparcelRequest):
     if len(barcodes) > 500:
         raise HTTPException(status_code=400, detail="Too many barcodes (max 500)")
 
-    auth = HTTPBasicAuth(req.username.strip(), req.password.strip())
-
-    def _cancel(barcode):
-        try:
-            r = requests.post(
-                "https://r_dservice.thailandpost.com/webservice/cancelOrder",
-                json={"barcode": barcode},
-                headers={"Content-Type": "application/json"},
-                auth=auth, timeout=30, verify=False,
-            )
-            if r.status_code == 401:
-                return {"barcode": barcode, "success": False, "errorCode": "401", "errorDetail": "Unauthorized"}
-            try:
-                data = r.json()
-            except Exception:
-                data = r.text
-            item = data[0] if isinstance(data, list) and data else data
-            if isinstance(item, dict):
-                code = str(item.get("errorCode", "")).strip()
-                ok = r.status_code == 200 and (code in ("000", "0") or str(item.get("status", "")).lower() == "true")
-                return {"barcode": barcode, "success": ok, "errorCode": code or str(r.status_code),
-                        "errorDetail": str(item.get("errorDetail", "") or "")}
-            return {"barcode": barcode, "success": False, "errorCode": str(r.status_code), "errorDetail": str(data)[:200]}
-        except Exception as e:
-            return {"barcode": barcode, "success": False, "errorCode": "ERR", "errorDetail": str(e)[:200]}
-
+    username, password = req.username.strip(), req.password.strip()
     with ThreadPoolExecutor(max_workers=5) as pool:
-        results = list(pool.map(_cancel, barcodes))
+        results = list(pool.map(lambda b: _cancel_eparcel_order(b, username, password), barcodes))
     unauthorized = all(r["errorCode"] == "401" for r in results)
     return {
         "success": not unauthorized,
@@ -872,6 +885,192 @@ def _collect_postoffice_items(zipcode, target_dates):
         notice = ("ดึงข้อมูลของบางหน่วยงานผิดพลาด: " + ", ".join(sorted(set(failed_agencies)))
                   + " (ตรวจสอบบัญชี e-Parcel ของหน่วยงานนั้น)")
     return items, notice
+
+
+# =====================================================================================
+# Admin: cancel e-Parcel orders that were sent but not yet received at the post office
+# =====================================================================================
+
+def _verify_admin(username, password):
+    """True when the credentials match an ADMIN row of the user sheet (server-side check)."""
+    uname = (username or "").strip().lower()
+    pwd = (password or "").strip()
+    if not uname or not pwd:
+        return False
+    try:
+        for row in _po_read_csv(PO_USERS_SHEET_CSV):
+            if (row.get("UserName") or "").strip().lower() != uname:
+                continue
+            status = (row.get("Status") or "").strip().upper()
+            is_admin = uname == "admin" or status in ("ADMIN", "ADMINISTRATOR")
+            return is_admin and (row.get("Password") or "").strip() == pwd
+    except Exception as e:
+        print(f"[admin] verify warning: {e}")
+    return False
+
+
+def _all_agency_credentials():
+    """{username_lower: {username, password, organization}} for every non-admin, non-post-office user."""
+    agencies = {}
+    for row in _po_read_csv(PO_USERS_SHEET_CSV):
+        status = (row.get("Status") or "").strip().upper()
+        uname = (row.get("UserName") or "").strip()
+        if not uname or status in ("ADMIN", "ADMINISTRATOR", "POSTOFFICE") or uname.lower() == "admin":
+            continue
+        agencies[uname.lower()] = {
+            "username": uname,
+            "password": (row.get("Password") or "").strip(),
+            "organization": (row.get("Organization") or uname).strip(),
+        }
+    return agencies
+
+
+def _eparcel_order_received(item):
+    """e-Parcel order status: 0/1 = data only (not yet received); >= 2 = handled by the post office."""
+    desc = str(item.get("statusDescription") or item.get("status_description") or item.get("statusName") or "")
+    status = str(item.get("status") or item.get("statusCode") or "").strip()
+    if _is_received_text(desc):
+        return True
+    try:
+        return int(status) >= 2
+    except ValueError:
+        return bool(status) and status not in ("0", "1")
+
+
+@app.post("/api/admin/eparcel-pending")
+def admin_eparcel_pending(req: AdminEparcelPendingRequest):
+    """Barcodes sent to e-Parcel via C2DPost (UseBarcode = yes) in a date range, with live order status."""
+    import requests
+    from requests.auth import HTTPBasicAuth
+    import urllib3
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+    if not _verify_admin(req.admin_username, req.admin_password):
+        return JSONResponse(status_code=403, content={"success": False, "message": "เฉพาะผู้ดูแลระบบเท่านั้น"})
+    try:
+        d0 = datetime.strptime(req.start_date.strip(), "%Y-%m-%d").date()
+        d1 = datetime.strptime(req.end_date.strip(), "%Y-%m-%d").date()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="รูปแบบวันที่ไม่ถูกต้อง (YYYY-MM-DD)")
+    if d1 < d0:
+        d0, d1 = d1, d0
+    if (d1 - d0).days > 92:
+        raise HTTPException(status_code=400, detail="เลือกช่วงวันที่ได้ไม่เกิน 3 เดือน")
+
+    agencies = _all_agency_credentials()
+    only = (req.agency or "").strip().lower()
+
+    by_agency = {}
+    for row in _po_read_csv(PO_USEBARCODE_CSV):
+        if (row.get("ส่งข้อมูล e-Parcel") or "").strip().lower() != "yes":
+            continue
+        owner = (row.get("UserName") or "").strip().lower()
+        if owner not in agencies or (only and owner != only):
+            continue
+        ts = (row.get("Timestamp") or "").strip()
+        try:
+            day = datetime.strptime(ts[:10], "%Y-%m-%d").date()
+        except ValueError:
+            continue
+        if not (d0 <= day <= d1):
+            continue
+        bc = (row.get("Barcode") or "").strip().upper()
+        if bc:
+            by_agency.setdefault(owner, {})[bc] = {"issued": ts, "details": (row.get("Details") or "").strip()}
+
+    items, errors = [], []
+    for owner, rows in by_agency.items():
+        agency = agencies[owner]
+        status_map = {}
+        codes = list(rows.keys())
+        for i in range(0, len(codes), 100):
+            chunk = codes[i:i + 100]
+            try:
+                r = requests.post(
+                    "https://r_dservice.thailandpost.com/webservice/getOrderByBarcodes",
+                    json={"barcodes": ",".join(chunk)},  # comma string (a JSON list returns HTTP 400)
+                    headers={"Content-Type": "application/json"},
+                    auth=HTTPBasicAuth(agency["username"], agency["password"]), timeout=60, verify=False,
+                )
+                if r.status_code != 200:
+                    errors.append(f"{agency['organization']}: e-Parcel ตอบ {r.status_code}")
+                    continue
+                for it in _normalize_payload_list(r.json()):
+                    if isinstance(it, dict) and it.get("barcode"):
+                        status_map[str(it["barcode"]).strip().upper()] = it
+            except Exception as e:
+                errors.append(f"{agency['organization']}: {str(e)[:120]}")
+        for bc, info in rows.items():
+            it = status_map.get(bc)
+            if it is None:
+                state = "not_found"
+                desc = "ไม่พบรายการใน e-Parcel (อาจถูกยกเลิกแล้ว)"
+            else:
+                state = "received" if _eparcel_order_received(it) else "pending"
+                desc = str(it.get("statusDescription") or it.get("statusName") or "").strip()
+            items.append({
+                "barcode": bc,
+                "agency": agency["username"],
+                "organization": agency["organization"],
+                "issued": info["issued"],
+                "details": info["details"],
+                "state": state,
+                "status": str((it or {}).get("status") or ""),
+                "status_description": desc or ("ยังไม่รับฝาก" if state == "pending" else ""),
+            })
+    items.sort(key=lambda x: (x["state"] != "pending", x["issued"]), reverse=False)
+    return {"success": True, "items": items, "errors": errors,
+            "pending": sum(1 for x in items if x["state"] == "pending")}
+
+
+@app.post("/api/admin/cancel-eparcel")
+def admin_cancel_eparcel(req: AdminCancelEparcelRequest):
+    """Admin cancels e-Parcel orders on behalf of the owning agency (credentials from the user sheet)."""
+    import requests
+    from concurrent.futures import ThreadPoolExecutor
+
+    if not _verify_admin(req.admin_username, req.admin_password):
+        return JSONResponse(status_code=403, content={"success": False, "message": "เฉพาะผู้ดูแลระบบเท่านั้น"})
+    barcodes = []
+    for b in req.barcodes or []:
+        b = str(b or "").strip().upper()
+        if b and b not in barcodes:
+            barcodes.append(b)
+    if not barcodes:
+        raise HTTPException(status_code=400, detail="No barcodes provided")
+    if len(barcodes) > 500:
+        raise HTTPException(status_code=400, detail="Too many barcodes (max 500)")
+
+    agencies = _all_agency_credentials()
+    owner_of = {}
+    for row in _po_read_csv(PO_USEBARCODE_CSV):
+        bc = (row.get("Barcode") or "").strip().upper()
+        if bc in barcodes:
+            owner_of[bc] = (row.get("UserName") or "").strip().lower()
+
+    def _run(bc):
+        agency = agencies.get(owner_of.get(bc, ""))
+        if not agency:
+            return {"barcode": bc, "success": False, "errorCode": "OWNER",
+                    "errorDetail": "ไม่พบหน่วยงานเจ้าของบาร์โค้ดในระบบ C2DPost"}
+        res = _cancel_eparcel_order(bc, agency["username"], agency["password"])
+        res["agency"] = agency["username"]
+        return res
+
+    with ThreadPoolExecutor(max_workers=5) as pool:
+        results = list(pool.map(_run, barcodes))
+
+    cancelled = [r["barcode"] for r in results if r["success"]]
+    if cancelled:
+        try:
+            requests.post(
+                "https://script.google.com/macros/s/AKfycbyyuEJ3pLdXUidsyYoHv84uspMDf8G93U8Mw1ZYCB9ELpFAPjmpwUxsuarxnklnnQ/exec",
+                json={"action": "update_eparcel_status", "barcodes": cancelled, "status": "cancelled"},
+                timeout=15, allow_redirects=False,
+            )
+        except Exception as e:
+            print(f"[admin cancel] sheet update warning: {e}")
+    return {"success": True, "results": results, "cancelled": len(cancelled)}
 
 
 @app.post("/api/postoffice/login")

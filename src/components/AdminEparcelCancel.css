@@ -1,0 +1,122 @@
+.eparcel-cancel-panel {
+  margin-top: 20px;
+}
+
+.eparcel-cancel-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+  padding: 0 20px 14px;
+}
+
+.eparcel-cancel-filters label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.82rem;
+  color: var(--text-secondary, #64748b);
+}
+
+.eparcel-cancel-filters select,
+.eparcel-cancel-filters input {
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--border-color, rgba(0, 0, 0, 0.12));
+  border-radius: 10px;
+  background: var(--bg-card, #ffffff);
+  color: var(--text-primary, #1f2937);
+  font: inherit;
+  font-size: 0.88rem;
+}
+
+.eparcel-cancel-filters select {
+  min-width: 260px;
+  max-width: 100%;
+}
+
+.btn-eparcel-search,
+.btn-eparcel-cancel {
+  height: 36px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 10px;
+  color: #ffffff;
+  font: inherit;
+  font-weight: 700;
+  font-size: 0.88rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btn-eparcel-search { background: #059669; }
+.btn-eparcel-search:not(:disabled):hover { background: #047857; }
+.btn-eparcel-cancel { background: #dc2626; }
+.btn-eparcel-cancel:not(:disabled):hover { background: #b91c1c; }
+.btn-eparcel-search:disabled,
+.btn-eparcel-cancel:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.eparcel-cancel-message {
+  margin: 0 20px 12px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(16, 185, 129, 0.08);
+  color: var(--text-primary, #1f2937);
+  font-size: 0.86rem;
+}
+
+.eparcel-cancel-table .col-check {
+  width: 44px;
+  text-align: center;
+}
+
+.eparcel-cancel-table .cell-barcode {
+  font-weight: 700;
+  color: #0369a1;
+  white-space: nowrap;
+}
+
+.eparcel-cancel-table .cell-nowrap { white-space: nowrap; }
+
+.eparcel-cancel-empty {
+  text-align: center;
+  padding: 28px 12px !important;
+  color: var(--text-secondary, #64748b);
+}
+
+.eparcel-state {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.state-pending { background: #fef3c7; color: #92400e; }
+.state-received { background: #dcfce7; color: #166534; }
+.state-missing { background: #e5e7eb; color: #374151; }
+.state-cancelled { background: #fee2e2; color: #991b1b; }
+
+.eparcel-state-desc,
+.eparcel-state-error {
+  margin-top: 2px;
+  font-size: 0.76rem;
+  color: var(--text-secondary, #64748b);
+}
+
+.eparcel-state-error { color: #dc2626; }
+
+[data-theme='dark'] .state-pending { background: rgba(245, 158, 11, 0.18); color: #fcd34d; }
+[data-theme='dark'] .state-received { background: rgba(34, 197, 94, 0.18); color: #86efac; }
+[data-theme='dark'] .state-missing { background: rgba(148, 163, 184, 0.18); color: #cbd5e1; }
+[data-theme='dark'] .state-cancelled { background: rgba(239, 68, 68, 0.18); color: #fca5a5; }
+[data-theme='dark'] .eparcel-cancel-table .cell-barcode { color: #7dd3fc; }
+
+@media (max-width: 640px) {
+  .eparcel-cancel-filters { padding: 0 12px 12px; }
+  .eparcel-cancel-filters label,
+  .eparcel-cancel-filters select { width: 100%; min-width: 0; }
+  .btn-eparcel-search,
+  .btn-eparcel-cancel { flex: 1; }
+}

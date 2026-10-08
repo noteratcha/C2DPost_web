@@ -1440,6 +1440,7 @@ export default function App() {
           {activePage === 'admin' && isAdmin && (
             <AdminManagementView
               user={user}
+              adminPassword={currentPerson?.Password || ''}
               people={people}
               loadingPeople={loadingSheet}
               onRefreshPeople={loadPeople}

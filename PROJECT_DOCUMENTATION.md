@@ -1809,3 +1809,13 @@ if any(k in desc for k in ["ถึงที่ทำการปลายทา�
 - Backend `POST /api/cancel_eparcel` `{username, password, barcodes[]}` → เรียก `POST https://r_dservice.thailandpost.com/webservice/cancelOrder` body `{"barcode": "..."}` ทีละบาร์โค้ด (ขนาน 5, สูงสุด 500) คืนผลรายบาร์โค้ด `{barcode, success, errorCode, errorDetail}`
 - ยกเลิกสำเร็จ → สถานะ "ยกเลิกแล้ว" (ลบแถวได้/ส่งใหม่ได้) และบันทึกคอลัมน์ "ส่งข้อมูล e-Parcel" ในชีต UseBarcode เป็น `cancelled`; ยกเลิกไม่สำเร็จ (เช่น ไปรษณีย์รับฝากแล้ว) คงสถานะ "✓ สำเร็จ" และแจ้งรายละเอียดจากไปรษณีย์
 - ปุ่ม "ส่งข้อมูล e-Parcel" ส่งเฉพาะรายการที่เลือกและยังไม่สำเร็จ (กันการส่งซ้ำที่ได้ Error 018 แล้วบาร์โค้ดถูกล้าง)
+
+---
+
+## 104. ผู้ดูแลระบบยกเลิกการส่งข้อมูล e-Parcel ที่ยังไม่รับฝาก (v2026.1008.1545)
+
+- หน้าจัดการระบบ (admin) มีแผง "ยกเลิกการส่งข้อมูล e-Parcel (ยังไม่รับฝาก)" (`src/components/AdminEparcelCancel.jsx`): เลือกหน่วยงาน (หรือทุกหน่วยงาน) + ช่วงวันที่ออกบาร์โค้ด (ไม่เกิน 3 เดือน) → ค้นหา → ติ๊กได้เฉพาะ "ยังไม่รับฝาก" → ยืนยัน → ยกเลิก
+- `POST /api/admin/eparcel-pending`: อ่านชีต UseBarcode แถวที่ "ส่งข้อมูล e-Parcel" = yes ในช่วงวันที่ แยกตามหน่วยงาน แล้วเรียก `getOrderByBarcodes` (ทีละ 100, ใช้บัญชีของหน่วยงานนั้น) — สถานะ order 0/1 = ยังไม่รับฝาก, ≥ 2 หรือคำอธิบายมี "รับฝาก" = รับฝากแล้ว, ไม่พบใน e-Parcel = not_found
+- `POST /api/admin/cancel-eparcel`: หาเจ้าของบาร์โค้ดจาก UseBarcode แล้วเรียก `cancelOrder` ด้วยบัญชี e-Parcel ของหน่วยงานเจ้าของ (credential delegation แบบเดียวกับบัญชี ปณ.) และบันทึกชีตเป็น `cancelled`; ไปรษณีย์จะปฏิเสธรายการที่รับฝากแล้วเอง
+- ทั้งสอง endpoint ตรวจสิทธิ์ฝั่งเซิร์ฟเวอร์ (`_verify_admin`: UserName/Password ต้องตรงกับแถว ADMIN ในชีตผู้ใช้) ไม่ผ่าน = 403
+- ฟังก์ชันกลาง `_cancel_eparcel_order()` ใช้ร่วมกับ `/api/cancel_eparcel` ของผู้ใช้ทั่วไป

@@ -2,10 +2,12 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { NO_EDIT_USERNAMES } from '../config';
 import { exportAdminUsersExcel } from '../utils/api';
 import { stripVendorZeros } from '../utils/parseCsv';
+import AdminEparcelCancel from './AdminEparcelCancel';
 import './AdminManagementView.css';
 
 export default function AdminManagementView({
   user,
+  adminPassword = '',
   people = [],
   loadingPeople = false,
   onRefreshPeople,
@@ -567,6 +569,9 @@ export default function AdminManagementView({
           </div>
         </main>
       </div>
+
+      {/* 3. Cancel e-Parcel orders not yet received (on behalf of agencies) */}
+      <AdminEparcelCancel adminUser={user} adminPassword={adminPassword} people={people} />
 
       {/* ─── User Edit Modal Popup ─── */}
       {editModalOpen && editModalPerson && (
