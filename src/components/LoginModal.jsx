@@ -50,10 +50,11 @@ export default function LoginModal({ onLogin, people = [], loading = false, erro
 
     if (matched) {
       const status = (matched.Status || '').trim().toUpperCase();
-      if (status === 'DOL' || status === 'LAO' || status === 'POL' || status === 'ADMIN' || status === 'ADMINISTRATOR') {
+      // ทุก Status เข้าใช้งานได้ ยกเว้น INACTIVE (ปิดการใช้งาน)
+      if (status !== 'INACTIVE') {
         onLogin(matched.UserName, matched);
       } else {
-        setAuthError('คุณไม่มีสิทธิ์เข้าถึงระบบ (Status ไม่ใช่ DOL, LAO, POL หรือ ADMIN)');
+        setAuthError('บัญชีนี้ถูกปิดการใช้งาน (INACTIVE) กรุณาติดต่อผู้ดูแลระบบ');
       }
     } else {
       setAuthError('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
