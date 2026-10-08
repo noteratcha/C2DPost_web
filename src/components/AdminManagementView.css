@@ -618,6 +618,14 @@
   color: #34d399;
 }
 
+.status-pill-btn.pill-lao.active {
+  color: #d97706;
+}
+
+:root[data-theme="dark"] .status-pill-btn.pill-lao.active {
+  color: #fbbf24;
+}
+
 .status-pill-btn.pill-inactive.active {
   color: #dc2626;
 }
@@ -859,6 +867,17 @@
 :root[data-theme="dark"] .tag-dol {
   background: rgba(52, 211, 153, 0.18);
   color: #34d399;
+}
+
+.tag-lao {
+  background: rgba(245, 158, 11, 0.14);
+  color: #b45309;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+:root[data-theme="dark"] .tag-lao {
+  background: rgba(251, 191, 36, 0.18);
+  color: #fbbf24;
 }
 
 .tag-inactive {
@@ -1105,6 +1124,16 @@
 :root[data-theme="dark"] .aem-status-badge.status-dol {
   background: rgba(16, 185, 129, 0.22);
   color: #34d399;
+}
+
+.aem-status-badge.status-lao {
+  background: rgba(245, 158, 11, 0.14);
+  color: #b45309;
+}
+
+:root[data-theme="dark"] .aem-status-badge.status-lao {
+  background: rgba(251, 191, 36, 0.2);
+  color: #fbbf24;
 }
 
 .aem-status-badge.status-inactive {

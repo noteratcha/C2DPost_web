@@ -50,10 +50,10 @@ export default function LoginModal({ onLogin, people = [], loading = false, erro
 
     if (matched) {
       const status = (matched.Status || '').trim().toUpperCase();
-      if (status === 'DOL' || status === 'ADMIN' || status === 'ADMINISTRATOR') {
+      if (status === 'DOL' || status === 'LAO' || status === 'ADMIN' || status === 'ADMINISTRATOR') {
         onLogin(matched.UserName, matched);
       } else {
-        setAuthError('คุณไม่มีสิทธิ์เข้าถึงระบบ (Status ไม่ใช่ DOL หรือ ADMIN)');
+        setAuthError('คุณไม่มีสิทธิ์เข้าถึงระบบ (Status ไม่ใช่ DOL, LAO หรือ ADMIN)');
       }
     } else {
       setAuthError('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
