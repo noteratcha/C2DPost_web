@@ -283,6 +283,7 @@ export default function App() {
   const [progress, setProgress] = useState(null); // { val, current, total, percent }
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSendingApi, setIsSendingApi] = useState(false);
+  const [isCancellingApi, setIsCancellingApi] = useState(false);
   const [manifestCounter, setManifestCounter] = useState(1);
 
   // Handle Logout with complete session cleanup
@@ -765,9 +766,10 @@ export default function App() {
       return;
     }
 
-    const selectedRows = records.filter(r => r.SELECTED === true);
+    // ส่งเฉพาะรายการที่ยังไม่สำเร็จ (ส่งซ้ำรายการที่สำเร็จแล้วจะได้ Error 018 Duplicate Barcode)
+    const selectedRows = records.filter(r => r.SELECTED === true && (r.API_STATUS || '').trim() !== '✓ สำเร็จ');
     if (selectedRows.length === 0) {
-      alert('กรุณาเลือกข้อมูลที่ต้องการส่งอย่างน้อย 1 รายการ');
+      alert('กรุณาเลือกข้อมูลที่ยังไม่ได้ส่ง (หรือยกเลิกแล้ว) อย่างน้อย 1 รายการ');
       return;
     }
 
@@ -929,6 +931,72 @@ export default function App() {
       }
     } finally {
       setIsSendingApi(false);
+    }
+  };
+
+  // 3b. Cancel e-Parcel orders of the selected rows that were sent successfully
+  const handleCancelEparcel = async () => {
+    const targets = records.filter(r => r.SELECTED === true
+      && (r.API_STATUS || '').trim() === '✓ สำเร็จ'
+      && String(r.BARCODE_NO || '').trim());
+    if (targets.length === 0) {
+      alert('กรุณาเลือกรายการที่ส่งข้อมูล e-Parcel สำเร็จแล้ว อย่างน้อย 1 รายการ');
+      return;
+    }
+    const barcodes = targets.map(r => String(r.BARCODE_NO).trim());
+    const preview = barcodes.slice(0, 10).join('\n') + (barcodes.length > 10 ? `\n... และอีก ${barcodes.length - 10} รายการ` : '');
+    if (!window.confirm(`ยืนยันยกเลิกการส่งข้อมูล e-Parcel จำนวน ${barcodes.length} รายการ?\n\n${preview}\n\nรายการที่ไปรษณีย์รับฝากแล้วจะยกเลิกไม่ได้`)) {
+      return;
+    }
+
+    setIsCancellingApi(true);
+    setStatusText('กำลังยกเลิกการส่งข้อมูล e-Parcel...');
+    try {
+      const response = await fetch('/api/cancel_eparcel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: currentPerson?.UserName || '',
+          password: currentPerson?.Password || '',
+          barcodes
+        })
+      });
+      const resJson = await response.json();
+      if (resJson.status_code === 401) {
+        alert('ไม่สามารถยืนยันตัวตนกับระบบ e-Parcel ได้ (401)');
+        setStatusText('การยืนยันตัวตนล้มเหลว (401)');
+        return;
+      }
+      const resultMap = {};
+      (resJson.results || []).forEach(r => { resultMap[r.barcode] = r; });
+
+      setRecords(prev => prev.map(row => {
+        const bcode = String(row.BARCODE_NO || '').trim().toUpperCase();
+        const res = resultMap[bcode];
+        if (!res) return row;
+        if (res.success) return { ...row, API_STATUS: 'ยกเลิกแล้ว' };
+        return row; // keep '✓ สำเร็จ' when the cancel was refused
+      }));
+
+      const cancelled = (resJson.results || []).filter(r => r.success).map(r => r.barcode);
+      const failed = (resJson.results || []).filter(r => !r.success);
+      if (cancelled.length > 0) {
+        updateEparcelStatusInSheet(cancelled, 'cancelled').catch(() => {});
+      }
+      if (failed.length === 0) {
+        setStatusText(`ยกเลิกการส่งข้อมูล e-Parcel ${cancelled.length} รายการ สำเร็จ`);
+        alert(`ยกเลิกการส่งข้อมูล e-Parcel จำนวน ${cancelled.length} รายการ สำเร็จ`);
+      } else {
+        const detail = failed.slice(0, 10).map(f => `${f.barcode}: ${f.errorDetail || f.errorCode}`).join('\n');
+        setStatusText(`ยกเลิกสำเร็จ ${cancelled.length} / ไม่สำเร็จ ${failed.length} รายการ`);
+        alert(`ยกเลิกสำเร็จ ${cancelled.length} รายการ\nยกเลิกไม่สำเร็จ ${failed.length} รายการ:\n\n${detail}`);
+      }
+    } catch (err) {
+      console.error('Cancel e-Parcel error:', err);
+      setStatusText('เกิดข้อผิดพลาดในการยกเลิก e-Parcel');
+      alert(`เกิดข้อผิดพลาดในการเชื่อมต่อ:\n${err.message}`);
+    } finally {
+      setIsCancellingApi(false);
     }
   };
 
@@ -1303,6 +1371,8 @@ export default function App() {
                   onExportExcel={handleExportExcel}
                   onExportEnvelope={handleExportEnvelope}
                   onSendEparcel={handleSendEparcel}
+                  isCancellingApi={isCancellingApi}
+                  onCancelEparcel={handleCancelEparcel}
                   isReconciling={isReconciling}
                   onCheckDeposit={handleCheckDeposit}
                   onOpenDepositReport={() => setActivePage('deposit-report')}

@@ -14,6 +14,8 @@ export default function ActionToolbar({
   onExportExcel,
   onExportEnvelope,
   onSendEparcel,
+  isCancellingApi = false,
+  onCancelEparcel,
   onCheckDeposit,
   onOpenDepositReport
 }) {
@@ -38,6 +40,10 @@ export default function ActionToolbar({
 
   // 3. btn_send_api: enabled when all records have barcodes AND not yet all successful
   const canSendApi = allHaveBarcodes && !allApiSuccess && !isProcessing && !isSendingApi;
+
+  // 3b. btn_cancel_api: enabled when at least one SELECTED row was sent successfully
+  const cancellableCount = records.filter(r => r.SELECTED === true && (r.API_STATUS || '').trim() === '✓ สำเร็จ').length;
+  const canCancelApi = cancellableCount > 0 && !isProcessing && !isSendingApi && !isCancellingApi;
 
   // 4. btn_download_docs (รวม บันทึกไฟล์ + สร้างจ่าหน้าซอง): enabled ONLY when all records have API_STATUS == '✓ สำเร็จ'
   const canDownloadDocs = allApiSuccess && !isProcessing;
@@ -214,6 +220,23 @@ export default function ActionToolbar({
               {isSendingApi ? 'กำลังส่งข้อมูล...' : 'ส่งข้อมูล e-Parcel'}
             </button>
           </div>
+
+          {/* ยกเลิกการส่งข้อมูล e-Parcel (รายการที่เลือก) */}
+          {onCancelEparcel && records.some(r => (r.API_STATUS || '').trim() === '✓ สำเร็จ' || (r.API_STATUS || '').trim() === 'ยกเลิกแล้ว') && (
+            <div
+              className="btn-tooltip-wrapper"
+              data-tooltip={"เลือกรายการที่ส่งข้อมูลสำเร็จแล้ว\nเพื่อยกเลิกการส่งข้อมูล e-Parcel"}
+            >
+              <button
+                type="button"
+                className="btn-card-action btn-cancel-api"
+                disabled={!canCancelApi}
+                onClick={onCancelEparcel}
+              >
+                {isCancellingApi ? 'กำลังยกเลิก...' : `ยกเลิกส่งข้อมูล${cancellableCount > 0 ? ` (${cancellableCount})` : ''}`}
+              </button>
+            </div>
+          )}
 
           {/* ดาวน์โหลดเอกสาร (รวม บันทึกไฟล์ + สร้างจ่าหน้าซอง เข้าเป็นปุ่มเดียว) */}
           <div 

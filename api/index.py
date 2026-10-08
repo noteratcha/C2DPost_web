@@ -119,6 +119,11 @@ class LogBarcodesRequest(BaseModel):
     username: Optional[str] = "Unknown"
     items: List[dict]
 
+class CancelEparcelRequest(BaseModel):
+    username: str
+    password: str
+    barcodes: List[str]
+
 class UpdateEparcelStatusRequest(BaseModel):
     barcodes: List[str]
     status: Optional[str] = "yes"
@@ -465,6 +470,61 @@ def send_eparcel(req: SendEparcelRequest):
             status_code=500,
             content={"status_code": 500, "error": str(e)}
         )
+
+@app.post("/api/cancel_eparcel")
+def cancel_eparcel(req: CancelEparcelRequest):
+    """Cancel e-Parcel orders (Thailand Post cancelOrder, one barcode per call)."""
+    import requests
+    from requests.auth import HTTPBasicAuth
+    from concurrent.futures import ThreadPoolExecutor
+    import urllib3
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+    barcodes = []
+    for b in req.barcodes or []:
+        b = str(b or "").strip().upper()
+        if b and b not in barcodes:
+            barcodes.append(b)
+    if not barcodes:
+        raise HTTPException(status_code=400, detail="No barcodes provided")
+    if len(barcodes) > 500:
+        raise HTTPException(status_code=400, detail="Too many barcodes (max 500)")
+
+    auth = HTTPBasicAuth(req.username.strip(), req.password.strip())
+
+    def _cancel(barcode):
+        try:
+            r = requests.post(
+                "https://r_dservice.thailandpost.com/webservice/cancelOrder",
+                json={"barcode": barcode},
+                headers={"Content-Type": "application/json"},
+                auth=auth, timeout=30, verify=False,
+            )
+            if r.status_code == 401:
+                return {"barcode": barcode, "success": False, "errorCode": "401", "errorDetail": "Unauthorized"}
+            try:
+                data = r.json()
+            except Exception:
+                data = r.text
+            item = data[0] if isinstance(data, list) and data else data
+            if isinstance(item, dict):
+                code = str(item.get("errorCode", "")).strip()
+                ok = r.status_code == 200 and (code in ("000", "0") or str(item.get("status", "")).lower() == "true")
+                return {"barcode": barcode, "success": ok, "errorCode": code or str(r.status_code),
+                        "errorDetail": str(item.get("errorDetail", "") or "")}
+            return {"barcode": barcode, "success": False, "errorCode": str(r.status_code), "errorDetail": str(data)[:200]}
+        except Exception as e:
+            return {"barcode": barcode, "success": False, "errorCode": "ERR", "errorDetail": str(e)[:200]}
+
+    with ThreadPoolExecutor(max_workers=5) as pool:
+        results = list(pool.map(_cancel, barcodes))
+    unauthorized = all(r["errorCode"] == "401" for r in results)
+    return {
+        "success": not unauthorized,
+        "status_code": 401 if unauthorized else 200,
+        "results": results,
+        "cancelled": sum(1 for r in results if r["success"]),
+    }
 
 @app.post("/api/log-barcodes")
 def log_barcodes_endpoint(req: LogBarcodesRequest):

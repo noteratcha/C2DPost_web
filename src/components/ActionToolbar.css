@@ -479,6 +479,14 @@
   transform: translateY(-1px);
 }
 
+.btn-cancel-api {
+  background-color: #dc2626;
+}
+.btn-cancel-api:not(:disabled):hover {
+  background-color: #b91c1c;
+  transform: translateY(-1px);
+}
+
 .btn-check-deposit {
   background-color: #0ea5e9;
 }
