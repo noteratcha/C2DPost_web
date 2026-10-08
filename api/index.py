@@ -3941,6 +3941,33 @@ def get_admin_users():
             headers={"Cache-Control": "no-cache, no-store, must-revalidate"}
         )
 
+def _confirm_user_saved(data, attempts=4):
+    """Re-read the user sheet to confirm an update/delete really happened ('' when not confirmed)."""
+    import time
+    action = str(data.get("action") or "update_user")
+    uname = str(data.get("UserName") or data.get("username") or "").strip().lower()
+    if not uname:
+        return ""
+    fields = ["Status", "Organization", "Email", "Prefix", "ResponsibleZipcode", "TypeBarcode"]
+    for i in range(attempts):
+        if i:
+            time.sleep(2)  # CSV export can lag a moment behind the write
+        try:
+            row = next((r for r in _po_read_csv(PO_USERS_SHEET_CSV)
+                        if (r.get("UserName") or "").strip().lower() == uname), None)
+        except Exception:
+            continue
+        if action == "delete_user":
+            if row is None:
+                return "ลบบัญชีผู้ใช้เรียบร้อยแล้ว (ยืนยันจากชีต)"
+            continue
+        if row is not None and all(
+                str(data.get(f) or "").strip() == str(row.get(f) or "").strip()
+                for f in fields if data.get(f) is not None):
+            return "บันทึกข้อมูลเรียบร้อยแล้ว (ยืนยันจากชีต)"
+    return ""
+
+
 @app.post("/api/admin/update_user")
 async def admin_update_user(request: Request):
     """
@@ -3963,13 +3990,10 @@ async def admin_update_user(request: Request):
         except Exception:
             pass
         # Google sometimes answers the result URL with its HTML error page although the
-        # script already ran -> re-read the result once, then give a readable message
-        if loc:
-            try:
-                r2 = requests.get(loc, timeout=30)
-                return r2.json()
-            except Exception:
-                pass
+        # script already wrote the sheet -> confirm the outcome from the sheet itself
+        confirmed = _confirm_user_saved(data)
+        if confirmed:
+            return {"status": "success", "message": confirmed}
         text = (r.text or "").strip()
         if text.startswith("<"):
             return {"status": "error", "message": "Google Apps Script ตอบกลับผิดปกติ (อาจบันทึกสำเร็จแล้ว) กรุณากด 'รีเฟรชข้อมูล' เพื่อตรวจสอบก่อนบันทึกซ้ำ"}
