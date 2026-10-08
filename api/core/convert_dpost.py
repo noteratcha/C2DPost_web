@@ -38,7 +38,7 @@ except Exception as e:
     print(f"Error registering fonts: {e}")
     FONT_REGISTERED = False
 
-__version__ = "2026.1007.1554"
+__version__ = "2026.1008.1209"
 
 # Thailand Post API Credentials
 API_KEY = "V9JN25IFH5hdZYc1k8NNRVgnLYXyQLzc"
@@ -716,6 +716,13 @@ def extract_page_text_robust(page):
 
 def process_pdf(pdf_path):
     print(f"กำลังประมวลผลไฟล์: {os.path.basename(pdf_path)}...") if __name__ == "__main__" else None
+    # Local-government tax mail (เทศบาล/อบต. – ภ.ด.ส.3/6, หนังสือแจ้งเตือน) has its own layout
+    try:
+        from .municipal import is_municipal_pdf, process_municipal_pdf
+    except ImportError:
+        from municipal import is_municipal_pdf, process_municipal_pdf
+    if is_municipal_pdf(pdf_path):
+        return process_municipal_pdf(pdf_path)
     reader = PdfReader(pdf_path)
     records = []
     
@@ -1132,7 +1139,32 @@ def generate_combined_pdf(dataframe, output_pdf_path, envelope_only=False):
                     sender_bottom = min(sender_y_list) if sender_y_list else None
                     sender_left = min(sender_x_list) if sender_x_list else None
 
-                    if y_coord_rian is not None and x_coord_rian is not None:
+                    anchor = None
+                    ear_box_override = None  # (center_x, box_y) when the e-AR box sits apart from the QR/barcode
+                    if str(file_records[current_record_idx].get('COMP_ORDER_ID', '')) == 'TaxLocalGovernment':
+                        try:
+                            from .municipal import stamp_anchor
+                        except ImportError:
+                            from municipal import stamp_anchor
+                        anchor = stamp_anchor(source_file, i)
+                    if anchor and anchor[0] == 'notice':
+                        _, ar_cx, ar_bottom, left_x, left_bottom = anchor
+                        base_x = max(10, left_x)
+                        base_y = max(10, left_bottom - (65 + 75) * scale)  # QR top just under the sender block
+                        ear_box_override = (ar_cx, ar_bottom - 55 * scale)
+                        y_coord_rian = left_bottom
+                    elif anchor and anchor[0] == 'rian':
+                        # Municipal notice envelope: left of "เรียน", e-AR box bottom on its baseline
+                        y_coord_rian, x_coord_rian = anchor[2], anchor[1]
+                        base_y = max(10, y_coord_rian - (155 * scale))
+                        base_x = max(10, x_coord_rian - 5 - (164.7 * scale))
+                    elif anchor and anchor[0] == 'box':
+                        # Municipal ภ.ด.ส. envelope: stack under the permit box (top right)
+                        center_target = min(width - 95, anchor[1] + 60)
+                        base_x = center_target - (164.7 * scale) / 2.0
+                        base_y = max(10, anchor[2] - 14 - (210 * scale))
+                        y_coord_rian = anchor[2]
+                    elif y_coord_rian is not None and x_coord_rian is not None:
                         # Position dynamically relative to "เรียน"
                         # Align the bottom edge of the e-AR box with the baseline of the "เรียน" text
                         # The e-AR box bottom is at base_y + (155 * scale)
@@ -1190,6 +1222,9 @@ def generate_combined_pdf(dataframe, output_pdf_path, envelope_only=False):
                     box_h = 55 * scale
                     box_x = center_x - (box_w / 2.0)
                     box_y = base_y + (155 * scale)
+                    if ear_box_override:
+                        box_x = ear_box_override[0] - (box_w / 2.0)
+                        box_y = ear_box_override[1]
                 
                     c.setStrokeColorRGB(0, 0, 0) # Black border
                     c.setLineWidth(1)
@@ -1201,14 +1236,15 @@ def generate_combined_pdf(dataframe, output_pdf_path, envelope_only=False):
                         c.setFont('Tahoma-Bold', 24 * scale)
                     else:
                         c.setFont('Helvetica-Bold', 24 * scale)
-                    c.drawCentredString(center_x, box_y + (31 * scale), "e-AR")
+                    box_cx = box_x + (box_w / 2.0)
+                    c.drawCentredString(box_cx, box_y + (31 * scale), "e-AR")
                 
                     if FONT_REGISTERED:
                         c.setFont('Tahoma', max(7.5, 9 * scale))
                     else:
                         c.setFont('Helvetica', max(7.5, 9 * scale))
-                    c.drawCentredString(center_x, box_y + (19 * scale), "ลงทะเบียนตอบรับ")
-                    c.drawCentredString(center_x, box_y + (9 * scale), "ทางอิเล็กทรอนิกส์")
+                    c.drawCentredString(box_cx, box_y + (19 * scale), "ลงทะเบียนตอบรับ")
+                    c.drawCentredString(box_cx, box_y + (9 * scale), "ทางอิเล็กทรอนิกส์")
                     # -----------------------------------
                 
                     c.save()
