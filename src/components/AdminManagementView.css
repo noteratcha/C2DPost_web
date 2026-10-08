@@ -626,6 +626,14 @@
   color: #fbbf24;
 }
 
+.status-pill-btn.pill-pol.active {
+  color: #1d4ed8;
+}
+
+:root[data-theme="dark"] .status-pill-btn.pill-pol.active {
+  color: #93c5fd;
+}
+
 .status-pill-btn.pill-inactive.active {
   color: #dc2626;
 }
@@ -878,6 +886,17 @@
 :root[data-theme="dark"] .tag-lao {
   background: rgba(251, 191, 36, 0.18);
   color: #fbbf24;
+}
+
+.tag-pol {
+  background: rgba(37, 99, 235, 0.12);
+  color: #1d4ed8;
+  border: 1px solid rgba(37, 99, 235, 0.28);
+}
+
+:root[data-theme="dark"] .tag-pol {
+  background: rgba(96, 165, 250, 0.18);
+  color: #93c5fd;
 }
 
 .tag-inactive {
@@ -1134,6 +1153,16 @@
 :root[data-theme="dark"] .aem-status-badge.status-lao {
   background: rgba(251, 191, 36, 0.2);
   color: #fbbf24;
+}
+
+.aem-status-badge.status-pol {
+  background: rgba(37, 99, 235, 0.12);
+  color: #1d4ed8;
+}
+
+:root[data-theme="dark"] .aem-status-badge.status-pol {
+  background: rgba(96, 165, 250, 0.2);
+  color: #93c5fd;
 }
 
 .aem-status-badge.status-inactive {

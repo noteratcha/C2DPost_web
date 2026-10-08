@@ -54,7 +54,7 @@ export default function AdminManagementView({
 
   // Search & Filter State for Table
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('ALL'); // ALL, DOL, LAO, INACTIVE
+  const [statusFilter, setStatusFilter] = useState('ALL'); // ALL, DOL, LAO, POL, INACTIVE
 
   // Check Thailand Post API Services
   const checkApiServices = useCallback(async () => {
@@ -381,6 +381,14 @@ export default function AdminManagementView({
                   title="อปท. (องค์กรปกครองส่วนท้องถิ่น)"
                 >
                   LAO
+                </button>
+                <button
+                  type="button"
+                  className={`status-pill-btn pill-pol ${statusFilter === 'POL' ? 'active' : ''}`}
+                  onClick={() => setStatusFilter('POL')}
+                  title="สำนักงานตำรวจแห่งชาติ"
+                >
+                  POL
                 </button>
                 <button
                   type="button"
@@ -745,6 +753,7 @@ export default function AdminManagementView({
                     onChange={e => handleModalInputChange('Status', e.target.value)}>
                     <option value="DOL">DOL (เปิดใช้งาน)</option>
                     <option value="LAO">LAO (อปท. องค์กรปกครองส่วนท้องถิ่น)</option>
+                    <option value="POL">POL (สำนักงานตำรวจแห่งชาติ)</option>
                     <option value="INACTIVE">INACTIVE (ปิดการใช้งาน)</option>
                     <option value="ADMIN">ADMIN (ผู้ดูแลระบบ)</option>
                   </select>
