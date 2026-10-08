@@ -72,7 +72,7 @@ export default function AdminEparcelCancel({ adminUser, adminPassword, people = 
       setItems(data.items || []);
       setSearched(true);
       const errs = (data.errors || []).length ? ` · ดึงสถานะไม่ได้บางหน่วยงาน: ${data.errors.join(', ')}` : '';
-      setMessage(`พบ ${data.items.length} รายการ · ยังไม่รับฝาก ${data.pending} รายการ${errs}`);
+      setMessage(`ยังไม่รับฝาก ${data.pending} รายการ (ตรวจทั้งหมด ${data.checked ?? data.pending} รายการ · รับฝากแล้ว ${data.received ?? 0} · ไม่พบใน e-Parcel ${data.not_found ?? 0})${errs}`);
     } catch (err) {
       setMessage(`เชื่อมต่อไม่สำเร็จ: ${err.message}`);
     } finally {
@@ -198,7 +198,7 @@ export default function AdminEparcelCancel({ adminUser, adminPassword, people = 
             {items.length === 0 ? (
               <tr>
                 <td colSpan={6} className="eparcel-cancel-empty">
-                  {searched ? 'ไม่พบรายการที่ส่งข้อมูล e-Parcel ในช่วงวันที่นี้' : 'เลือกหน่วยงานและช่วงวันที่ แล้วกด "ค้นหา"'}
+                  {searched ? 'ไม่มีรายการที่ยังไม่รับฝากในช่วงวันที่นี้' : 'เลือกหน่วยงานและช่วงวันที่ แล้วกด "ค้นหา"'}
                 </td>
               </tr>
             ) : items.map(it => {

@@ -1018,9 +1018,14 @@ def admin_eparcel_pending(req: AdminEparcelPendingRequest):
                 "status": str((it or {}).get("status") or ""),
                 "status_description": desc or ("ยังไม่รับฝาก" if state == "pending" else ""),
             })
-    items.sort(key=lambda x: (x["state"] != "pending", x["issued"]), reverse=False)
-    return {"success": True, "items": items, "errors": errors,
-            "pending": sum(1 for x in items if x["state"] == "pending")}
+    # Only items not yet received can be cancelled -> list those; report the rest as counts
+    counts = {"received": 0, "not_found": 0}
+    for x in items:
+        if x["state"] in counts:
+            counts[x["state"]] += 1
+    items = sorted((x for x in items if x["state"] == "pending"), key=lambda x: x["issued"])
+    return {"success": True, "items": items, "errors": errors, "pending": len(items),
+            "checked": len(items) + counts["received"] + counts["not_found"], **counts}
 
 
 @app.post("/api/admin/cancel-eparcel")

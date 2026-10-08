@@ -1,4 +1,4 @@
-export const APP_VERSION = 'v2026.1008.1545';
+export const APP_VERSION = 'v2026.1008.1638';
 export const SPREADSHEET_ID = '1hiWww6BI7NCTAw3Ai3CjbzS8TWdIX2AAOj7P_2BxMcQ'
 export const ADMIN_USERNAME = 'admin'
 export const PROTECTED_USERNAMES = ['admin', 'Usertest']

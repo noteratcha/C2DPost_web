@@ -1819,3 +1819,5 @@ if any(k in desc for k in ["ถึงที่ทำการปลายทา�
 - `POST /api/admin/cancel-eparcel`: หาเจ้าของบาร์โค้ดจาก UseBarcode แล้วเรียก `cancelOrder` ด้วยบัญชี e-Parcel ของหน่วยงานเจ้าของ (credential delegation แบบเดียวกับบัญชี ปณ.) และบันทึกชีตเป็น `cancelled`; ไปรษณีย์จะปฏิเสธรายการที่รับฝากแล้วเอง
 - ทั้งสอง endpoint ตรวจสิทธิ์ฝั่งเซิร์ฟเวอร์ (`_verify_admin`: UserName/Password ต้องตรงกับแถว ADMIN ในชีตผู้ใช้) ไม่ผ่าน = 403
 - ฟังก์ชันกลาง `_cancel_eparcel_order()` ใช้ร่วมกับ `/api/cancel_eparcel` ของผู้ใช้ทั่วไป
+
+- (v2026.1008.1638) แผงยกเลิกแสดงเฉพาะรายการ "ยังไม่รับฝาก" — รายการรับฝากแล้ว/ไม่พบใน e-Parcel แสดงเป็นจำนวนในข้อความสรุปแทน (`received`, `not_found`, `checked`)
