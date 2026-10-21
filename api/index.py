@@ -3778,6 +3778,19 @@ def add_custom_postoffice(req: CustomPostofficeRequest):
     _save_custom_postoffice(req.zipcode, req.postoffice)
     return {"success": True, "message": "บันทึกรหัสไปรษณีย์และชื่อที่ทำการเรียบร้อยแล้ว"}
 
+KNOWN_AGENCY_CODES = ("DOL", "LAO", "POL")
+
+
+def _registration_agency_code(username):
+    """Status/Prefix for a new registration: a known agency code found before or after the dot
+    (DOL.Renunakhon -> DOL, Royalthai.pol -> POL), otherwise the first 3 letters (sakon.municipal -> SAK)."""
+    name = (username or "").strip()
+    for part in name.split("."):
+        if part.upper() in KNOWN_AGENCY_CODES:
+            return part.upper()
+    return name[:3].upper()
+
+
 @app.post("/api/register_user")
 def register_user(req: RegisterUserRequest):
     import requests
@@ -3802,6 +3815,7 @@ def register_user(req: RegisterUserRequest):
         except Exception:
             pass
 
+    agency_code = _registration_agency_code(target_user)
     url = "https://script.google.com/macros/s/AKfycbwi9khFasbC7RYgsFya_pwTgOI-3B7jp2VIyoY_OVFV58ukjo1jyN_zKcQGfmxm1_8/exec"
     payload = {
         "action": "update_user",
@@ -3809,7 +3823,7 @@ def register_user(req: RegisterUserRequest):
         "UserName": target_user,
         "Password": req.password.strip(),
         "Email": req.email.strip(),
-        "Prefix": "",
+        "Prefix": agency_code,
         "Organization": req.organization.strip(),
         "ResponsiblePostoffice": req.postoffice.strip(),
         "ResponsibleZipcode": req.zipcode.strip(),
@@ -3820,8 +3834,8 @@ def register_user(req: RegisterUserRequest):
         "TelContactPerson2": (req.tel2 or "").strip(),
         "ContactPerson3": (req.contact3 or "").strip(),
         "TelContactPerson3": (req.tel3 or "").strip(),
-        "Status": "DOL",
-        "TypeBarcode": "EMS",
+        "Status": agency_code,
+        "TypeBarcode": "R",
         "Agree": req.pdpa or "Yes",
         "VendorID": vendor_val,
         "vendor_id": vendor_val,

@@ -750,6 +750,9 @@ export default function AdminManagementView({
                   <label>Status <span className="req-star">*</span></label>
                   <select className="aem-select" value={editModalData.Status || 'DOL'}
                     onChange={e => handleModalInputChange('Status', e.target.value)}>
+                    {editModalData.Status && !['DOL', 'LAO', 'POL', 'INACTIVE', 'ADMIN'].includes(editModalData.Status) && (
+                      <option value={editModalData.Status}>{editModalData.Status} (จากการลงทะเบียน)</option>
+                    )}
                     <option value="DOL">DOL (กรมที่ดิน)</option>
                     <option value="LAO">LAO (อปท. องค์กรปกครองส่วนท้องถิ่น)</option>
                     <option value="POL">POL (สำนักงานตำรวจแห่งชาติ)</option>
