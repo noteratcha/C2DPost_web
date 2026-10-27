@@ -129,13 +129,20 @@ export function formatStationWithZipcode(station, record = null) {
     }
   }
 
-  // 3. Check Origin / Sender office
-  const shipperZc = (record && record.shipper_zipcode) || '48170';
-  const receivedPo = (record && record.received_postoffice) || '';
-  if (st.includes('เรณูนคร')) {
-    return `${st} 48170`;
+  // 3. Zipcodes resolved by the API from the post office sheet (received / latest station)
+  if (record) {
+    if (st === String(record.latest_station || '').trim() && record.latest_station_zipcode) {
+      return `${st} ${record.latest_station_zipcode}`;
+    }
+    if (st === String(record.received_postoffice || '').trim() && record.received_postoffice_zipcode) {
+      return `${st} ${record.received_postoffice_zipcode}`;
+    }
   }
-  if (receivedPo && clean === cleanStationName(receivedPo).toLowerCase()) {
+
+  // 3b. Origin / Sender office (no hard-coded default: unknown -> keep looking)
+  const receivedPo = (record && record.received_postoffice) || '';
+  const shipperZc = (record && record.shipper_zipcode) || KNOWN_DISTRICT_ZIPCODES[clean] || '';
+  if (shipperZc && receivedPo && clean === cleanStationName(receivedPo).toLowerCase()) {
     return `${st} ${shipperZc}`;
   }
 

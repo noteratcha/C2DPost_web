@@ -38,7 +38,7 @@ except Exception as e:
     print(f"Error registering fonts: {e}")
     FONT_REGISTERED = False
 
-__version__ = "2026.1021.1416"
+__version__ = "2026.1027.1559"
 
 # Thailand Post API Credentials
 API_KEY = "V9JN25IFH5hdZYc1k8NNRVgnLYXyQLzc"
@@ -1677,13 +1677,17 @@ def format_station_with_zipcode(station, record=None):
             elif clean == mc_lower and is_mail_center:
                 return f"{st} {zcode}"
 
-    shipper_zc = (record.get("shipper_zipcode") if record else "") or "48170"
+    # Zipcodes resolved by the API from the post office sheet (received / latest station)
+    if record:
+        if st == str(record.get("latest_station") or "").strip() and record.get("latest_station_zipcode"):
+            return f"{st} {record['latest_station_zipcode']}"
+        if st == str(record.get("received_postoffice") or "").strip() and record.get("received_postoffice_zipcode"):
+            return f"{st} {record['received_postoffice_zipcode']}"
     received_po = (record.get("received_postoffice") if record else "") or ""
-    if "เรณูนคร" in st:
-        return f"{st} 48170"
     if received_po:
         clean_po = re.sub(r'^(ศปฝ\.|ศป\.|ปณศ\.|ปณร\.|ปณ\.|ที่ทำการไปรษณีย์)\s*', '', str(received_po)).strip().lower()
-        if clean == clean_po:
+        shipper_zc = (record.get("shipper_zipcode") if record else "") or KNOWN_DISTRICT_ZIP.get(clean, "")
+        if clean == clean_po and shipper_zc:
             return f"{st} {shipper_zc}"
 
     if record:

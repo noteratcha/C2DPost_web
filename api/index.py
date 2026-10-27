@@ -695,6 +695,53 @@ def _postoffice_zip(username, password):
     return zipcode
 
 
+_PO_ZIP_CACHE = {"at": 0.0, "map": {}}
+_PO_NAME_PREFIX = re.compile(r'^(ปณ\.|ปจ\.|ปณย\.|คปณ\.|ปณศ\.|ปณร\.|ศปฝ\.|ศป\.|ที่ทำการไปรษณีย์)\s*')
+
+
+def _clean_po_name(name):
+    return _PO_NAME_PREFIX.sub('', str(name or '').strip()).strip().lower()
+
+
+def _postoffice_zip_map():
+    """{clean post office name: zipcode} from the post office sheet (cached 1 hour)."""
+    import csv
+    import time
+    import requests
+    now = time.time()
+    if _PO_ZIP_CACHE["map"] and now - _PO_ZIP_CACHE["at"] < 3600:
+        return _PO_ZIP_CACHE["map"]
+    mapping = {}
+    try:
+        resp = requests.get(PO_POSTOFFICE_CSV, timeout=10)
+        resp.encoding = "utf-8"
+        for row in list(csv.reader(io.StringIO(resp.text)))[1:]:
+            zc = (row[0] if row else "").strip()
+            if not re.fullmatch(r'[1-9]\d{4}', zc):
+                continue  # skip counters/agents with non-postal codes (e.g. 00343)
+            for cell in row[1:3]:
+                key = _clean_po_name(cell)
+                if key:
+                    mapping.setdefault(key, zc)
+    except Exception as e:
+        print(f"[postoffice] zip map warning: {e}")
+    if mapping:
+        _PO_ZIP_CACHE.update(at=now, map=mapping)
+    return mapping or _PO_ZIP_CACHE["map"]
+
+
+def _station_zipcode(name, zip_map=None):
+    """Zipcode of a post office / station name ('' when unknown or already contains one)."""
+    from core.convert_dpost import KNOWN_DISTRICT_ZIP
+    if not name or re.search(r'\b\d{5}\b', str(name)):
+        return ""
+    key = _clean_po_name(name)
+    if not key or key == "ที่ทำการไปรษณีย์":
+        return ""
+    zip_map = _postoffice_zip_map() if zip_map is None else zip_map
+    return zip_map.get(key) or KNOWN_DISTRICT_ZIP.get(key, "")
+
+
 def _po_read_csv(url, timeout=20):
     import csv
     import requests
@@ -1604,6 +1651,13 @@ def _fetch_received_report_payload(req_date, req_end_date, req_username, req_pas
             normalized_records = list(executor.map(_fetch_realtime_tracking, normalized_records))
 
     date_display = clean_date if clean_date == clean_end_date else f"{clean_date} - {clean_end_date}"
+
+    # Zipcode of the deposit post office / latest station (the API only gives names)
+    if normalized_records:
+        zip_map = _postoffice_zip_map()
+        for r in normalized_records:
+            r["received_postoffice_zipcode"] = _station_zipcode(r.get("received_postoffice"), zip_map)
+            r["latest_station_zipcode"] = _station_zipcode(r.get("latest_station"), zip_map)
 
     delivered_count = sum(1 for r in normalized_records if r["status_key"] == "delivered")
     in_transit_count = sum(1 for r in normalized_records if r["status_key"] == "in_transit")

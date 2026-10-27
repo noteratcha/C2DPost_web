@@ -1844,3 +1844,9 @@ if any(k in desc for k in ["ถึงที่ทำการปลายทา�
 - `/api/register_user` บันทึกผู้ลงทะเบียนด้วย Status และ Prefix = รหัสหน่วยงานที่รู้จัก (DOL/LAO/POL) ที่อยู่หน้าหรือหลังจุดของ UserName ถ้าไม่มีใช้ 3 ตัวอักษรแรกตัวพิมพ์ใหญ่ (`_registration_agency_code`: `DOL.Renunakhon` → DOL, `Royalthai.pol` → POL, `sakon.municipal` → SAK), TypeBarcode = `R` (เดิม Prefix ว่าง, TypeBarcode `EMS`), Agree ตาม PDPA, ActivationDate = วันที่ลงทะเบียน
 - หน้าจัดการผู้ใช้แสดง Status ที่ไม่อยู่ในรายการ (เช่น `SAK`) เป็นตัวเลือก "(จากการลงทะเบียน)" แทนการแสดง DOL ผิด ๆ; เข้าสู่ระบบได้เพราะไม่ใช่ INACTIVE
 - หมายเหตุ: โหมดอัปเดตข้อมูลผู้ใช้เดิม (`is_update`) ยังเขียนค่าเหล่านี้ทับของเดิม
+
+---
+
+## 107. รหัสไปรษณีย์ของ ปณ.รับฝาก/สถานที่ล่าสุด (v2026.1027.1559)
+
+- record ในรายงานสถานะมี `received_postoffice_zipcode`, `latest_station_zipcode` (จาก `_station_zipcode()` ใน api/index.py: ชีตรายชื่อที่ทำการ + KNOWN_DISTRICT_ZIP) — หน้าเว็บและไฟล์ Excel/PDF ใช้ค่านี้; ไม่มีค่า default 48170 แล้ว — ดู `BUGFIX_REPORT.md` หัวข้อ 40
