@@ -26,6 +26,7 @@ export default function PostofficePendingCard({ currentPerson, refreshKey = 0 })
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [openAgency, setOpenAgency] = useState('');
+  const [agencyFilter, setAgencyFilter] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -48,8 +49,18 @@ export default function PostofficePendingCard({ currentPerson, refreshKey = 0 })
 
   useEffect(() => { load(); }, [load, refreshKey]);
 
-  const agencies = data?.by_agency || [];
+  const allAgencies = data?.by_agency || [];
+  const agencies = agencyFilter ? allAgencies.filter((a) => a.agency === agencyFilter) : allAgencies;
+  const shownPending = agencies.reduce((sum, a) => sum + a.pending, 0);
   const itemsOf = (agency) => (data?.items || []).filter((it) => it.agency === agency);
+
+  // Dropdown lists every agency registered with this post office (pending count in brackets)
+  const pendingOf = Object.fromEntries(allAgencies.map((a) => [a.agency, a.pending]));
+  const options = (data?.agencies?.length ? data.agencies : allAgencies).map((a) => ({
+    value: a.agency,
+    label: `${a.organization} (${pendingOf[a.agency] || 0})`
+  }));
+  const selectedName = options.find((o) => o.value === agencyFilter)?.label.replace(/\s\(\d+\)$/, '') || '';
 
   return (
     <div className="dash-section-card po-pending-card">
@@ -71,18 +82,34 @@ export default function PostofficePendingCard({ currentPerson, refreshKey = 0 })
         <div className="po-pending-empty">กำลังตรวจสอบสถานะกับระบบไปรษณีย์...</div>
       ) : data && (
         <>
+          <div className="po-pending-filter">
+            <label htmlFor="po-pending-agency">หน่วยงาน</label>
+            <select
+              id="po-pending-agency"
+              value={agencyFilter}
+              onChange={(e) => { setAgencyFilter(e.target.value); setOpenAgency(e.target.value); }}
+            >
+              <option value="">ทุกหน่วยงาน ({data.pending})</option>
+              {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </div>
+
           <div className="po-pending-summary">
             <div className="po-pending-hero">
-              <span className="po-pending-num">{data.pending.toLocaleString('th-TH')}</span>
+              <span className="po-pending-num">{shownPending.toLocaleString('th-TH')}</span>
               <span className="po-pending-unit">ชิ้น รอฝากส่ง</span>
             </div>
             <div className="po-pending-meta">
-              จาก {agencies.length} หน่วยงาน (ลงทะเบียนกับ ปณ. นี้ทั้งหมด {data.agencies_registered} หน่วยงาน)
+              {agencyFilter
+                ? selectedName
+                : `จาก ${agencies.length} หน่วยงาน (ลงทะเบียนกับ ปณ. นี้ทั้งหมด ${data.agencies_registered} หน่วยงาน)`}
             </div>
           </div>
 
           {agencies.length === 0 ? (
-            <div className="po-pending-empty">ไม่มีพัสดุค้างฝากส่ง ✓</div>
+            <div className="po-pending-empty">
+              {agencyFilter ? 'หน่วยงานนี้ไม่มีพัสดุค้างฝากส่ง ✓' : 'ไม่มีพัสดุค้างฝากส่ง ✓'}
+            </div>
           ) : (
             <div className="po-pending-table-wrap">
               <table className="po-pending-table">

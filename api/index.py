@@ -1171,6 +1171,8 @@ def postoffice_pending(req: PostofficePendingRequest):
         "start_date": d0.isoformat(),
         "end_date": today.isoformat(),
         "agencies_registered": len(agencies),
+        "agencies": sorted(({"agency": v["username"], "organization": v["organization"]} for v in agencies.values()),
+                           key=lambda a: a["organization"]),
         "pending": len(pending),
         "by_agency": sorted(by_agency.values(), key=lambda a: -a["pending"]),
         "items": pending,

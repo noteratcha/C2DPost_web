@@ -3,7 +3,7 @@
   --pp-muted: #64748b;
   --pp-line: rgba(15, 23, 42, 0.08);
   --pp-accent: #d97706;
-  margin-top: 1.25rem;
+  margin: 1.25rem 0;
   min-width: 0;
 }
 
@@ -29,6 +29,35 @@
 .po-pending-refresh:hover,
 .po-pending-toggle:hover { color: var(--pp-ink); }
 .po-pending-refresh:disabled { opacity: 0.5; cursor: wait; }
+
+.po-pending-filter {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0.25rem 0 0.5rem;
+  font-size: 0.85rem;
+  color: var(--pp-muted);
+}
+
+.po-pending-filter select {
+  height: 34px;
+  min-width: 280px;
+  max-width: 100%;
+  padding: 0 10px;
+  border: 1px solid var(--pp-line);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--pp-ink);
+  font: inherit;
+  font-size: 0.88rem;
+}
+
+[data-theme='dark'] .po-pending-filter select option { background: #0f172a; }
+
+@media (max-width: 640px) {
+  .po-pending-filter { flex-wrap: wrap; }
+  .po-pending-filter select { min-width: 0; width: 100%; }
+}
 
 .po-pending-summary {
   display: flex;

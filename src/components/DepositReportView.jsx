@@ -4,6 +4,7 @@ import { formatStationWithZipcode } from '../utils/postalUtils';
 import { downloadBatchEar, useEarServiceDown, EAR_DOWN_MESSAGE } from '../utils/earService';
 import TrackingTimelineModal from './TrackingTimelineModal';
 import TrackingInquiryView from './TrackingInquiryView';
+import PostofficePendingCard from './PostofficePendingCard';
 import ThaiDateInput from './ThaiDateInput';
 import { APP_VERSION } from '../config';
 import { useSignatureChecks } from '../utils/useSignatureChecks';
@@ -1238,6 +1239,9 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
             </div>
           </div>
         </div>
+
+        {/* Post office accounts: parcels sent to e-Parcel but not deposited yet */}
+        {isPostOffice && <PostofficePendingCard currentPerson={currentPerson} />}
 
         {/* Data Table Section Card */}
         <div className="deposit-table-card">
