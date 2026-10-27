@@ -607,7 +607,8 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
     return Object.entries(counts).sort((a, b) => a[0].localeCompare(b[0], 'th'));
   }, [reportData]);
 
-  const filteredRecords = useMemo(() => {
+  const isSignatureTab = filterTab === 'sig_yes' || filterTab === 'sig_no';
+  const baseFilteredRecords = useMemo(() => {
     if (!reportData || !reportData.records) return [];
     let list = reportData.records;
 
@@ -615,7 +616,7 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
       list = list.filter((r) => r.agency === agencyFilter);
     }
 
-    if (filterTab === 'delivered') {
+    if (filterTab === 'delivered' || filterTab === 'sig_yes' || filterTab === 'sig_no') {
       list = list.filter((r) => getDeliveryStatusInfo(r).key === 'delivered');
     } else if (filterTab === 'in_transit') {
       list = list.filter((r) => getDeliveryStatusInfo(r).key === 'in_transit');
@@ -651,6 +652,32 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
     return list;
   }, [reportData, filterTab, searchQuery, queryBarcodes, agencyFilter]);
 
+  // Signature verification (via e-AR): the visible page, or all delivered parcels on a signature tab
+  const signatureCheckEnabled = useMemo(() => !isMobileDevice(), []);
+  const signatureBarcodes = useMemo(() => {
+    const source = isSignatureTab
+      ? baseFilteredRecords
+      : baseFilteredRecords.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+    return source
+      .filter((r) => r.barcode && getDeliveryStatusInfo(r).key === 'delivered')
+      .map((r) => r.barcode.toUpperCase());
+  }, [baseFilteredRecords, isSignatureTab, currentPage, PAGE_SIZE]);
+  const { checks: signatureChecks, recheck: recheckSignature, loadImage: loadSignatureImage } =
+    useSignatureChecks(signatureBarcodes, signatureCheckEnabled);
+
+  const filteredRecords = useMemo(() => {
+    if (!isSignatureTab) return baseFilteredRecords;
+    const want = filterTab === 'sig_yes' ? 'yes' : 'no';
+    return baseFilteredRecords.filter((r) => signatureChecks[(r.barcode || '').toUpperCase()]?.state === want);
+  }, [baseFilteredRecords, isSignatureTab, filterTab, signatureChecks]);
+
+  // Signature tab progress: how many delivered parcels have been checked so far
+  const signatureProgress = useMemo(() => {
+    if (!isSignatureTab) return null;
+    const done = signatureBarcodes.filter((bc) => ['yes', 'no', 'error'].includes(signatureChecks[bc]?.state)).length;
+    return { done, total: signatureBarcodes.length };
+  }, [isSignatureTab, signatureBarcodes, signatureChecks]);
+
   // Total pages and clamping
   const totalPages = Math.max(1, Math.ceil(filteredRecords.length / PAGE_SIZE));
 
@@ -666,16 +693,6 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
     return filteredRecords.slice(startIdx, startIdx + PAGE_SIZE);
   }, [filteredRecords, currentPage, PAGE_SIZE]);
 
-  // Signature verification for delivered parcels on the current page (via e-AR)
-  const signatureCheckEnabled = useMemo(() => !isMobileDevice(), []);
-  const deliveredBarcodesOnPage = useMemo(
-    () => paginatedRecords
-      .filter((r) => r.barcode && getDeliveryStatusInfo(r).key === 'delivered')
-      .map((r) => r.barcode.toUpperCase()),
-    [paginatedRecords]
-  );
-  const { checks: signatureChecks, recheck: recheckSignature, loadImage: loadSignatureImage } =
-    useSignatureChecks(deliveredBarcodesOnPage, signatureCheckEnabled);
   // { barcode, receiver, image, relationship, officer, loading }
   const [signatureViewer, setSignatureViewer] = useState(null);
 
@@ -850,6 +867,12 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
   const receivedCount = scopedRecords
     ? scopedRecords.filter((r) => getDeliveryStatusInfo(r).key === 'received').length
     : (summary.received_count || 0);
+
+  const deliveredScopeBarcodes = (scopedRecords || [])
+    .filter((r) => r.barcode && getDeliveryStatusInfo(r).key === 'delivered')
+    .map((r) => r.barcode.toUpperCase());
+  const sigYesCount = deliveredScopeBarcodes.filter((bc) => signatureChecks[bc]?.state === 'yes').length;
+  const sigNoCount = deliveredScopeBarcodes.filter((bc) => signatureChecks[bc]?.state === 'no').length;
 
   const pendingDepositCount = scopedRecords
     ? scopedRecords.filter((r) => getDeliveryStatusInfo(r).key === 'pending').length
@@ -1094,8 +1117,8 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
               className="btn-fetch-report"
               onClick={() => {
                 handleFetchReport(startDate, endDate);
-                // post office: also re-check parcels waiting to be deposited
-                if (isPostOffice) setPendingRefreshKey((k) => k + 1);
+                // also re-check parcels waiting to be deposited (post office + agency cards)
+                setPendingRefreshKey((k) => k + 1);
               }}
               disabled={loading}
             >
@@ -1311,8 +1334,24 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
           />
         )}
 
+        {/* Agency accounts: own parcels sent to e-Parcel but not deposited yet (auto-cancel warning) */}
+        {!isPostOffice && currentPerson?.UserName && String(currentPerson?.Status || '').toUpperCase() !== 'ADMIN' && (
+          <PostofficePendingCard
+            currentPerson={currentPerson}
+            endpoint="agency"
+            hideWhenEmpty
+            refreshKey={pendingRefreshKey}
+          />
+        )}
+
         {/* Data Table Section Card */}
         <div className="deposit-table-card">
+          {signatureProgress && signatureProgress.done < signatureProgress.total && (
+            <div className="sig-scan-progress">
+              <span className="spinner-small"></span>
+              กำลังตรวจลายเซ็นจากใบตอบรับ e-AR {signatureProgress.done}/{signatureProgress.total} รายการ — รายการจะเพิ่มขึ้นเรื่อย ๆ
+            </div>
+          )}
           <div className="deposit-table-toolbar">
             <div className="deposit-filter-tabs">
               <button
@@ -1357,6 +1396,26 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
                 <span className="dot-green"></span>
                 นำจ่ายสำเร็จ ({deliveredCount})
               </button>
+              {signatureCheckEnabled && deliveredCount > 0 && (
+                <span className="sig-filter-group" role="group" aria-label="กรองตามลายเซ็นผู้รับ">
+                  <button
+                    type="button"
+                    className={`btn-filter-tab btn-sig-tab ${filterTab === 'sig_yes' ? 'active' : ''}`}
+                    onClick={() => setFilterTab('sig_yes')}
+                    title="นำจ่ายสำเร็จและใบตอบรับ e-AR มีลายเซ็นผู้รับ (ตรวจทุกรายการเมื่อเลือก)"
+                  >
+                    ✍️ มีลายเซ็น ({sigYesCount})
+                  </button>
+                  <button
+                    type="button"
+                    className={`btn-filter-tab btn-sig-tab ${filterTab === 'sig_no' ? 'active' : ''}`}
+                    onClick={() => setFilterTab('sig_no')}
+                    title="นำจ่ายสำเร็จแต่ใบตอบรับ e-AR ไม่มีลายเซ็นผู้รับ (ตรวจทุกรายการเมื่อเลือก)"
+                  >
+                    ✕ ไม่มีลายเซ็น ({sigNoCount})
+                  </button>
+                </span>
+              )}
               <button
                 type="button"
                 className={`btn-filter-tab ${filterTab === 'returned' ? 'active' : ''}`}
@@ -1375,7 +1434,7 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
               <input
                 type="text"
                 className="deposit-search-input"
-                placeholder="ค้นหา/วางเลขบาร์โค้ด (หลายหมายเลขได้), เลขคำขอ, ชื่อผู้รับ..."
+                placeholder="ค้นหาบาร์โค้ด / ชื่อผู้รับ"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onPaste={handleSearchPaste}

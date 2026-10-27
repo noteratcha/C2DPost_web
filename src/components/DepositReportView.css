@@ -2291,3 +2291,27 @@ button.sig-check-badge:hover {
   }
 }
 
+/* Signature sub-filters (delivered parcels) */
+.sig-filter-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding-left: 6px;
+  margin-left: 2px;
+  border-left: 1px solid var(--border-color, rgba(0, 0, 0, 0.1));
+}
+
+.btn-sig-tab { font-size: 0.8rem; }
+
+.sig-scan-progress {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1.25rem;
+  font-size: 0.82rem;
+  color: #047857;
+  background: rgba(16, 185, 129, 0.06);
+  border-bottom: 1px solid var(--border-color, rgba(0, 0, 0, 0.06));
+}
+
+[data-theme='dark'] .sig-scan-progress { color: #34d399; background: rgba(16, 185, 129, 0.1); }

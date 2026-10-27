@@ -136,6 +136,11 @@ class PostofficePendingRequest(BaseModel):
     password: str
     days: Optional[int] = 30
 
+class AgencyPendingRequest(BaseModel):
+    username: str
+    password: str
+    days: Optional[int] = 30
+
 class AdminCancelEparcelRequest(BaseModel):
     admin_username: str
     admin_password: str
@@ -848,8 +853,8 @@ def _postoffice_credentials_for(zipcode, barcodes):
     return result
 
 
-def _log_postoffice_access(username, action, detail=""):
-    """Audit log -> PostOfficeLog sheet (fire-and-forget, never blocks the request)."""
+def _log_postoffice_access(username, action, detail="", sync=False):
+    """Audit log -> PostOfficeLog sheet (fire-and-forget unless sync=True, e.g. from the cron job)."""
     import threading
     import requests
     from datetime import timezone, timedelta
@@ -868,7 +873,10 @@ def _log_postoffice_access(username, action, detail=""):
         except Exception as e:
             print(f"[postoffice] audit log warning: {e}")
 
-    threading.Thread(target=_send, daemon=True).start()
+    if sync:
+        _send()
+    else:
+        threading.Thread(target=_send, daemon=True).start()
 
 
 def _collect_postoffice_items(zipcode, target_dates):
@@ -1152,10 +1160,43 @@ def postoffice_pending(req: PostofficePendingRequest):
     zipcode = _postoffice_zip(req.username, req.password)
     if not zipcode:
         return JSONResponse(status_code=403, content={"success": False, "message": "เฉพาะบัญชีที่ทำการไปรษณีย์"})
-    days = max(1, min(int(req.days or 30), 92))
+    agencies = _postoffice_agencies(zipcode)
+    result = _pending_summary(agencies, req.days)
+    _log_postoffice_access(req.username, "ดูรายการรอฝากส่ง", f"{result['pending']} ชิ้น ({result['days']} วัน)")
+    return result
+
+
+AUTO_CANCEL_AFTER_DAYS = 30   # parcels still "pending" (order created, not deposited) after this are cancelled
+AUTO_CANCEL_WARN_DAYS = 25    # UI warns from this age
+
+
+def _verify_user_credentials(username, password):
+    """Agency account check against the user sheet (not INACTIVE). Returns the agency dict or None."""
+    uname = (username or "").strip().lower()
+    pwd = (password or "").strip()
+    if not uname or not pwd:
+        return None
+    try:
+        for row in _po_read_csv(PO_USERS_SHEET_CSV):
+            if (row.get("UserName") or "").strip().lower() != uname:
+                continue
+            if (row.get("Password") or "").strip() != pwd:
+                return None
+            if (row.get("Status") or "").strip().upper() == "INACTIVE":
+                return None
+            return {"username": (row.get("UserName") or "").strip(), "password": pwd,
+                    "organization": (row.get("Organization") or uname).strip()}
+    except Exception as e:
+        print(f"[agency] verify warning: {e}")
+    return None
+
+
+def _pending_summary(agencies, days):
+    """Pending (not deposited) parcels of the given agencies issued in the last `days` days."""
+    from datetime import timedelta
+    days = max(1, min(int(days or 30), 92))
     today = (datetime.utcnow() + timedelta(hours=7)).date()  # Thai date
     d0 = today - timedelta(days=days - 1)
-    agencies = _postoffice_agencies(zipcode)
     items, errors = _eparcel_sent_items(agencies, d0, today)
     pending = sorted((x for x in items if x["state"] == "pending"), key=lambda x: x["issued"])
     by_agency = {}
@@ -1164,7 +1205,6 @@ def postoffice_pending(req: PostofficePendingRequest):
                                                "pending": 0, "oldest": x["issued"], "latest": x["issued"]})
         a["pending"] += 1
         a["latest"] = x["issued"]
-    _log_postoffice_access(req.username, "ดูรายการรอฝากส่ง", f"{len(pending)} ชิ้น ({days} วัน)")
     return {
         "success": True,
         "days": days,
@@ -1176,6 +1216,92 @@ def postoffice_pending(req: PostofficePendingRequest):
         "pending": len(pending),
         "by_agency": sorted(by_agency.values(), key=lambda a: -a["pending"]),
         "items": pending,
+        "errors": errors,
+        "auto_cancel_after_days": AUTO_CANCEL_AFTER_DAYS,
+        "auto_cancel_warn_days": AUTO_CANCEL_WARN_DAYS,
+        "auto_cancel_live": _auto_cancel_live(),
+    }
+
+
+def _auto_cancel_live():
+    return os.environ.get("AUTO_CANCEL_LIVE", "").strip() == "1"
+
+
+@app.post("/api/agency/pending")
+def agency_pending(req: AgencyPendingRequest):
+    """Agency account: its own parcels sent to e-Parcel but not deposited yet (warns before auto-cancel)."""
+    agency = _verify_user_credentials(req.username, req.password)
+    if not agency:
+        return JSONResponse(status_code=403, content={"success": False, "message": "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง"})
+    return _pending_summary({agency["username"].lower(): agency}, req.days)
+
+
+@app.get("/api/cron/auto-cancel")
+def cron_auto_cancel(request: Request):
+    """
+    Daily (Vercel Cron): cancel e-Parcel orders still pending (created, never deposited) more than
+    AUTO_CANCEL_AFTER_DAYS days after the barcode was issued. Report-only unless AUTO_CANCEL_LIVE=1.
+    Protected by CRON_SECRET (Vercel sends "Authorization: Bearer <CRON_SECRET>").
+    """
+    from datetime import timedelta
+    from concurrent.futures import ThreadPoolExecutor
+    import requests
+
+    secret = os.environ.get("CRON_SECRET", "").strip()
+    if not secret or request.headers.get("authorization", "") != f"Bearer {secret}":
+        return JSONResponse(status_code=401, content={"success": False, "message": "unauthorized"})
+
+    live = _auto_cancel_live()
+    today = (datetime.utcnow() + timedelta(hours=7)).date()
+    d1 = today - timedelta(days=AUTO_CANCEL_AFTER_DAYS + 1)   # issued more than 30 days ago
+    d0 = today - timedelta(days=92)
+    agencies = _all_agency_credentials()
+    items, errors = _eparcel_sent_items(agencies, d0, d1)
+    overdue = [x for x in items if x["state"] == "pending"]
+
+    results = []
+    if live and overdue:
+        def _run(x):
+            ag = agencies.get(x["agency"].lower())
+            if not ag:
+                return {"barcode": x["barcode"], "success": False, "errorCode": "OWNER", "errorDetail": "agency not found"}
+            r = _cancel_eparcel_order(x["barcode"], ag["username"], ag["password"])
+            r["agency"] = x["agency"]
+            return r
+        with ThreadPoolExecutor(max_workers=5) as pool:
+            results = list(pool.map(_run, overdue[:400]))
+        cancelled = [r["barcode"] for r in results if r["success"]]
+        if cancelled:
+            try:
+                requests.post(
+                    "https://script.google.com/macros/s/AKfycbyyuEJ3pLdXUidsyYoHv84uspMDf8G93U8Mw1ZYCB9ELpFAPjmpwUxsuarxnklnnQ/exec",
+                    json={"action": "update_eparcel_status", "barcodes": cancelled, "status": "cancelled"},
+                    timeout=20, allow_redirects=False,
+                )
+            except Exception as e:
+                errors.append(f"sheet update: {str(e)[:120]}")
+
+    # One audit row per agency (PostOfficeLog sheet)
+    by_agency = {}
+    for x in overdue:
+        by_agency.setdefault(x["organization"], []).append(x["barcode"])
+    ok_set = {r["barcode"] for r in results if r.get("success")}
+    event = "ยกเลิกอัตโนมัติ (Pending > 30 วัน)" if live else "ทดลอง: จะยกเลิกอัตโนมัติ (Pending > 30 วัน)"
+    for org, codes in by_agency.items():
+        done = [c for c in codes if c in ok_set] if live else codes
+        detail = f"{org}: {len(done)}/{len(codes)} ชิ้น {', '.join(done[:40])}"
+        _log_postoffice_access("AUTO-CANCEL", event, detail, sync=True)
+    if not overdue:
+        _log_postoffice_access("AUTO-CANCEL", event, f"ไม่มีรายการเกิน {AUTO_CANCEL_AFTER_DAYS} วัน", sync=True)
+
+    return {
+        "success": True,
+        "live": live,
+        "issued_before": d1.isoformat(),
+        "overdue": len(overdue),
+        "cancelled": sum(1 for r in results if r.get("success")),
+        "failed": [r for r in results if not r.get("success")],
+        "by_agency": {k: len(v) for k, v in by_agency.items()},
         "errors": errors,
     }
 
