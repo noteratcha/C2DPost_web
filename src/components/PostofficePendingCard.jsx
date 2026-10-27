@@ -21,12 +21,11 @@ function daysAgo(ts) {
  * Post office accounts: parcels that registered agencies sent to e-Parcel
  * but have not deposited at the counter yet (last 30 days).
  */
-export default function PostofficePendingCard({ currentPerson, refreshKey = 0 }) {
+export default function PostofficePendingCard({ currentPerson, refreshKey = 0, agencyFilter = '', onLoaded, onShowInTable }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [openAgency, setOpenAgency] = useState('');
-  const [agencyFilter, setAgencyFilter] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -40,27 +39,22 @@ export default function PostofficePendingCard({ currentPerson, refreshKey = 0 })
       const json = await res.json().catch(() => ({}));
       if (!res.ok || !json.success) throw new Error(json.message || json.detail || `HTTP ${res.status}`);
       setData(json);
+      if (onLoaded) onLoaded(json);
     } catch (err) {
       setError(`ดึงรายการรอฝากส่งไม่สำเร็จ: ${err.message}`);
     } finally {
       setLoading(false);
     }
-  }, [currentPerson?.UserName, currentPerson?.Password]);
+  }, [currentPerson?.UserName, currentPerson?.Password, onLoaded]);
 
   useEffect(() => { load(); }, [load, refreshKey]);
 
   const allAgencies = data?.by_agency || [];
-  const agencies = agencyFilter ? allAgencies.filter((a) => a.agency === agencyFilter) : allAgencies;
+  // agencyFilter is the organization name selected in the page-wide filter
+  const agencies = agencyFilter ? allAgencies.filter((a) => a.organization === agencyFilter) : allAgencies;
   const shownPending = agencies.reduce((sum, a) => sum + a.pending, 0);
   const itemsOf = (agency) => (data?.items || []).filter((it) => it.agency === agency);
 
-  // Dropdown lists every agency registered with this post office (pending count in brackets)
-  const pendingOf = Object.fromEntries(allAgencies.map((a) => [a.agency, a.pending]));
-  const options = (data?.agencies?.length ? data.agencies : allAgencies).map((a) => ({
-    value: a.agency,
-    label: `${a.organization} (${pendingOf[a.agency] || 0})`
-  }));
-  const selectedName = options.find((o) => o.value === agencyFilter)?.label.replace(/\s\(\d+\)$/, '') || '';
 
   return (
     <div className="dash-section-card po-pending-card">
@@ -68,12 +62,19 @@ export default function PostofficePendingCard({ currentPerson, refreshKey = 0 })
         <div className="dash-section-title-group">
           <h3 className="dash-section-title">พัสดุรอการฝากส่ง</h3>
           <span className="dash-section-sub">
-            ส่งข้อมูล e-Parcel แล้ว แต่ยังไม่นำมาฝากที่ ปณ. · ออกบาร์โค้ดใน 30 วันล่าสุด
+            ส่งข้อมูล e-Parcel แล้ว แต่ยังไม่นำมาฝากที่ ปณ. · ค้างทั้งหมดใน 30 วันล่าสุด (ไม่ขึ้นกับช่วงวันที่ด้านบน)
           </span>
         </div>
-        <button type="button" className="po-pending-refresh" onClick={load} disabled={loading}>
-          {loading ? 'กำลังตรวจสอบ...' : 'ตรวจสอบใหม่'}
-        </button>
+        <div className="po-pending-actions">
+          {onShowInTable && data?.pending > 0 && (
+            <button type="button" className="po-pending-refresh" onClick={onShowInTable} title="แสดงรายการ Pending ในช่วงวันที่ที่เลือกในตารางด้านล่าง">
+              ดูในตาราง
+            </button>
+          )}
+          <button type="button" className="po-pending-refresh" onClick={load} disabled={loading}>
+            {loading ? 'กำลังตรวจสอบ...' : 'ตรวจสอบใหม่'}
+          </button>
+        </div>
       </div>
 
       {error && <div className="po-pending-error">{error}</div>}
@@ -82,17 +83,6 @@ export default function PostofficePendingCard({ currentPerson, refreshKey = 0 })
         <div className="po-pending-empty">กำลังตรวจสอบสถานะกับระบบไปรษณีย์...</div>
       ) : data && (
         <>
-          <div className="po-pending-filter">
-            <label htmlFor="po-pending-agency">หน่วยงาน</label>
-            <select
-              id="po-pending-agency"
-              value={agencyFilter}
-              onChange={(e) => { setAgencyFilter(e.target.value); setOpenAgency(e.target.value); }}
-            >
-              <option value="">ทุกหน่วยงาน ({data.pending})</option>
-              {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
-          </div>
 
           <div className="po-pending-summary">
             <div className="po-pending-hero">
@@ -101,7 +91,7 @@ export default function PostofficePendingCard({ currentPerson, refreshKey = 0 })
             </div>
             <div className="po-pending-meta">
               {agencyFilter
-                ? selectedName
+                ? agencyFilter
                 : `จาก ${agencies.length} หน่วยงาน (ลงทะเบียนกับ ปณ. นี้ทั้งหมด ${data.agencies_registered} หน่วยงาน)`}
             </div>
           </div>

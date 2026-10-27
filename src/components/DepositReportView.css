@@ -2216,6 +2216,12 @@ button.sig-check-badge:hover {
 }
 
 /* Post office accounts: agency filter + agency name under receiver */
+.po-agency-bar.po-agency-bar-top {
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  border-radius: 14px;
+  margin-bottom: 1rem;
+}
+
 .po-agency-bar {
   display: flex;
   align-items: center;

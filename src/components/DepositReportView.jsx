@@ -579,6 +579,25 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
     }
   };
 
+  const [pendingInfo, setPendingInfo] = useState(null);
+  const agencyCounts = useMemo(() => {
+    const counts = {};
+    (reportData?.records || []).forEach((r) => {
+      if (r.agency) counts[r.agency] = (counts[r.agency] || 0) + 1;
+    });
+    return counts;
+  }, [reportData]);
+  const pendingByAgency = useMemo(() => {
+    const m = {};
+    (pendingInfo?.by_agency || []).forEach((a) => { m[a.organization] = a.pending; });
+    return m;
+  }, [pendingInfo]);
+  const poAgencyNames = useMemo(() => {
+    const names = new Set(Object.keys(agencyCounts));
+    (pendingInfo?.agencies || []).forEach((a) => names.add(a.organization));
+    return [...names].sort((a, b) => a.localeCompare(b, 'th'));
+  }, [agencyCounts, pendingInfo]);
+
   const agencyOptions = useMemo(() => {
     const counts = {};
     (reportData?.records || []).forEach((r) => {
@@ -795,31 +814,44 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
     }
   };
 
-  const summary = reportData?.summary || {
+  // Records in the selected agency (post office filter) — every count on the page uses these
+  const scopedRecords = useMemo(() => {
+    if (!reportData?.records) return null;
+    return agencyFilter ? reportData.records.filter((r) => r.agency === agencyFilter) : reportData.records;
+  }, [reportData, agencyFilter]);
+
+  const baseSummary = reportData?.summary || {
     total_items: 0,
     total_weight: 0,
     total_fee: 0,
     received_count: 0
   };
+  const summary = agencyFilter && scopedRecords
+    ? {
+        ...baseSummary,
+        total_items: scopedRecords.length,
+        total_fee: scopedRecords.reduce((sum, r) => sum + (Number(r.fee) || 0), 0)
+      }
+    : baseSummary;
 
-  const deliveredCount = reportData?.records
-    ? reportData.records.filter((r) => getDeliveryStatusInfo(r).key === 'delivered').length
+  const deliveredCount = scopedRecords
+    ? scopedRecords.filter((r) => getDeliveryStatusInfo(r).key === 'delivered').length
     : (summary.delivered_count || 0);
 
-  const inTransitCount = reportData?.records
-    ? reportData.records.filter((r) => getDeliveryStatusInfo(r).key === 'in_transit').length
+  const inTransitCount = scopedRecords
+    ? scopedRecords.filter((r) => getDeliveryStatusInfo(r).key === 'in_transit').length
     : (summary.in_transit_count || 0);
 
-  const returnedCount = reportData?.records
-    ? reportData.records.filter((r) => getDeliveryStatusInfo(r).key === 'returned').length
+  const returnedCount = scopedRecords
+    ? scopedRecords.filter((r) => getDeliveryStatusInfo(r).key === 'returned').length
     : (summary.returned_count || 0);
 
-  const receivedCount = reportData?.records
-    ? reportData.records.filter((r) => getDeliveryStatusInfo(r).key === 'received').length
+  const receivedCount = scopedRecords
+    ? scopedRecords.filter((r) => getDeliveryStatusInfo(r).key === 'received').length
     : (summary.received_count || 0);
 
-  const pendingDepositCount = reportData?.records
-    ? reportData.records.filter((r) => getDeliveryStatusInfo(r).key === 'pending').length
+  const pendingDepositCount = scopedRecords
+    ? scopedRecords.filter((r) => getDeliveryStatusInfo(r).key === 'pending').length
     : (summary.pending_deposit_count || 0);
 
   // Delivered records helpers for batch e-AR download
@@ -1126,6 +1158,26 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
           </div>
         )}
 
+        {/* Post office: ONE agency filter for the whole page (cards, pending, tabs, table) */}
+        {isPostOffice && (
+          <div className="po-agency-bar po-agency-bar-top">
+            <span className="po-agency-label">หน่วยงานที่ลงทะเบียนกับ {currentPerson?.ResponsiblePostoffice || 'ปณ.'}</span>
+            <select
+              className="po-agency-select"
+              value={agencyFilter}
+              onChange={(e) => setAgencyFilter(e.target.value)}
+            >
+              <option value="">ทุกหน่วยงาน</option>
+              {poAgencyNames.map((name) => (
+                <option key={name} value={name}>
+                  {name} ({agencyCounts[name] || 0}{pendingByAgency[name] ? ` · รอฝาก ${pendingByAgency[name]}` : ''})
+                </option>
+              ))}
+            </select>
+            <span className="po-agency-note">ตัวกรองนี้ใช้กับทุกส่วนของหน้า · แสดงเฉพาะพัสดุที่ออกบาร์โค้ดผ่าน C2DPost</span>
+          </div>
+        )}
+
         {/* Summary Stats Cards (6 Categories) */}
         <div className="deposit-stats-grid">
           {/* 1. รับฝากแล้ว */}
@@ -1241,26 +1293,20 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
         </div>
 
         {/* Post office accounts: parcels sent to e-Parcel but not deposited yet */}
-        {isPostOffice && <PostofficePendingCard currentPerson={currentPerson} />}
+        {isPostOffice && (
+          <PostofficePendingCard
+            currentPerson={currentPerson}
+            agencyFilter={agencyFilter}
+            onLoaded={setPendingInfo}
+            onShowInTable={() => {
+              setFilterTab('pending');
+              setTimeout(() => document.querySelector('.deposit-table-card')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+            }}
+          />
+        )}
 
         {/* Data Table Section Card */}
         <div className="deposit-table-card">
-          {isPostOffice && (
-            <div className="po-agency-bar">
-              <span className="po-agency-label">หน่วยงานที่ลงทะเบียนกับ {currentPerson?.ResponsiblePostoffice || 'ปณ.'}</span>
-              <select
-                className="po-agency-select"
-                value={agencyFilter}
-                onChange={(e) => setAgencyFilter(e.target.value)}
-              >
-                <option value="">ทุกหน่วยงาน ({(reportData?.records || []).length})</option>
-                {agencyOptions.map(([name, count]) => (
-                  <option key={name} value={name}>{name} ({count})</option>
-                ))}
-              </select>
-              <span className="po-agency-note">แสดงเฉพาะพัสดุที่ออกบาร์โค้ดผ่าน C2DPost (ตามวันที่ออกบาร์โค้ด)</span>
-            </div>
-          )}
           <div className="deposit-table-toolbar">
             <div className="deposit-filter-tabs">
               <button
@@ -1268,7 +1314,7 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
                 className={`btn-filter-tab ${filterTab === 'all' ? 'active' : ''}`}
                 onClick={() => setFilterTab('all')}
               >
-                ทั้งหมด ({reportData?.records?.length || 0})
+                ทั้งหมด ({scopedRecords?.length || 0})
               </button>
               {pendingDepositCount > 0 && (
                 <button
