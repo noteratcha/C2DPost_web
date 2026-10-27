@@ -580,6 +580,7 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
   };
 
   const [pendingInfo, setPendingInfo] = useState(null);
+  const [pendingRefreshKey, setPendingRefreshKey] = useState(0);
   const agencyCounts = useMemo(() => {
     const counts = {};
     (reportData?.records || []).forEach((r) => {
@@ -1091,7 +1092,11 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
             <button
               type="button"
               className="btn-fetch-report"
-              onClick={() => handleFetchReport(startDate, endDate)}
+              onClick={() => {
+                handleFetchReport(startDate, endDate);
+                // post office: also re-check parcels waiting to be deposited
+                if (isPostOffice) setPendingRefreshKey((k) => k + 1);
+              }}
               disabled={loading}
             >
               {loading ? (
@@ -1296,6 +1301,7 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
         {isPostOffice && (
           <PostofficePendingCard
             currentPerson={currentPerson}
+            refreshKey={pendingRefreshKey}
             agencyFilter={agencyFilter}
             onLoaded={setPendingInfo}
             onShowInTable={() => {

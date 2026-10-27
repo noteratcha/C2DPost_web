@@ -71,9 +71,7 @@ export default function PostofficePendingCard({ currentPerson, refreshKey = 0, a
               ดูในตาราง
             </button>
           )}
-          <button type="button" className="po-pending-refresh" onClick={load} disabled={loading}>
-            {loading ? 'กำลังตรวจสอบ...' : 'ตรวจสอบใหม่'}
-          </button>
+          {loading && data && <span className="po-pending-checking">กำลังตรวจสอบ...</span>}
         </div>
       </div>
 

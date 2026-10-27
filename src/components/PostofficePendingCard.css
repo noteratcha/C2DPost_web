@@ -59,7 +59,8 @@
   .po-pending-filter select { min-width: 0; width: 100%; }
 }
 
-.po-pending-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.po-pending-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.po-pending-checking { font-size: 0.8rem; color: var(--pp-muted); }
 
 .po-pending-summary {
   display: flex;
