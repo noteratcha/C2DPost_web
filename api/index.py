@@ -1967,6 +1967,7 @@ def get_dashboard_report(req: DashboardRequest):
     return_reason_counts = {}
     delivery_failed_reason_counts = {}
     province_map = {}
+    daily_map = {}
     parcels = []
     reason_parcels = []
 
@@ -2028,6 +2029,18 @@ def get_dashboard_report(req: DashboardRequest):
             pending += 1
         else:
             unknown += 1
+
+        # Daily bar chart: bucket by deposit date (receivedDate, DD/MM/YYYY ...)
+        day_src = str(rec.get("received_date") or rec.get("created_date") or "").strip()
+        dm = re.match(r'^(\d{1,2})/(\d{1,2})/(\d{4})', day_src)
+        if dm:
+            yy = int(dm.group(3))
+            yy = yy - 543 if yy > 2400 else yy
+            day_key = f"{yy:04d}-{int(dm.group(2)):02d}-{int(dm.group(1)):02d}"
+            bucket = "delivered" if key == "delivered" else "returned" if is_actual_return else "received" if key == "received" else "in_transit"
+            dd = daily_map.setdefault(day_key, {"date": day_key, "received": 0, "in_transit": 0, "delivered": 0, "returned": 0, "total": 0})
+            dd[bucket] += 1
+            dd["total"] += 1
 
         st = province_map.setdefault(province, {"count": 0, "delivered": 0, "failed": 0, "pending": 0, "received": 0, "in_transit": 0})
         st["count"] += 1
@@ -2170,6 +2183,7 @@ def get_dashboard_report(req: DashboardRequest):
         "total_return_reasons": total_return_reasons,
         "total_delivery_failed_reasons": total_delivery_failed_reasons,
         "provinces": provinces,
+        "daily": [daily_map[k] for k in sorted(daily_map)],
         "parcels": parcels,
         "parcels_truncated": parcels_truncated,
         "reason_parcels": reason_parcels,

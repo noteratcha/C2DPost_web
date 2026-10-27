@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { fetchDashboardReport } from '../utils/api';
 import ThaiDateInput from './ThaiDateInput';
 import ReasonDetailModal from './ReasonDetailModal';
+import DailyStatusChart from './DailyStatusChart';
 import { THAILAND_VIEWBOX, THAILAND_PROVINCES } from '../data/thailandMapData';
 import { APP_VERSION } from '../config';
 import './DashboardView.css';
@@ -745,6 +746,13 @@ export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
                 </div>
               ))}
             </div>
+
+            {/* 1b. Daily stacked bar chart (parcels per deposit day by status) */}
+            <DailyStatusChart
+              days={Array.isArray(data?.daily) ? data.daily : []}
+              startDate={data?.date}
+              endDate={data?.end_date || data?.date}
+            />
 
             {/* 2. Map + Province ranking layout */}
             <div className="dash-map-layout">
