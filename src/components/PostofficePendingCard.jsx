@@ -81,9 +81,9 @@ export default function PostofficePendingCard({
     return age !== null && age >= warnFrom && (!agencyFilter || it.organization === agencyFilter);
   }).length;
 
-  // A single agency is opened automatically
-  const isOpen = (a) => openAgency === a.agency || (agencies.length === 1 && openAgency !== `closed:${a.agency}`);
-  const toggle = (a) => setOpenAgency(isOpen(a) ? `closed:${a.agency}` : a.agency);
+  // Collapsed by default; click an agency row to show its parcels
+  const isOpen = (a) => openAgency === a.agency;
+  const toggle = (a) => setOpenAgency(isOpen(a) ? '' : a.agency);
 
   if (hideWhenEmpty && data && !error && shownPending === 0) return null;
 
@@ -137,7 +137,7 @@ export default function PostofficePendingCard({
             const items = open ? itemsOf(a.agency) : [];
             return (
               <div key={a.agency} className={`po-agency-row ${open ? 'is-open' : ''}`}>
-                <button type="button" className="po-agency-summary" onClick={() => toggle(a)} aria-expanded={open}>
+                <button type="button" className="po-agency-summary" onClick={() => toggle(a)} aria-expanded={open} title={open ? 'ย่อรายการ' : 'แสดงรายการพัสดุ'}>
                   <span className="po-agency-name">{a.organization}</span>
                   <span className="po-agency-meta">
                     ออกบาร์โค้ด {formatIssued(a.oldest, false)}
