@@ -131,6 +131,11 @@ class AdminEparcelPendingRequest(BaseModel):
     end_date: str
     agency: Optional[str] = ""  # UserName, '' = all agencies
 
+class PostofficePendingRequest(BaseModel):
+    username: str
+    password: str
+    days: Optional[int] = 30
+
 class AdminCancelEparcelRequest(BaseModel):
     admin_username: str
     admin_password: str
@@ -251,8 +256,9 @@ def _is_received_text(text):
     return False
 
 def _is_received_status_code(code):
+    # e-Parcel order status 1 = order created only (not deposited); 2 = deposited at the origin post office
     code = str(code or "").strip().lower()
-    return code in ("1", "001", "p001", "received", "success")
+    return code in ("2", "p001", "received", "success")
 
 def _is_received_event(ev):
     if _is_received_text(ev.get("status_description")):
@@ -287,6 +293,11 @@ def classify_delivery_status(status_code, status_desc):
     if ("บ้านปิด" in desc_norm or code == "301") and not is_explicit_return:
         return "in_transit", "อยู่ระหว่างการนำจ่าย"
 
+    # e-Parcel order status 1 "ผู้ฝากสร้างใบฝากส่งเข้าระบบแล้ว" = data sent, parcel NOT deposited yet
+    # (status 2 "ปณ.ต้นทางรับฝากแล้ว" is the real deposit)
+    if "สร้างใบฝาก" in desc_norm or desc_norm.lower() == "pending" or (code in ("0", "1", "001") and "รับฝาก" not in desc_norm):
+        return "pending", "Pending"
+
     # 1. Returned / ส่งคืน / คืนต้นทาง (Must check before delivered to avoid false-positive on "นำจ่ายคืน...")
     if (
         any(k in desc_norm for k in [
@@ -308,8 +319,8 @@ def classify_delivery_status(status_code, status_desc):
     ):
         return "delivered", "นำจ่ายสำเร็จ"
 
-    # 3. Received / รับฝากแล้ว (initial deposit checkpoint - status code 1 or 001)
-    if code in ["1", "001", "received"] or any(k in desc_norm for k in ["รับฝากเข้าระบบ", "รับฝากแล้ว", "รับฝาก"]):
+    # 3. Received / รับฝากแล้ว (e-Parcel order status 2 "ปณ.ต้นทางรับฝากแล้ว")
+    if code in ["2", "received"] or any(k in desc_norm for k in ["รับฝากเข้าระบบ", "รับฝากแล้ว", "รับฝาก"]):
         return "received", "รับฝากแล้ว"
 
     # 4. All other statuses -> อยู่ระหว่างการนำจ่าย
@@ -984,35 +995,21 @@ def _eparcel_order_received(item):
         return bool(status) and status not in ("0", "1")
 
 
-@app.post("/api/admin/eparcel-pending")
-def admin_eparcel_pending(req: AdminEparcelPendingRequest):
-    """Barcodes sent to e-Parcel via C2DPost (UseBarcode = yes) in a date range, with live order status."""
+def _eparcel_sent_items(agencies, d0, d1):
+    """Barcodes each agency sent to e-Parcel via C2DPost (UseBarcode = yes, issued d0..d1) with live status.
+    agencies: {username_lower: {username, password, organization}}. Returns (items, errors);
+    item["state"] is 'pending' (not yet received), 'received' or 'not_found'."""
     import requests
     from requests.auth import HTTPBasicAuth
     import urllib3
     urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-
-    if not _verify_admin(req.admin_username, req.admin_password):
-        return JSONResponse(status_code=403, content={"success": False, "message": "เฉพาะผู้ดูแลระบบเท่านั้น"})
-    try:
-        d0 = datetime.strptime(req.start_date.strip(), "%Y-%m-%d").date()
-        d1 = datetime.strptime(req.end_date.strip(), "%Y-%m-%d").date()
-    except ValueError:
-        raise HTTPException(status_code=400, detail="รูปแบบวันที่ไม่ถูกต้อง (YYYY-MM-DD)")
-    if d1 < d0:
-        d0, d1 = d1, d0
-    if (d1 - d0).days > 92:
-        raise HTTPException(status_code=400, detail="เลือกช่วงวันที่ได้ไม่เกิน 3 เดือน")
-
-    agencies = _all_agency_credentials()
-    only = (req.agency or "").strip().lower()
 
     by_agency = {}
     for row in _po_read_csv(PO_USEBARCODE_CSV):
         if (row.get("ส่งข้อมูล e-Parcel") or "").strip().lower() != "yes":
             continue
         owner = (row.get("UserName") or "").strip().lower()
-        if owner not in agencies or (only and owner != only):
+        if owner not in agencies:
             continue
         ts = (row.get("Timestamp") or "").strip()
         try:
@@ -1065,6 +1062,29 @@ def admin_eparcel_pending(req: AdminEparcelPendingRequest):
                 "status": str((it or {}).get("status") or ""),
                 "status_description": desc or ("ยังไม่รับฝาก" if state == "pending" else ""),
             })
+    return items, errors
+
+
+@app.post("/api/admin/eparcel-pending")
+def admin_eparcel_pending(req: AdminEparcelPendingRequest):
+    """Barcodes sent to e-Parcel via C2DPost (UseBarcode = yes) in a date range, with live order status."""
+    if not _verify_admin(req.admin_username, req.admin_password):
+        return JSONResponse(status_code=403, content={"success": False, "message": "เฉพาะผู้ดูแลระบบเท่านั้น"})
+    try:
+        d0 = datetime.strptime(req.start_date.strip(), "%Y-%m-%d").date()
+        d1 = datetime.strptime(req.end_date.strip(), "%Y-%m-%d").date()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="รูปแบบวันที่ไม่ถูกต้อง (YYYY-MM-DD)")
+    if d1 < d0:
+        d0, d1 = d1, d0
+    if (d1 - d0).days > 92:
+        raise HTTPException(status_code=400, detail="เลือกช่วงวันที่ได้ไม่เกิน 3 เดือน")
+
+    agencies = _all_agency_credentials()
+    only = (req.agency or "").strip().lower()
+    if only:
+        agencies = {k: v for k, v in agencies.items() if k == only}
+    items, errors = _eparcel_sent_items(agencies, d0, d1)
     # Only items not yet received can be cancelled -> list those; report the rest as counts
     counts = {"received": 0, "not_found": 0}
     for x in items:
@@ -1123,6 +1143,39 @@ def admin_cancel_eparcel(req: AdminCancelEparcelRequest):
         except Exception as e:
             print(f"[admin cancel] sheet update warning: {e}")
     return {"success": True, "results": results, "cancelled": len(cancelled)}
+
+
+@app.post("/api/postoffice/pending")
+def postoffice_pending(req: PostofficePendingRequest):
+    """Post office account: parcels its agencies sent to e-Parcel but have not deposited yet (last N days)."""
+    from datetime import timedelta
+    zipcode = _postoffice_zip(req.username, req.password)
+    if not zipcode:
+        return JSONResponse(status_code=403, content={"success": False, "message": "เฉพาะบัญชีที่ทำการไปรษณีย์"})
+    days = max(1, min(int(req.days or 30), 92))
+    today = (datetime.utcnow() + timedelta(hours=7)).date()  # Thai date
+    d0 = today - timedelta(days=days - 1)
+    agencies = _postoffice_agencies(zipcode)
+    items, errors = _eparcel_sent_items(agencies, d0, today)
+    pending = sorted((x for x in items if x["state"] == "pending"), key=lambda x: x["issued"])
+    by_agency = {}
+    for x in pending:
+        a = by_agency.setdefault(x["agency"], {"agency": x["agency"], "organization": x["organization"],
+                                               "pending": 0, "oldest": x["issued"], "latest": x["issued"]})
+        a["pending"] += 1
+        a["latest"] = x["issued"]
+    _log_postoffice_access(req.username, "ดูรายการรอฝากส่ง", f"{len(pending)} ชิ้น ({days} วัน)")
+    return {
+        "success": True,
+        "days": days,
+        "start_date": d0.isoformat(),
+        "end_date": today.isoformat(),
+        "agencies_registered": len(agencies),
+        "pending": len(pending),
+        "by_agency": sorted(by_agency.values(), key=lambda a: -a["pending"]),
+        "items": pending,
+        "errors": errors,
+    }
 
 
 @app.post("/api/postoffice/login")
@@ -1663,6 +1716,7 @@ def _fetch_received_report_payload(req_date, req_end_date, req_username, req_pas
     in_transit_count = sum(1 for r in normalized_records if r["status_key"] == "in_transit")
     returned_count = sum(1 for r in normalized_records if r["status_key"] == "returned")
     received_count = sum(1 for r in normalized_records if r["status_key"] == "received")
+    pending_deposit_count = sum(1 for r in normalized_records if r["status_key"] == "pending")
 
     return {
         "success": True,
@@ -1680,6 +1734,7 @@ def _fetch_received_report_payload(req_date, req_end_date, req_username, req_pas
             "total_weight": round(total_weight, 2),
             "total_fee": round(total_fee, 2),
             "received_count": received_count,
+            "pending_deposit_count": pending_deposit_count,
             "delivered_count": delivered_count,
             "in_transit_count": in_transit_count,
             "returned_count": returned_count,
@@ -1962,6 +2017,7 @@ def get_dashboard_report(req: DashboardRequest):
     received = 0
     in_transit = 0
     pending = 0
+    pending_deposit = 0
     unknown = 0
     reason_counts = {}
     return_reason_counts = {}
@@ -2027,6 +2083,8 @@ def get_dashboard_report(req: DashboardRequest):
         elif key == "in_transit":
             in_transit += 1
             pending += 1
+        elif key == "pending":
+            pending_deposit += 1  # order created in e-Parcel, parcel not deposited yet
         else:
             unknown += 1
 
@@ -2037,8 +2095,9 @@ def get_dashboard_report(req: DashboardRequest):
             yy = int(dm.group(3))
             yy = yy - 543 if yy > 2400 else yy
             day_key = f"{yy:04d}-{int(dm.group(2)):02d}-{int(dm.group(1)):02d}"
-            bucket = "delivered" if key == "delivered" else "returned" if is_actual_return else "received" if key == "received" else "in_transit"
-            dd = daily_map.setdefault(day_key, {"date": day_key, "received": 0, "in_transit": 0, "delivered": 0, "returned": 0, "total": 0})
+            bucket = ("delivered" if key == "delivered" else "returned" if is_actual_return
+                      else "received" if key == "received" else "pending" if key == "pending" else "in_transit")
+            dd = daily_map.setdefault(day_key, {"date": day_key, "pending": 0, "received": 0, "in_transit": 0, "delivered": 0, "returned": 0, "total": 0})
             dd[bucket] += 1
             dd["total"] += 1
 
@@ -2108,6 +2167,7 @@ def get_dashboard_report(req: DashboardRequest):
         "delivered_count": delivered,
         "failed_count": failed,
         "received_count": received,
+        "pending_deposit_count": pending_deposit,
         "in_transit_count": in_transit,
         "pending_count": pending,
         "unknown_count": unknown,

@@ -642,6 +642,31 @@
   background: #10b981;
 }
 
+.dot-slate {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #64748b;
+}
+
+.status-pill.awaiting {
+  background: rgba(100, 116, 139, 0.12);
+  color: #475569;
+  border: 1px solid rgba(100, 116, 139, 0.3);
+}
+
+[data-theme='dark'] .status-pill.awaiting {
+  background: rgba(148, 163, 184, 0.18);
+  color: #cbd5e1;
+  border-color: rgba(148, 163, 184, 0.35);
+}
+
+.stat-sub-pending {
+  margin-top: 2px;
+  font-size: 0.72rem;
+  color: #64748b;
+}
+
 .dot-blue {
   width: 7px;
   height: 7px;

@@ -8,8 +8,9 @@ const SERIES = [
   { key: 'received', label: 'รับฝากแล้ว', cls: 's-received' },
   { key: 'in_transit', label: 'อยู่ระหว่างการนำจ่าย', cls: 's-transit' },
   { key: 'returned', label: 'ส่งคืน', cls: 's-returned' },
+  { key: 'pending', label: 'Pending (รอฝากส่ง)', cls: 's-pending' },
 ];
-const LEGEND_ORDER = ['received', 'in_transit', 'delivered', 'returned'];
+const LEGEND_ORDER = ['pending', 'received', 'in_transit', 'delivered', 'returned'];
 const TH_MONTHS = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
 
 function parseDay(value) {
@@ -70,6 +71,7 @@ export default function DailyStatusChart({ days = [], startDate, endDate }) {
       out.push({
         date: k,
         dateObj: new Date(d),
+        pending: row.pending || 0,
         received: row.received || 0,
         in_transit: row.in_transit || 0,
         delivered: row.delivered || 0,
@@ -81,9 +83,9 @@ export default function DailyStatusChart({ days = [], startDate, endDate }) {
   }, [days, startDate, endDate]);
 
   const totals = useMemo(() => {
-    const t = { received: 0, in_transit: 0, delivered: 0, returned: 0, total: 0 };
+    const t = { pending: 0, received: 0, in_transit: 0, delivered: 0, returned: 0, total: 0 };
     series.forEach((d) => SERIES.forEach((s) => { t[s.key] += d[s.key]; }));
-    t.total = t.received + t.in_transit + t.delivered + t.returned;
+    t.total = t.pending + t.received + t.in_transit + t.delivered + t.returned;
     return t;
   }, [series]);
 
@@ -115,7 +117,7 @@ export default function DailyStatusChart({ days = [], startDate, endDate }) {
     <div className="dash-section-card daily-chart-card">
       <div className="dash-section-title-row">
         <div className="dash-section-title-group">
-          <h3 className="dash-section-title">จำนวนพัสดุรายวัน (ตามวันที่รับฝาก)</h3>
+          <h3 className="dash-section-title">จำนวนพัสดุรายวัน (ตามวันที่รับฝาก{totals.pending > 0 ? ' / วันที่ส่งข้อมูลสำหรับ Pending' : ''})</h3>
           <span className="dash-section-sub">รวม {totals.total.toLocaleString('th-TH')} ชิ้น · {series.length} วัน</span>
         </div>
         <button type="button" className="daily-chart-toggle" onClick={() => setShowTable((v) => !v)}>
@@ -124,7 +126,7 @@ export default function DailyStatusChart({ days = [], startDate, endDate }) {
       </div>
 
       <div className="daily-chart-legend" role="list">
-        {LEGEND_ORDER.map((k) => {
+        {LEGEND_ORDER.filter((k) => k !== 'pending' || totals.pending > 0).map((k) => {
           const s = SERIES.find((x) => x.key === k);
           return (
             <span key={k} className="daily-legend-item" role="listitem">

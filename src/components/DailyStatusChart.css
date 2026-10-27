@@ -4,6 +4,7 @@
   --s-transit: #d97706;
   --s-delivered: #059669;
   --s-returned: #e11d48;
+  --s-pending: #94a3b8;
   --chart-ink: #334155;
   --chart-muted: #64748b;
   --chart-grid: rgba(15, 23, 42, 0.07);
@@ -63,6 +64,7 @@
 .s-transit { background: var(--s-transit); fill: var(--s-transit); }
 .s-delivered { background: var(--s-delivered); fill: var(--s-delivered); }
 .s-returned { background: var(--s-returned); fill: var(--s-returned); }
+.s-pending { background: var(--s-pending); fill: var(--s-pending); }
 
 .daily-chart-frame { position: relative; }
 

@@ -157,9 +157,20 @@ export function getDeliveryStatusInfo(item) {
     };
   }
 
-  // 3. Received / รับฝากแล้ว (initial deposit checkpoint)
+  // 2b. Pending: e-Parcel order created (status 1 "ผู้ฝากสร้างใบฝากส่งเข้าระบบแล้ว"), not deposited yet
+  if (item.status_key === 'pending' || /สร้างใบฝาก/.test(desc) || (code === '1' && !/รับฝาก/.test(desc))) {
+    return {
+      key: 'pending',
+      label: 'Pending',
+      smartLabel: 'Pending (รอฝากส่ง)',
+      icon: '⏳',
+      className: 'awaiting'
+    };
+  }
+
+  // 3. Received / รับฝากแล้ว (e-Parcel order status 2 "ปณ.ต้นทางรับฝากแล้ว")
   if (
-    code === '1' || code === '001' || code.toLowerCase() === 'received' ||
+    code === '2' || code.toLowerCase() === 'received' ||
     /รับฝากเข้าระบบ|รับฝากแล้ว|^รับฝาก$/i.test(desc) ||
     item.status_key === 'received' || item.status_label === 'รับฝากแล้ว'
   ) {
@@ -591,6 +602,8 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
       list = list.filter((r) => getDeliveryStatusInfo(r).key === 'returned');
     } else if (filterTab === 'received') {
       list = list.filter((r) => getDeliveryStatusInfo(r).key === 'received');
+    } else if (filterTab === 'pending') {
+      list = list.filter((r) => getDeliveryStatusInfo(r).key === 'pending');
     }
 
     if (queryBarcodes.length > 0) {
@@ -803,6 +816,10 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
   const receivedCount = reportData?.records
     ? reportData.records.filter((r) => getDeliveryStatusInfo(r).key === 'received').length
     : (summary.received_count || 0);
+
+  const pendingDepositCount = reportData?.records
+    ? reportData.records.filter((r) => getDeliveryStatusInfo(r).key === 'pending').length
+    : (summary.pending_deposit_count || 0);
 
   // Delivered records helpers for batch e-AR download
   const deliveredRecords = useMemo(() => {
@@ -1196,6 +1213,9 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
               <div className="stat-value">
                 {summary.total_items} <span className="stat-unit">ฉบับ</span>
               </div>
+              {pendingDepositCount > 0 && (
+                <div className="stat-sub-pending">รวม Pending (รอฝากส่ง) {pendingDepositCount} ชิ้น</div>
+              )}
             </div>
           </div>
 
@@ -1246,6 +1266,17 @@ export default function DepositReportView({ currentPerson, onSyncRecords, onSwit
               >
                 ทั้งหมด ({reportData?.records?.length || 0})
               </button>
+              {pendingDepositCount > 0 && (
+                <button
+                  type="button"
+                  className={`btn-filter-tab ${filterTab === 'pending' ? 'active' : ''}`}
+                  onClick={() => setFilterTab('pending')}
+                  title="ส่งข้อมูล e-Parcel แล้ว แต่ยังไม่นำมาฝากที่ ปณ."
+                >
+                  <span className="dot-slate"></span>
+                  Pending ({pendingDepositCount})
+                </button>
+              )}
               <button
                 type="button"
                 className={`btn-filter-tab ${filterTab === 'received' ? 'active' : ''}`}

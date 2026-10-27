@@ -3,6 +3,7 @@ import { fetchDashboardReport } from '../utils/api';
 import ThaiDateInput from './ThaiDateInput';
 import ReasonDetailModal from './ReasonDetailModal';
 import DailyStatusChart from './DailyStatusChart';
+import PostofficePendingCard from './PostofficePendingCard';
 import { THAILAND_VIEWBOX, THAILAND_PROVINCES } from '../data/thailandMapData';
 import { APP_VERSION } from '../config';
 import './DashboardView.css';
@@ -549,7 +550,7 @@ export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
     {
       label: 'รายการทั้งหมด',
       value: totalItems,
-      unit: 'ฉบับ',
+      unit: summary.pending_deposit_count ? `ฉบับ (Pending ${summary.pending_deposit_count})` : 'ฉบับ',
       valueColorClass: '',
       className: 'icon-total',
       icon: (
@@ -746,6 +747,11 @@ export default function DashboardView({ currentPerson, onSwitchToWorkspace }) {
                 </div>
               ))}
             </div>
+
+            {/* 1a. Post office accounts: parcels sent to e-Parcel but not deposited yet */}
+            {String(currentPerson?.Status || '').toUpperCase() === 'POSTOFFICE' && (
+              <PostofficePendingCard currentPerson={currentPerson} />
+            )}
 
             {/* 1b. Daily stacked bar chart (parcels per deposit day by status) */}
             <DailyStatusChart
